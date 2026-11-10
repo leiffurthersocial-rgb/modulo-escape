@@ -21,6 +21,9 @@ export interface GameEvents {
   'audio:cue': { name: string; x?: number; z?: number; volume?: number };
   'settings:changed': { key: string };
   'quality:changed': { preset: string };
+  'perf:suggest': { reason: 'frametime' | 'battery' };
+  'quality:autoLowered': { to: string };
+  'mood:changed': { mood: number };
 }
 
 type Handler<T> = (payload: T) => void;

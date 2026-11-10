@@ -56,3 +56,66 @@ export function boxesToGeometry(boxes: AABB[], uvScale = 0.5): THREE.BufferGeome
   g.computeBoundingSphere();
   return g;
 }
+
+export type SurfaceFn = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => [number, number, number];
+
+/**
+ * Like boxesToGeometry, but large faces are subdivided (≤ maxSeg metres) and every vertex gets a
+ * `surface` attribute from `fn` (baked AO, moss mask, wet mask). Faces smaller than ~0.5 m stay single quads.
+ */
+export function boxesToSurfaceGeometry(boxes: AABB[], fn: SurfaceFn, maxSeg = 1, uvScale = 0.5): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const surf: number[] = [];
+  const idx: number[] = [];
+  for (const b of boxes) {
+    for (const f of FACES) {
+      // Face corners c0..c3; edges along (c1-c0) and (c3-c0).
+      const P = f.corners.map((c) => [c[0] ? b.max[0] : b.min[0], c[1] ? b.max[1] : b.min[1], c[2] ? b.max[2] : b.min[2]] as const);
+      const p0 = P[0]!;
+      const p1 = P[1]!;
+      const p3 = P[3]!;
+      const e1 = [p1[0]! - p0[0]!, p1[1]! - p0[1]!, p1[2]! - p0[2]!];
+      const e2 = [p3[0]! - p0[0]!, p3[1]! - p0[1]!, p3[2]! - p0[2]!];
+      const l1 = Math.hypot(e1[0]!, e1[1]!, e1[2]!);
+      const l2 = Math.hypot(e2[0]!, e2[1]!, e2[2]!);
+      if (l1 < 1e-5 || l2 < 1e-5) continue;
+      const n1 = l1 > 0.5 ? Math.max(1, Math.ceil(l1 / maxSeg)) : 1;
+      const n2 = l2 > 0.5 ? Math.max(1, Math.ceil(l2 / maxSeg)) : 1;
+      const base = pos.length / 3;
+      for (let j = 0; j <= n2; j++) {
+        for (let i = 0; i <= n1; i++) {
+          const s = i / n1;
+          const t = j / n2;
+          const x = p0[0]! + e1[0]! * s + e2[0]! * t;
+          const y = p0[1]! + e1[1]! * s + e2[1]! * t;
+          const z = p0[2]! + e1[2]! * s + e2[2]! * t;
+          pos.push(x, y, z);
+          nor.push(...f.n);
+          const [u, w] = f.n[0] !== 0 ? [z, y] : f.n[1] !== 0 ? [x, z] : [x, y];
+          uv.push(u * uvScale, w * uvScale);
+          surf.push(...fn(x, y, z, f.n[0], f.n[1], f.n[2]));
+        }
+      }
+      for (let j = 0; j < n2; j++) {
+        for (let i = 0; i < n1; i++) {
+          const a = base + j * (n1 + 1) + i;
+          const b2 = a + 1;
+          const c = a + n1 + 2;
+          const d = a + n1 + 1;
+          idx.push(a, b2, c, a, c, d);
+        }
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('surface', new THREE.Float32BufferAttribute(surf, 3));
+  g.setIndex(pos.length / 3 < 65536 ? new THREE.Uint16BufferAttribute(idx, 1) : new THREE.Uint32BufferAttribute(idx, 1));
+  g.computeBoundingBox();
+  g.computeBoundingSphere();
+  return g;
+}

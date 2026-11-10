@@ -16,6 +16,7 @@ import { CELL_SIZE, MAX_ATTEMPTS, SIZE_CONFIG, STOREY_HEIGHT, type SizeConfig } 
 import { DIR, OPPOSITE, SIDES, cellIndex, getEdge, inBounds, isPassable, setEdge } from './grid.ts';
 import { buildNav, bfs } from './nav.ts';
 import { placeProps, placeLights, pickSpawnPoints } from './props.ts';
+import { dressLevel } from './dressing.ts';
 import type { Cell, EdgeKind, LevelData, LevelSize, Room, Side } from './types.ts';
 
 export class GenerationError extends Error {}
@@ -136,6 +137,7 @@ function tryGenerate(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
     lights: [],
     spawnPoints: [],
     nav: { adj: [], distToExit: [] },
+    dressing: { damp: [], decals: [], vines: [], roots: [], trees: [], shrubs: [], roomLabels: [] },
     stats: {
       attempts: attempt + 1,
       walkable: walkable.length,
@@ -151,6 +153,7 @@ function tryGenerate(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
   level.props = placeProps(level, streamRng(seed, 'props', attempt));
   level.lights = placeLights(level, streamRng(seed, 'lights', attempt));
   level.spawnPoints = pickSpawnPoints(level, streamRng(seed, 'spawns', attempt));
+  level.dressing = dressLevel(level, attempt);
   return level;
 }
 

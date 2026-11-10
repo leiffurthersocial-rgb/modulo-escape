@@ -7,7 +7,7 @@ async function main() {
   const ui = new UI(root);
   const { seed, size } = readUrlParams();
   ui.setLoadingText(`Generating building ${seed}…`);
-  const game = await createGame(root, seed, size, { onState: (s, g) => ui.onState(s, g) });
+  const game = await createGame(root, seed, size, { onState: (s, g) => ui.onState(s, g), onDebugMenu: () => ui.toggleDebugMenu() }, (msg) => ui.setLoadingText(msg));
   ui.attach(game);
   game.renderFrame(0);
   const w = window as unknown as { __game: unknown };

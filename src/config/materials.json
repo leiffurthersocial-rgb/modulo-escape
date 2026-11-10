@@ -1,0 +1,22 @@
+{
+  "picks": {
+    "concrete_wall": "concrete_wall_006",
+    "concrete_floor": "concrete_floor_worn_001",
+    "plaster": "worn_mossy_plasterwall",
+    "rusted_metal": "rusty_metal_02",
+    "wet_floor": "dirty_concrete",
+    "moss_ground": "Moss002",
+    "brick": "worn_brick_wall",
+    "rubble": "concrete_debris"
+  },
+  "tuning": {
+    "concrete_wall": { "scale": 0.4 },
+    "concrete_floor": { "scale": 0.33 },
+    "plaster": { "scale": 0.45 },
+    "rusted_metal": { "scale": 1.0 },
+    "wet_floor": { "scale": 0.33 },
+    "moss_ground": { "scale": 0.5 },
+    "brick": { "scale": 0.6 },
+    "rubble": { "scale": 0.8 }
+  }
+}

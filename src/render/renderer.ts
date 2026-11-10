@@ -31,7 +31,7 @@ export function createRenderer(canvasParent: HTMLElement, opts: RenderOptions): 
 }
 
 /** Keeps renderer and camera sized to the canvas' parent. */
-export function bindResize(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, el: HTMLElement): () => void {
+export function bindResize(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, el: HTMLElement, onResize?: (w: number, h: number) => void): () => void {
   const apply = () => {
     const w = el.clientWidth || window.innerWidth;
     const h = el.clientHeight || window.innerHeight;
@@ -40,6 +40,7 @@ export function bindResize(renderer: THREE.WebGLRenderer, camera: THREE.Perspect
     renderer.domElement.style.height = '100%';
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    onResize?.(renderer.domElement.width, renderer.domElement.height);
   };
   apply();
   const ro = new ResizeObserver(apply);

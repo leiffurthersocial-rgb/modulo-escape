@@ -81,8 +81,28 @@ export class Player {
     bus.emit('player:flashlight', { on });
   }
 
+  setFlashlightShadows(on: boolean) {
+    this.flashlight.castShadow = on;
+    if (on) {
+      this.flashlight.shadow.mapSize.set(512, 512);
+      this.flashlight.shadow.bias = -0.0008;
+      this.flashlight.shadow.camera.near = 0.2;
+      this.flashlight.shadow.camera.far = 25;
+    }
+  }
+
   get flashlightOn(): boolean {
     return this.flashlight.intensity > 0;
+  }
+
+  /** Debug/test helper: move the player to a floor position and set the view. */
+  teleport(x: number, z: number, yaw: number, pitch = 0) {
+    this.body.setTranslation({ x, y: this.height / 2 + 0.02, z }, true);
+    this.body.setNextKinematicTranslation({ x, y: this.height / 2 + 0.02, z });
+    this.feet.set(x, 0, z);
+    this.prevFeet.copy(this.feet);
+    this.yaw = yaw;
+    this.pitch = pitch;
   }
 
   /** Apply look deltas (pixels). */

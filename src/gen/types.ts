@@ -81,6 +81,8 @@ export interface LevelStats {
   pathLength: number;
 }
 
+import type { Dressing } from './dressing.ts';
+
 export interface LevelData {
   version: 1;
   seed: string;
@@ -106,4 +108,6 @@ export interface LevelData {
   spawnPoints: { x: number; z: number }[];
   nav: NavGraph;
   stats: LevelStats;
+  /** Decals, damp map, vines, roots, trees, shrubs (separate RNG streams). */
+  dressing: Dressing;
 }

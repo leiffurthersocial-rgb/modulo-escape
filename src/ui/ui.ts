@@ -5,7 +5,9 @@
 import licenses from '../../assets/LICENSES.json';
 import { bus } from '../core/events.ts';
 import type { Game, GameState } from '../game/game.ts';
-import { ACTIONS, DEFAULT_BINDINGS, keyLabel, resetSettings, saveSettings, settings, type Action } from '../game/settings.ts';
+import { ACTIONS, DEFAULT_BINDINGS, keyLabel, resetSettings, resolvedQuality, saveSettings, settings, type Action } from '../game/settings.ts';
+import type { PresetName, Quality } from '../render/quality.ts';
+import { surfaceUniforms } from '../render/surface.ts';
 import type { LevelSize } from '../gen/types.ts';
 import { randomSeed } from '../core/rng.ts';
 
@@ -88,6 +90,8 @@ export class UI {
     this.el.append(this.toastEl);
     this.show(this.titleScreen);
     bus.on('exit:opened', () => this.toast('The gate grinds open…'));
+    bus.on('quality:autoLowered', ({ to }) => this.toast(`Running slow: graphics lowered to ${to}`, 3000));
+    bus.on('perf:suggest', ({ reason }) => this.suggestBattery(reason));
     if (game.touch.enabled && game.input.pointerLockSupported === false) this.toast('Touch controls enabled (change in Settings)', 3500);
     else if (game.touch.enabled) this.toast('Touch device detected: touch controls on (change in Settings)', 3500);
   }
@@ -112,6 +116,34 @@ export class UI {
       this.show(this.winScreen);
     }
     if (state !== 'playing') cancelAnimationFrame(this.rafTimer);
+  }
+
+  private suggestBattery(reason: 'frametime' | 'battery') {
+    if (settings.graphics.preset === 'battery') return;
+    const box = h(
+      'div',
+      { class: 'panel suggest' },
+      h('p', {}, reason === 'battery' ? 'Battery is low.' : 'Frame rate has been low for a while.'),
+      h('p', {}, 'Switch to Battery Saver? (30 fps, lighter effects; change any time in Settings → Graphics)'),
+    );
+    const close = () => box.remove();
+    box.append(
+      h(
+        'div',
+        { class: 'row' },
+        h('button', {
+          class: 'primary',
+          onclick: () => {
+            settings.graphics.preset = 'battery';
+            saveSettings('graphics');
+            close();
+          },
+        }, 'Battery Saver'),
+        h('button', { onclick: close }, 'Not now'),
+      ),
+    );
+    this.el.append(box);
+    setTimeout(close, 15000);
   }
 
   toast(msg: string, ms = 2200) {
@@ -341,20 +373,17 @@ export class UI {
         }, 'Default keys'),
       ),
     );
-    const tabGeneral = h('button', { class: 'active' }, 'General');
-    const tabKeys = h('button', {}, 'Keys');
-    tabGeneral.onclick = () => {
-      general.hidden = false;
-      controls.hidden = true;
-      tabGeneral.classList.add('active');
-      tabKeys.classList.remove('active');
-    };
-    tabKeys.onclick = () => {
-      general.hidden = true;
-      controls.hidden = false;
-      tabKeys.classList.add('active');
-      tabGeneral.classList.remove('active');
-    };
+    const graphics = this.buildGraphics();
+    graphics.hidden = true;
+    const panes: [string, HTMLElement][] = [['General', general], ['Graphics', graphics], ['Keys', controls]];
+    const tabs = panes.map(([label, pane], i) => {
+      const b = h('button', { class: i === 0 ? 'active' : '' }, label);
+      b.onclick = () => {
+        panes.forEach(([, p], j) => (p.hidden = j !== i));
+        tabs.forEach((t, j) => t.classList.toggle('active', j === i));
+      };
+      return b;
+    });
     return h(
       'div',
       { class: 'screen', hidden: true },
@@ -362,10 +391,10 @@ export class UI {
         'div',
         { class: 'panel' },
         h('h2', {}, 'Settings'),
-        h('div', { class: 'tabs' }, tabGeneral, tabKeys),
+        h('div', { class: 'tabs' }, ...tabs),
         general,
+        graphics,
         controls,
-        h('p', {}, 'Graphics presets and Battery Saver arrive with the real assets (Phase 2).'),
         h(
           'div',
           { class: 'row' },
@@ -380,6 +409,117 @@ export class UI {
       ),
     );
   }
+
+  private buildGraphics(): HTMLElement {
+    const g = settings.graphics;
+    const wrap = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
+    const render = () => {
+      const q = resolvedQuality();
+      const preset = h('select', { id: 'preset-select' });
+      for (const [v, label] of [['ultra', 'Ultra'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low'], ['battery', 'Battery Saver'], ['custom', 'Custom']] as const) {
+        preset.append(h('option', { value: v, selected: g.preset === v }, label));
+      }
+      preset.onchange = () => {
+        const v = preset.value as PresetName;
+        if (v === 'custom') {
+          g.customBase = g.preset === 'custom' ? g.customBase : (g.preset as Exclude<PresetName, 'custom'>);
+          g.custom = {};
+        }
+        g.preset = v;
+        saveSettings('graphics');
+        render();
+      };
+      const custom = g.preset === 'custom';
+      const set = <K extends keyof Quality>(k: K, v: Quality[K]) => {
+        g.custom[k] = v;
+        saveSettings('graphics');
+        render();
+      };
+      const sel = <K extends keyof Quality>(k: K, opts: [Quality[K], string][]) => {
+        const e = h('select', { disabled: !custom });
+        for (const [v, label] of opts) e.append(h('option', { value: String(v), selected: q[k] === v }, label));
+        e.onchange = () => set(k, opts.find(([v]) => String(v) === e.value)![0]);
+        return e;
+      };
+      const tick = (k: keyof Quality) => {
+        const e = h('input', { type: 'checkbox', checked: Boolean(q[k]), disabled: !custom, style: 'width:22px;height:22px;accent-color:var(--accent)' });
+        e.onchange = () => set(k, e.checked as never);
+        return e;
+      };
+      const wd = h('input', { type: 'checkbox', checked: g.watchdog, style: 'width:22px;height:22px;accent-color:var(--accent)' });
+      wd.onchange = () => {
+        g.watchdog = wd.checked;
+        saveSettings('graphics');
+      };
+      const row = (label: string, el: HTMLElement) => [h('label', {}, label), el];
+      wrap.replaceChildren(
+        h('div', { class: 'field' }, ...row('Preset', preset), ...row('Auto-lower when slow (watchdog)', wd)),
+        h('p', {}, custom ? 'Custom: every option below is yours.' : 'Pick Custom to change individual options. Texture size and sky resolution apply on the next building you load.'),
+        h(
+          'div',
+          { class: 'field' },
+          ...row('Render scale (max pixel ratio)', sel('pixelRatioCap', [[2, '2.0'], [1.5, '1.5'], [1.25, '1.25'], [1, '1.0'], [0.75, '0.75'], [0.6, '0.6']])),
+          ...row('FPS cap', sel('fpsCap', [[0, 'none'], [60, '60'], [30, '30']])),
+          ...row('Sun shadows', sel('shadowMapSize', [[4096, '4096'], [2048, '2048'], [1024, '1024'], [512, '512'], [0, 'off']])),
+          ...row('Flashlight shadows', tick('flashlightShadows')),
+          ...row('Post-processing', tick('post')),
+          ...row('Ambient occlusion', sel('ao', [['full', 'full res'], ['half', 'half res'], ['off', 'off (baked only)']])),
+          ...row('Bloom', tick('bloom')),
+          ...row('Light shafts', sel('lightShafts', [['full', 'full'], ['cards', 'simple'], ['off', 'off']])),
+          ...row('Anti-aliasing', sel('antialias', [['smaa', 'SMAA'], ['fxaa', 'FXAA'], ['none', 'off']])),
+          ...row('Depth of field', tick('dof')),
+          ...row('Textures', sel('textureTier', [['2k', '2k'], ['1k', '1k'], ['512', '512']])),
+          ...row('Anisotropy', sel('anisotropy', [[16, '16×'], [8, '8×'], [4, '4×'], [2, '2×'], [1, 'off']])),
+          ...row('Sky (HDRI)', sel('hdriRes', [['2k', '2k'], ['1k', '1k']])),
+          ...row('Draw distance', sel('chunkRadius', [[3, 'far'], [2, 'medium'], [1, 'near']])),
+          ...row('Vegetation', sel('vegetation', [[1, '100%'], [0.7, '70%'], [0.5, '50%'], [0.3, '30%']])),
+          ...row('Decals', sel('decals', [[1, 'all'], [0.85, 'most'], [0.5, 'few']])),
+          ...row('Particles', sel('particles', [[1, '100%'], [0.7, '70%'], [0.5, '50%'], [0.25, '25%'], [0, 'off']])),
+          ...row('Ceiling lights', sel('lightPool', [[8, '8'], [6, '6'], [4, '4'], [3, '3'], [2, '2']])),
+          ...row('Physics rate', sel('physicsHz', [[60, '60 Hz'], [30, '30 Hz']])),
+        ),
+      );
+    };
+    render();
+    return wrap;
+  }
+
+  /** F4 debug menu: mood (sunlit ↔ overcast), wetness and moss overrides. */
+  toggleDebugMenu() {
+    if (this.debugMenu) {
+      this.debugMenu.remove();
+      this.debugMenu = null;
+      return;
+    }
+    const slider = (label: string, value: number, on: (v: number) => void) => {
+      const val = h('span', { class: 'val' }, value.toFixed(2));
+      const input = h('input', { type: 'range', min: '0', max: '1', step: '0.01', value: String(value) });
+      input.addEventListener('input', () => {
+        val.textContent = Number(input.value).toFixed(2);
+        on(Number(input.value));
+      });
+      return [h('label', {}, label), h('div', { class: 'row', style: 'flex-wrap:nowrap' }, input, val)];
+    };
+    this.debugMenu = h(
+      'div',
+      { class: 'panel debug-menu' },
+      h('h2', {}, 'Debug'),
+      h(
+        'div',
+        { class: 'field' },
+        ...slider('Mood: sunlit ↔ overcast', settings.graphics.mood, (v) => {
+          settings.graphics.mood = v;
+          saveSettings('mood');
+        }),
+        ...slider('Wetness override', surfaceUniforms.uWetness.value, (v) => (surfaceUniforms.uWetness.value = v)),
+        ...slider('Moss amount', surfaceUniforms.uMoss.value, (v) => (surfaceUniforms.uMoss.value = v)),
+      ),
+      h('p', {}, 'F4 closes. Mood is saved; wetness/moss reset on reload (mood drives wetness).'),
+    );
+    this.el.append(this.debugMenu);
+  }
+
+  private debugMenu: HTMLElement | null = null;
 
   private captureKey(action: Action, slot: number, btn: HTMLButtonElement, done: () => void) {
     const g = this.game;

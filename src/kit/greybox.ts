@@ -64,7 +64,7 @@ const DW = DOOR_WIDTH / 2;
 export const KIT: Record<KitId, Box[]> = {
   floor: [box(-h, -SLAB, -h, h, 0, h, 'floor')],
   floor_cracked: [box(-h, -SLAB, -h, h, 0, h, 'floor_cracked')],
-  floor_puddle: [box(-h, -SLAB, -h, h, 0, h, 'floor'), box(-1.1, 0, -0.8, 0.9, 0.01, 1.2, 'puddle', false)],
+  floor_puddle: [box(-h, -SLAB, -h, h, 0, h, 'floor'), box(-1.75, 0, -1.75, 1.75, 0.006, 1.75, 'puddle', false)],
   ceiling: [box(-h, H, -h, h, H + SLAB, h, 'ceiling')],
   ceiling_hole: [
     // 4 slabs around a 2.0 × 2.0 m hole.

@@ -12,7 +12,8 @@ export type Action =
   | 'interact'
   | 'pause'
   | 'minimap'
-  | 'debug';
+  | 'debug'
+  | 'debugMenu';
 
 export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'forward', label: 'Move forward' },
@@ -26,6 +27,7 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'minimap', label: 'Minimap' },
   { id: 'pause', label: 'Pause' },
   { id: 'debug', label: 'Debug overlay' },
+  { id: 'debugMenu', label: 'Debug menu (mood)' },
 ];
 
 export const DEFAULT_BINDINGS: Record<Action, string[]> = {
@@ -40,7 +42,21 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   minimap: ['KeyM'],
   pause: ['Escape', 'KeyP'],
   debug: ['F3', 'Backquote'],
+  debugMenu: ['F4'],
 };
+
+import { PRESETS, defaultPreset, type PresetName, type Quality } from '../render/quality.ts';
+
+export interface GraphicsSettings {
+  preset: PresetName;
+  /** Preset the custom values started from. */
+  customBase: Exclude<PresetName, 'custom'>;
+  custom: Partial<Quality>;
+  /** Opt-in: step quality down automatically when frame time stays bad. */
+  watchdog: boolean;
+  /** 0 = sunlit, 1 = overcast. Debug menu slider. */
+  mood: number;
+}
 
 export interface Settings {
   sensitivity: number;
@@ -51,6 +67,7 @@ export interface Settings {
   minimap: boolean;
   masterVolume: number;
   bindings: Record<Action, string[]>;
+  graphics: GraphicsSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -62,7 +79,18 @@ export const DEFAULT_SETTINGS: Settings = {
   minimap: false,
   masterVolume: 0.8,
   bindings: DEFAULT_BINDINGS,
+  graphics: { preset: defaultPreset(), customBase: 'high', custom: {}, watchdog: false, mood: 0.35 },
 };
+
+/** The quality settings currently in effect. */
+export function resolvedQuality(): Quality {
+  // ?quality=low etc. overrides for this page load only (tests, bench, screenshots).
+  const forced = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('quality') : null;
+  if (forced && forced in PRESETS) return PRESETS[forced as keyof typeof PRESETS];
+  const g = settings.graphics;
+  if (g.preset === 'custom') return { ...PRESETS[g.customBase], ...g.custom, name: 'custom' };
+  return PRESETS[g.preset];
+}
 
 const KEY = 'modulo-escape.settings.v1';
 
@@ -75,6 +103,7 @@ function load(): Settings {
       ...structuredClone(DEFAULT_SETTINGS),
       ...parsed,
       bindings: { ...structuredClone(DEFAULT_BINDINGS), ...(parsed.bindings ?? {}) },
+      graphics: { ...structuredClone(DEFAULT_SETTINGS.graphics), ...(parsed.graphics ?? {}) },
     };
   } catch {
     return structuredClone(DEFAULT_SETTINGS);

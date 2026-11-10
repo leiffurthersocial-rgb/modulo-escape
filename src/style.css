@@ -166,3 +166,11 @@ button.primary:hover { background: #e7c260; }
   touch-action: none;
 }
 .tbtn.on { background: rgba(216,176,74,0.55); color: #111; }
+.debug-menu { position: absolute; top: calc(10px + var(--sat)); left: calc(260px + var(--sal)); width: 380px; z-index: 60; }
+.suggest { position: absolute; bottom: calc(20px + var(--sab)); left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 32px)); z-index: 60; }
+.field select:disabled, .field input:disabled { opacity: 0.55; }
+.lab-panel { position: absolute; top: calc(10px + var(--sat)); right: calc(10px + var(--sar)); width: min(440px, calc(100% - 20px)); max-height: calc(100% - 20px); z-index: 30; gap: 10px; }
+.lab-info { margin: 0; font-size: 12px; white-space: pre-wrap; color: var(--fg); }
+.lab-slider { display: grid; grid-template-columns: 1fr 160px; align-items: center; font-size: 13px; gap: 8px; }
+.lab-slider input { accent-color: var(--accent); }
+.lab-panel select { font: inherit; color: var(--fg); background: #222; border: 1px solid var(--panel-border); border-radius: 6px; padding: 8px; min-height: 44px; }
