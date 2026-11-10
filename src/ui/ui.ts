@@ -376,7 +376,7 @@ export class UI {
     const graphics = this.buildGraphics();
     graphics.hidden = true;
     const panes: [string, HTMLElement][] = [['General', general], ['Graphics', graphics], ['Keys', controls]];
-    const tabs = panes.map(([label, pane], i) => {
+    const tabs = panes.map(([label], i) => {
       const b = h('button', { class: i === 0 ? 'active' : '' }, label);
       b.onclick = () => {
         panes.forEach(([, p], j) => (p.hidden = j !== i));
@@ -454,7 +454,10 @@ export class UI {
       const row = (label: string, el: HTMLElement) => [h('label', {}, label), el];
       wrap.replaceChildren(
         h('div', { class: 'field' }, ...row('Preset', preset), ...row('Auto-lower when slow (watchdog)', wd)),
-        h('p', {}, custom ? 'Custom: every option below is yours.' : 'Pick Custom to change individual options. Texture size and sky resolution apply on the next building you load.'),
+        h('p', {}, custom ? 'Custom: every option below is yours.' : 'Pick Custom to change individual options.'),
+        this.game && (this.game.quality.textureTier !== q.textureTier || this.game.quality.hdriRes !== q.hdriRes)
+          ? h('div', { class: 'row' }, h('p', {}, 'Texture size / sky resolution change on reload.'), h('button', { onclick: () => location.reload() }, 'Restart to apply'))
+          : '',
         h(
           'div',
           { class: 'field' },

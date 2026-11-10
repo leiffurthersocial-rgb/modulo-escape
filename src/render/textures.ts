@@ -78,6 +78,16 @@ export class TextureLibrary {
     return p;
   }
 
+  /** Estimated GPU memory of all loaded sets (bytes). */
+  async vramEstimate(): Promise<number> {
+    let sum = 0;
+    for (const p of this.sets.values()) {
+      const s = await p;
+      if (s) sum += Math.round(s.px * s.px * 3 * 1.333);
+    }
+    return sum;
+  }
+
   setAnisotropy(a: number) {
     this.anisotropy = a;
     for (const p of this.sets.values()) {

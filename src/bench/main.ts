@@ -11,7 +11,7 @@ import { cellCenter } from '../gen/grid.ts';
 import { pathToExit } from '../gen/nav.ts';
 import { cellIndex } from '../gen/grid.ts';
 import { isLevelSize } from '../gen/config.ts';
-import { PHASE1_PRESETS, type Quality } from '../render/quality.ts';
+import { PRESETS, PRESET_ORDER, type Quality } from '../render/quality.ts';
 
 interface Result {
   preset: string;
@@ -32,8 +32,8 @@ async function main() {
   const sizeP = url.searchParams.get('size');
   const size = isLevelSize(sizeP) ? sizeP : 'medium';
   const frames = Number(url.searchParams.get('frames') ?? 600);
-  const names = (url.searchParams.get('presets') ?? 'high,medium,low,battery').split(',');
-  const presets = names.map((n) => PHASE1_PRESETS.find((p) => p.name === n)).filter((p): p is Quality => !!p);
+  const names = (url.searchParams.get('presets') ?? PRESET_ORDER.join(',')).split(',');
+  const presets = names.map((n) => PRESETS[n as keyof typeof PRESETS]).filter((p): p is Quality => !!p);
 
   const panel = document.createElement('div');
   panel.className = 'debug-overlay';
@@ -41,7 +41,8 @@ async function main() {
   panel.textContent = 'Loading…';
   root.appendChild(panel);
 
-  const game = await createGame(root, seed, size, { onState: () => {} });
+  // Textures/HDRI load once at the tier of the first preset (tier changes need a reload in-game too).
+  const game = await createGame(root, seed, size, { onState: () => {} }, (m) => (panel.textContent = m), presets[0]);
   game.overlay.toggle(false);
   const l = game.level;
   // Camera path: cell centres along the shortest path, eye height, constant speed.
@@ -71,10 +72,13 @@ async function main() {
       look.y = 1.5;
       if (look.distanceToSquared(cam.position) > 1e-4) cam.lookAt(look);
       game.env.follow(cam.position);
+      game.env.update();
       game.chunks.update(cam.position.x, cam.position.z);
       game.director.update(1 / 60);
+      game.shafts?.setIntensity(game.env.params.shafts);
+      game.dust?.update(cam.position, 0.6, game.renderer.domElement.height);
       game.renderer.info.reset();
-      game.renderer.render(game.scene, cam);
+      game.post.render(1 / 60);
       calls += game.renderer.info.render.calls;
       tris += game.renderer.info.render.triangles;
       // Frames are capped like the game would (battery saver = 30).
@@ -98,7 +102,7 @@ async function main() {
   }
 
   const ua = navigator.userAgent;
-  const report = `Modulo: Escape bench  seed=${seed} size=${size} frames=${frames}\n${ua}\n${innerWidth}x${innerHeight} dpr=${devicePixelRatio}\n\n${table(results)}`;
+  const report = `Modulo: Escape bench  seed=${seed} size=${size} frames=${frames} textures=${presets[0]!.textureTier}\n${ua}\n${innerWidth}x${innerHeight} dpr=${devicePixelRatio}\n\n${table(results)}`;
   panel.textContent = report;
   const btn = document.createElement('button');
   btn.textContent = 'Copy results';

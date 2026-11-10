@@ -76,13 +76,20 @@ export class Player {
     return this.crouching ? CROUCH_HEIGHT : STAND_HEIGHT;
   }
 
+  private flashShadows = false;
+
   setFlashlight(on: boolean) {
     this.flashlight.intensity = on ? 38 : 0;
+    // Toggling visible/castShadow would recompile every shader; instead just stop re-rendering
+    // the shadow map while the light is off (a castShadow light renders its pass even at 0).
+    this.flashlight.shadow.autoUpdate = on;
     bus.emit('player:flashlight', { on });
   }
 
   setFlashlightShadows(on: boolean) {
+    this.flashShadows = on;
     this.flashlight.castShadow = on;
+    this.flashlight.shadow.autoUpdate = this.flashlightOn;
     if (on) {
       this.flashlight.shadow.mapSize.set(512, 512);
       this.flashlight.shadow.bias = -0.0008;

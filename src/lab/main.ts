@@ -146,6 +146,8 @@ async function main() {
   const idxB: Record<string, number> = {};
   let compare = false;
   let uiHidden = new URLSearchParams(location.search).has('shot');
+  // Screenshot mode: keep moss light so floor candidates stay visible.
+  if (uiHidden) surfaceUniforms.uMoss.value = 0.2;
   const scale: Record<string, number> = {};
   for (const c of CATEGORIES) {
     const ids = lib.idsInCategory(c);

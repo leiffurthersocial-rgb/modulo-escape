@@ -28,6 +28,8 @@ export interface Quality {
   anisotropy: number;
   hdriRes: '1k' | '2k';
   chunkRadius: number;
+  /** Chunks / outdoor tiles beyond this distance (m) are not drawn. */
+  viewDistance: number;
   vegetation: number;
   decals: number;
   particles: number;
@@ -39,7 +41,7 @@ const base: Omit<Quality, 'name'> = {
   pixelRatioCap: 1.5,
   fpsCap: 60,
   shadowMapSize: 2048,
-  shadowDistance: 26,
+  shadowDistance: 20,
   flashlightShadows: true,
   ao: 'half',
   bloom: true,
@@ -50,7 +52,8 @@ const base: Omit<Quality, 'name'> = {
   textureTier: '2k',
   anisotropy: 8,
   hdriRes: '2k',
-  chunkRadius: 3,
+  chunkRadius: 2,
+  viewDistance: 56,
   vegetation: 1,
   decals: 1,
   particles: 0.7,
@@ -59,7 +62,7 @@ const base: Omit<Quality, 'name'> = {
 };
 
 export const PRESETS: Record<Exclude<PresetName, 'custom'>, Quality> = {
-  ultra: { ...base, name: 'ultra', pixelRatioCap: 2, fpsCap: 0, shadowMapSize: 4096, shadowDistance: 34, ao: 'full', anisotropy: 16, particles: 1, lightPool: 8 },
+  ultra: { ...base, name: 'ultra', viewDistance: 72, pixelRatioCap: 2, fpsCap: 0, shadowMapSize: 4096, shadowDistance: 34, ao: 'full', anisotropy: 16, particles: 1, lightPool: 8 },
   high: { ...base, name: 'high' },
   medium: {
     ...base,
@@ -72,6 +75,7 @@ export const PRESETS: Record<Exclude<PresetName, 'custom'>, Quality> = {
     textureTier: '1k',
     anisotropy: 4,
     chunkRadius: 2,
+    viewDistance: 40,
     vegetation: 0.7,
     decals: 0.85,
     particles: 0.5,
@@ -91,7 +95,8 @@ export const PRESETS: Record<Exclude<PresetName, 'custom'>, Quality> = {
     textureTier: '1k',
     anisotropy: 2,
     hdriRes: '1k',
-    chunkRadius: 2,
+    chunkRadius: 1,
+    viewDistance: 30,
     vegetation: 0.5,
     decals: 0.5,
     particles: 0.25,
@@ -114,6 +119,7 @@ export const PRESETS: Record<Exclude<PresetName, 'custom'>, Quality> = {
     anisotropy: 1,
     hdriRes: '1k',
     chunkRadius: 1,
+    viewDistance: 20,
     vegetation: 0.3,
     decals: 0.5,
     particles: 0,

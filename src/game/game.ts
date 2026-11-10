@@ -85,6 +85,7 @@ export class Game {
   readonly touch: TouchControls;
   private offs: (() => void)[] = [];
   private openness: number[];
+  texVram = 0;
   /** Eye adaptation: current exposure multiplier, eased towards the target per cell. */
   private adapt = 1;
 
@@ -160,7 +161,7 @@ export class Game {
         look: this.input.lookMode,
         quality: `${this.quality.name}${this.post.enabled ? ' +post' : ''} tex ${this.quality.textureTier}`,
         mood: this.env.mood.toFixed(2),
-        assets: this.assets.textured ? 'textured' : 'greybox',
+        assets: this.assets.textured ? `textured, tex VRAM ≈ ${(this.texVram / 1048576).toFixed(0)} MB` : 'greybox',
         seed: `${level.seed} (${level.size})`,
       };
     };
@@ -172,6 +173,7 @@ export class Game {
     this.autopilot = new Autopilot(this);
     this.director = new AmbienceDirector(this.scene, level, quality.lightPool);
     this.applyQuality(quality, true);
+    void textures.vramEstimate().then((v) => (this.texVram = v));
     this.minimap = new Minimap(root, level);
     this.minimap.setVisible(settings.minimap);
     this.touch = new TouchControls(root, this.input, () => this.setState('paused'));
@@ -186,6 +188,12 @@ export class Game {
       }),
     );
     document.addEventListener('visibilitychange', this.onVisibility);
+    // iPadOS may drop the WebGL context under memory pressure: rebuild the same seed.
+    renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.stop();
+      setTimeout(() => location.reload(), 300);
+    });
     bus.emit('level:loaded', { level });
   }
 
@@ -246,6 +254,8 @@ export class Game {
     this.player.setFlashlightShadows(q.flashlightShadows);
     this.textures.setAnisotropy(q.anisotropy);
     this.chunks.radius = q.chunkRadius;
+    this.outdoors.viewDistance = q.viewDistance;
+    this.chunks.viewDistance = q.viewDistance;
     const contentChanged = initial || prev.decals !== q.decals || prev.vegetation !== q.vegetation;
     this.chunks.opts = { decals: q.decals, vegetation: q.vegetation };
     if (contentChanged && !initial) this.chunks.rebuildAll(this.player.feet.x, this.player.feet.z);
@@ -357,6 +367,7 @@ export class Game {
     this.env.update();
     this.env.follow(cam);
     this.chunks.update(cam.x, cam.z);
+    this.outdoors.update(cam);
     const shaftLevel = this.env.params.shafts;
     this.shafts?.setIntensity(shaftLevel);
     this.dust?.update(cam, 0.25 + shaftLevel * 0.75, this.renderer.domElement.height);
@@ -368,6 +379,8 @@ export class Game {
     this.adapt += (target - this.adapt) * Math.min(1, dt * 1.5);
     if (dt === 0) this.adapt = target;
     this.renderer.toneMappingExposure = this.env.params.exposure * this.adapt;
+    // Indoor air is lit by what comes in: darken the fog in enclosed spaces.
+    this.env.fog.color.copy(this.env.params.fogColor).multiplyScalar(THREE.MathUtils.clamp(0.12 + open * 0.75, 0.12, 1));
     this.renderer.info.reset();
     this.post.render(dt);
     this.overlay.frame(this.renderer);

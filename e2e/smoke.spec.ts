@@ -10,11 +10,12 @@ function watchErrors(page: Page): string[] {
   return errors;
 }
 
-const ready = (page: Page) => page.waitForFunction(() => (window as unknown as { __game?: { ready: boolean } }).__game?.ready, null, { timeout: 60_000 });
+const ready = (page: Page) => page.waitForFunction(() => (window as unknown as { __game?: { ready: boolean } }).__game?.ready, null, { timeout: 180_000 });
+// CI renders on the CPU: use light presets so frames come back in reasonable time.
 
 test('loads a fixed seed, enters the building, no console errors', async ({ page }, info) => {
   const errors = watchErrors(page);
-  await page.goto('/?seed=kzu&size=small');
+  await page.goto('/?seed=kzu&size=small&quality=low');
   await ready(page);
   await expect(page.locator('#btn-enter')).toBeVisible();
   await page.screenshot({ path: `docs/screenshots/${info.project.name}-title.png` });
@@ -38,7 +39,7 @@ test('loads a fixed seed, enters the building, no console errors', async ({ page
 });
 
 test('same seed builds the same level in the browser', async ({ page }) => {
-  await page.goto('/?seed=determinism&size=medium');
+  await page.goto('/?seed=determinism&size=medium&quality=battery');
   await ready(page);
   const a = await page.evaluate(() => JSON.stringify((window as any).__game.level.cells));
   await page.reload();
@@ -53,7 +54,7 @@ test('autopilot escapes a small building and sees the win screen', async ({ page
   const errors = watchErrors(page);
   // Software rendering in CI is slow and sim time is capped per frame: keep the canvas small.
   await page.setViewportSize({ width: 640, height: 400 });
-  await page.goto('/?seed=kzu&size=small');
+  await page.goto('/?seed=kzu&size=small&quality=battery');
   await ready(page);
   await page.click('#btn-enter');
   await page.evaluate(() => ((window as any).__game.game.autopilot.active = true));
@@ -66,10 +67,22 @@ test('autopilot escapes a small building and sees the win screen', async ({ page
 test('bench route produces results', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'desktop only');
   const errors = watchErrors(page);
-  await page.goto('/bench/?frames=30&presets=medium,battery');
-  await page.waitForFunction(() => (window as any).__bench?.done, null, { timeout: 120_000 });
+  await page.goto('/bench/?frames=20&presets=low,battery');
+  test.setTimeout(300_000);
+  await page.waitForFunction(() => (window as any).__bench?.done, null, { timeout: 280_000 });
   const results = await page.evaluate(() => (window as any).__bench.results as { preset: string; avgMs: number }[]);
-  expect(results.map((r) => r.preset)).toEqual(['medium', 'battery']);
+  expect(results.map((r) => r.preset)).toEqual(['low', 'battery']);
   expect(results.every((r) => r.avgMs > 0)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('texture lab loads and lists candidates', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'desktop only');
+  test.setTimeout(300_000);
+  const errors = watchErrors(page);
+  await page.goto('/lab/?quality=battery');
+  await page.waitForFunction(() => (window as any).__lab?.ready, null, { timeout: 280_000 });
+  const n = await page.evaluate(() => (window as any).__lab.candidates('concrete_wall').length as number);
+  expect(n).toBeGreaterThanOrEqual(8);
   expect(errors).toEqual([]);
 });

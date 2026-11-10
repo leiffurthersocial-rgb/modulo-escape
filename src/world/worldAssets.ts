@@ -92,7 +92,7 @@ export class WorldAssets {
 
     opts.onProgress?.('Painting decals…');
     const main = buildMainAtlas(opts.decalRes);
-    const plate = buildPlateAtlas(labels, Math.max(128, opts.decalRes));
+    const plate = buildPlateAtlas(labels, Math.min(256, Math.max(128, opts.decalRes)));
     const foliage = buildFoliageAtlas(opts.decalRes * 4);
     a.owned.push(main, plate, foliage);
     const decal = (map: THREE.Texture) =>

@@ -72,7 +72,7 @@ export class LightShafts {
           float edge = smoothstep(0.0, 0.3, vUv.x) * smoothstep(1.0, 0.7, vUv.x);
           float along = smoothstep(0.0, 0.08, vUv.y) * (1.0 - smoothstep(0.55, 1.0, vUv.y));
           float streak = 0.65 + 0.35 * n(vec2(vUv.x * 9.0, vUv.y * 1.5 + uTime * 0.05));
-          float a = edge * along * streak * uIntensity * 0.075;
+          float a = edge * along * streak * uIntensity * 0.22;
           gl_FragColor = vec4(uColor * a, a);
         }`,
       transparent: true,

@@ -16,9 +16,10 @@ import { ROLE_OF, type KitRole, type WorldAssets } from './worldAssets.ts';
 import { buildRoots, buildVines } from './flora.ts';
 import { tileUv } from '../render/decalAtlas.ts';
 import { bus } from '../core/events.ts';
+import { streamRng } from '../core/rng.ts';
 import { computeOpenness } from './openness.ts';
 
-export const CHUNK_CELLS = 4;
+export const CHUNK_CELLS = 6;
 
 interface Chunk {
   key: string;
@@ -37,6 +38,8 @@ type PropEntry = { p: PropSlot; i: number };
 export class ChunkManager {
   readonly root = new THREE.Group();
   radius = 2;
+  /** Chunk groups whose nearest point is farther than this are hidden (fog covers them). */
+  viewDistance = 50;
   buildBudget = 1;
   opts: ChunkOptions = { decals: 1, vegetation: 1 };
   private chunks = new Map<string, Chunk>();
@@ -69,8 +72,9 @@ export class ChunkManager {
     for (const d of level.dressing.decals) push(this.decalsByChunk, chunkKey(d.cx, d.cz), d);
     for (const v of level.dressing.vines) push(this.vinesByChunk, chunkKey(v.cx, v.cz), v);
     for (const r of level.dressing.roots) push(this.rootsByChunk, chunkKey(r.cx, r.cz), r);
-    // Classrooms are plastered (every other room); corridors and halls stay raw concrete.
-    this.plasterRooms = new Set(level.rooms.filter((r) => r.kind === 'room' && r.id % 2 === 0).map((r) => r.id));
+    // About half the classrooms are plastered (seeded); corridors and halls stay raw concrete.
+    const mr = streamRng(level.seed, 'materials');
+    this.plasterRooms = new Set(level.rooms.filter((r) => r.kind === 'room' && mr.chance(0.5)).map((r) => r.id));
     this.surfaceFn = makeSurfaceFn(level);
   }
 
@@ -102,6 +106,14 @@ export class ChunkManager {
     want.sort((a, b) => a[2] - b[2]);
     const budget = force ? Infinity : this.buildBudget;
     for (const [x, z] of want.slice(0, budget)) this.build(x, z);
+    // Distance cull against the chunk's footprint rectangle.
+    const vd2 = this.viewDistance * this.viewDistance;
+    for (const [key, ch] of this.chunks) {
+      const [x, z] = key.split(',').map(Number) as [number, number];
+      const dx = Math.max(x * S - wx, 0, wx - (x + 1) * S);
+      const dz = Math.max(z * S - wz, 0, wz - (z + 1) * S);
+      ch.group.visible = dx * dx + dz * dz < vd2;
+    }
   }
 
   /** Rebuild everything (after quality changes that affect chunk content). */
@@ -117,6 +129,8 @@ export class ChunkManager {
       // Plaster if either side of this edge is a plastered room.
       for (const c of edgeCells(l, p)) if (c >= 0 && this.plasterRooms.has(l.cells[c]!.room)) return 'plaster';
     }
+    // Pillars and skirtings reuse the wall material (one draw call fewer each per chunk).
+    if (role === 'pillar' || role === 'trim') return 'wall';
     if (role === 'floor') {
       const c = cellIndex(l, p.cx, p.cz);
       if ((l.dressing.damp[c] ?? 0) > 0.58) return 'wetfloor';
@@ -206,7 +220,7 @@ export class ChunkManager {
     const S = this.level.cellSize;
     // Bucket instances by (geometry, material) so each pair is one draw call.
     const buckets = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material; items: { m: THREE.Matrix4; propIndex: number; fit: number }[]; shadow: boolean }>();
-    const add = (geo: THREE.BufferGeometry, mat: THREE.Material, m: THREE.Matrix4, propIndex: number, fit: number, shadow = true) => {
+    const add = (geo: THREE.BufferGeometry, mat: THREE.Material, m: THREE.Matrix4, propIndex: number, fit: number, shadow = false) => {
       const k = `${geo.uuid}|${mat.uuid}`;
       let b = buckets.get(k);
       if (!b) buckets.set(k, (b = { geo, mat, items: [], shadow }));
@@ -220,7 +234,7 @@ export class ChunkManager {
       if (p.type === 'rubble') {
         add(a.rubble[p.variant % a.rubble.length]!, a.rubbleMat, base, i, 1);
       } else if (p.type === 'collapsed_slab') {
-        add(a.slab.slab, a.kit.get('wall')!, base, i, 1);
+        add(a.slab.slab, a.kit.get('wall')!, base, i, 1, true);
         add(a.slab.rebar, a.kit.get('metal')!, base, i, 1);
       } else if (p.type === 'pipe') {
         add(a.pipe, a.kit.get('metal')!, base, i, 1);
@@ -228,7 +242,9 @@ export class ChunkManager {
         const model = models[p.variant % models.length]!;
         const fit = a.props.fitFor(p.type, model);
         const m = base.clone().multiply(scaleM.makeScale(fit, fit, fit));
-        for (const part of model.parts) add(part.geometry, part.material, m, i, fit);
+        // Only furniture-sized props cast sun shadows; small clutter would just add draw calls.
+        const shadow = p.type === 'barrel' || p.type === 'chair' || p.type === 'desk';
+        for (const part of model.parts) add(part.geometry, part.material, m, i, fit, shadow);
       } else {
         add(a.greyboxProps.get(p.type)!, a.greyboxPropMats.get(p.type)!, base, i, 1);
       }

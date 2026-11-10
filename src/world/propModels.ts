@@ -31,9 +31,9 @@ export const PROP_MODEL_IDS: Partial<Record<PropType, string[]>> = {
   desk: ['SchoolDesk_01'],
   barrel: ['Barrel_01', 'barrel_03', 'metal_trash_can'],
   debris: ['can_rusted', 'cement_bag', 'trashbag', 'old_tyre', 'plastic_crate_02', 'wooden_crate_02', 'cardboard_box_01', 'dry_branches_medium_01'],
-  vegetation: ['fern_02', 'calathea_orbifolia_01', 'weed_plant_02', 'shrub_sorrel_01'],
+  vegetation: ['fern_02', 'shrub_sorrel_01', 'fern_02', 'weed_plant_02'],
 };
-export const OUTDOOR_SHRUB_IDS = ['fern_02', 'shrub_sorrel_01', 'weed_plant_02', 'fern_02', 'calathea_orbifolia_01'];
+export const OUTDOOR_SHRUB_IDS = ['fern_02', 'shrub_sorrel_01', 'calathea_orbifolia_01'];
 export const OUTDOOR_ROCK_IDS = ['rock_07', 'rock_09'];
 
 /** Target footprint radius per prop type (m); models are scaled down if larger. */
