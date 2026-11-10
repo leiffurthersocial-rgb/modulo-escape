@@ -2,13 +2,17 @@
  * Typed event bus. Systems publish facts; others (UI, audio, the future horror
  * director) subscribe without the publisher knowing about them.
  */
-import type { LevelData, Side } from '../gen/types.ts';
+import type { Building, Side } from '../gen/types.ts';
 
 export interface GameEvents {
-  'level:loaded': { level: LevelData };
+  'level:loaded': { building: Building };
   'level:started': { seed: string };
   'level:won': { seed: string; timeMs: number };
-  'player:enteredCell': { x: number; z: number; prevX: number; prevZ: number };
+  'player:enteredCell': { floor: number; x: number; z: number; prevFloor: number; prevX: number; prevZ: number };
+  /** Something made a sound at a world position (footsteps, doors, props). Monsters listen. */
+  'noise': { x: number; y: number; z: number; floor: number; radius: number; source: 'player' | 'prop' | 'world' };
+  'player:caught': { by: string };
+  'player:stamina': { value: number; exhausted: boolean };
   'player:flashlight': { on: boolean };
   'player:sprint': { on: boolean };
   'player:crouch': { on: boolean };

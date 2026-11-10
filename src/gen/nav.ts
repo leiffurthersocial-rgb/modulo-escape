@@ -1,4 +1,4 @@
-import { DIR, SIDES, cellIndex, getEdge, inBounds, isPassable, type EdgeArrays } from './grid.ts';
+import { DIR, SIDES, cellIndex, getEdge, inBounds, isPassable, isWalkable, type EdgeArrays } from './grid.ts';
 import type { Cell, NavGraph } from './types.ts';
 
 /** Cell adjacency through passable edges, plus BFS distances to the exit (if given). */
@@ -7,13 +7,13 @@ export function buildNav(l: EdgeArrays & { cells: Cell[] }, exitIndex = -1): Nav
   for (let z = 0; z < l.height; z++) {
     for (let x = 0; x < l.width; x++) {
       const i = cellIndex(l, x, z);
-      if (l.cells[i]!.kind === 'void') continue;
+      if (!isWalkable(l.cells[i]!.kind)) continue;
       for (const s of SIDES) {
         const nx = x + DIR[s].dx;
         const nz = z + DIR[s].dz;
         if (!inBounds(l, nx, nz)) continue;
         const j = cellIndex(l, nx, nz);
-        if (l.cells[j]!.kind === 'void') continue;
+        if (!isWalkable(l.cells[j]!.kind)) continue;
         if (isPassable(getEdge(l, x, z, s))) adj[i]!.push(j);
       }
     }

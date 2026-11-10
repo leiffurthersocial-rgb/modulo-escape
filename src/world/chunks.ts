@@ -226,6 +226,17 @@ export class ChunkManager {
         add(a.slab.rebar, a.kit.get('metal')!, base, i, 1);
       } else if (p.type === 'pipe') {
         add(a.pipe, a.kit.get('metal')!, base, i, 1);
+      } else if (p.type === 'classroom_desk' && models.length) {
+        // Desk with its chair pulled up behind it (same facing), like a classroom row.
+        const desk = models[0]!;
+        const fit = a.props.fitFor('classroom_desk', desk);
+        const m = base.clone().multiply(scaleM.makeScale(fit, fit, fit));
+        for (const part of desk.parts) add(part.geometry, part.material, m, i, fit, true);
+        const chair = a.props.forType('chair')[0];
+        if (chair) {
+          const cm = base.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.55)).multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+          for (const part of chair.parts) add(part.geometry, part.material, cm, i, 1, true);
+        }
       } else if (models.length) {
         const model = models[p.variant % models.length]!;
         const fit = a.props.fitFor(p.type, model);

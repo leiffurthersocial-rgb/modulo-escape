@@ -4,9 +4,13 @@
  * Barrels are dynamic bodies the player can shove; other solid props are fixed.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import type { LevelData } from '../gen/types.ts';
-import type { KitPiece } from '../gen/kit.ts';
+import type { Building } from '../gen/types.ts';
+import { kitPieces } from '../gen/kit.ts';
 import { KIT, transformBox } from '../kit/greybox.ts';
+import { stairRamp } from '../world/stairs.ts';
+
+/** Key for a prop across floors. */
+export const propKey = (floor: number, index: number) => floor * 100000 + index;
 
 let initPromise: Promise<void> | null = null;
 export function initPhysics(): Promise<void> {
@@ -23,39 +27,46 @@ export class PhysicsWorld {
   private gateCollider: RAPIER.Collider | null = null;
   staticColliderCount = 0;
 
-  constructor(level: LevelData, pieces: KitPiece[], stepHz = 60) {
+  constructor(b: Building, stepHz = 60) {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = 1 / stepHz;
     const fixed = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
 
-    for (const p of pieces) {
-      for (const b of KIT[p.id]) {
-        if (b.collide === false) continue;
-        const a = transformBox(b, p.x, p.z, p.yaw);
-        this.addBox(fixed, a.min, a.max);
+    for (const level of b.floors) {
+      const y0 = level.elevation;
+      for (const p of kitPieces(level)) {
+        for (const box of KIT[p.id]) {
+          if (box.collide === false) continue;
+          const a = transformBox(box, p.x, p.z, p.yaw);
+          this.addBox(fixed, [a.min[0], a.min[1] + y0, a.min[2]], [a.max[0], a.max[1] + y0, a.max[2]]);
+        }
       }
+      level.props.forEach((p, i) => {
+        if (!p.solid) return;
+        if (p.type === 'barrel') {
+          const body = this.world.createRigidBody(
+            RAPIER.RigidBodyDesc.dynamic().setTranslation(p.x, y0 + 0.45 * p.scale, p.z).setLinearDamping(0.6).setAngularDamping(0.8).setCanSleep(true).setSleeping(true),
+          );
+          this.world.createCollider(RAPIER.ColliderDesc.cylinder(0.45 * p.scale, 0.3 * p.scale).setDensity(60).setFriction(0.7), body);
+          this.dynamicProps.set(propKey(level.floor, i), body);
+        } else {
+          const h = p.type === 'desk' || p.type === 'classroom_desk' ? 0.75 : p.type === 'chair' ? 0.85 : 0.6;
+          this.world.createCollider(RAPIER.ColliderDesc.cylinder(h / 2, p.r * p.scale * 0.9).setTranslation(p.x, y0 + h / 2, p.z), fixed);
+        }
+      });
+    }
+    // Stair flights: one smooth ramp collider each (the steps are visual only).
+    for (const s of b.stairs) {
+      const r = stairRamp(b, s);
+      this.world.createCollider(
+        RAPIER.ColliderDesc.cuboid(r.halfWidth, 0.1, r.halfLength).setTranslation(r.center.x, r.center.y, r.center.z).setRotation(r.rotation).setFriction(0.9),
+        fixed,
+      );
     }
     // Ground outside the building (so you can walk out of the exit).
-    const W = level.width * level.cellSize;
-    const D = level.height * level.cellSize;
-    this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(W / 2 + 150, 0.5, D / 2 + 150).setTranslation(W / 2, -0.76, D / 2),
-      fixed,
-    );
-
-    level.props.forEach((p, i) => {
-      if (!p.solid) return;
-      if (p.type === 'barrel') {
-        const body = this.world.createRigidBody(
-          RAPIER.RigidBodyDesc.dynamic().setTranslation(p.x, 0.45 * p.scale, p.z).setLinearDamping(0.6).setAngularDamping(0.8).setCanSleep(true).setSleeping(true),
-        );
-        this.world.createCollider(RAPIER.ColliderDesc.cylinder(0.45 * p.scale, 0.3 * p.scale).setDensity(60).setFriction(0.7), body);
-        this.dynamicProps.set(i, body);
-      } else {
-        const h = p.type === 'desk' ? 0.75 : p.type === 'chair' ? 0.85 : 0.6;
-        this.world.createCollider(RAPIER.ColliderDesc.cylinder(h / 2, p.r * p.scale * 0.9).setTranslation(p.x, h / 2, p.z), fixed);
-      }
-    });
+    const W = b.width * b.cellSize;
+    const D = b.height * b.cellSize;
+    this.world.createCollider(RAPIER.ColliderDesc.cuboid(W / 2 + 150, 0.5, D / 2 + 150).setTranslation(W / 2, -0.64, D / 2), fixed);
   }
 
   private addBox(body: RAPIER.RigidBody, min: number[], max: number[]) {

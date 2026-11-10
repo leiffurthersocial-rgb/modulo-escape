@@ -1,6 +1,6 @@
 /**
  * On-screen touch controls: floating left joystick (move), right-side look pad,
- * and buttons for sprint (hold), crouch (toggle), flashlight, minimap and pause.
+ * and buttons for sprint (hold), crouch (toggle) and flashlight.
  * Safe-area aware. Uses Pointer Events so it also works with Apple Pencil.
  */
 import type { Input } from './input.ts';
@@ -39,7 +39,6 @@ export class TouchControls {
         <button data-act="sprint" class="tbtn">RUN</button>
         <button data-act="crouch" class="tbtn">DUCK</button>
         <button data-act="flashlight" class="tbtn">LIGHT</button>
-        <button data-act="minimap" class="tbtn">MAP</button>
       </div>`;
     parent.appendChild(this.el);
     this.stickBase = this.el.querySelector('.stick-base')!;

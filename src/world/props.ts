@@ -22,6 +22,7 @@ export function makePropGeometries(): Map<PropType, THREE.BufferGeometry> {
   m.set('vegetation', new THREE.ConeGeometry(0.45, 0.9, 6).translate(0, 0.45, 0));
   m.set('chair', new THREE.BoxGeometry(0.45, 0.85, 0.45).translate(0, 0.425, 0));
   m.set('desk', new THREE.BoxGeometry(1.0, 0.75, 0.6).translate(0, 0.375, 0));
+  m.set('classroom_desk', new THREE.BoxGeometry(0.7, 0.75, 0.5).translate(0, 0.375, 0));
   // Pipe: horizontal along X near the ceiling.
   m.set('pipe', new THREE.CylinderGeometry(0.08, 0.08, 4, 8).rotateZ(Math.PI / 2).translate(0, STOREY_HEIGHT - 0.45, 0));
   return m;

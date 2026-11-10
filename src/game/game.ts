@@ -1,6 +1,6 @@
 /**
- * Game orchestration: loads the level, wires systems together and runs the loop.
- * State machine: loading → ready → playing ⇄ paused → won.
+ * Game orchestration: loads the building, wires systems together and runs the loop.
+ * State machine: loading → ready → playing ⇄ paused → won | caught.
  * Physics runs at a fixed step with render interpolation; the render loop stops
  * entirely while paused or when the tab is hidden.
  */
@@ -8,41 +8,43 @@ import * as THREE from 'three';
 import { bus } from '../core/events.ts';
 import { randomSeed } from '../core/rng.ts';
 import { isLevelSize } from '../gen/config.ts';
-import { cellCenter, cellIndex, SIDE_YAW, worldToCell } from '../gen/grid.ts';
+import { cellCenter, cellIndex, SIDE_YAW } from '../gen/grid.ts';
 import { kitPieces } from '../gen/kit.ts';
-import { loadLevel } from '../gen/load.ts';
-import type { LevelData, LevelSize } from '../gen/types.ts';
+import { loadBuilding } from '../gen/load.ts';
+import type { Building, LevelData, LevelSize } from '../gen/types.ts';
 import { Input } from '../input/input.ts';
-import { initPhysics, PhysicsWorld } from '../physics/physicsWorld.ts';
+import { initPhysics, PhysicsWorld, propKey } from '../physics/physicsWorld.ts';
 import { Player } from '../player/player.ts';
 import { Atmosphere } from '../render/atmosphere.ts';
 import { bindResize, createRenderer, DEFAULT_RENDER } from '../render/renderer.ts';
 import { PostFX } from '../render/post.ts';
-import { Dust, LightShafts } from '../render/shafts.ts';
+import { Dust } from '../render/shafts.ts';
 import { surfaceUniforms } from '../render/surface.ts';
 import { TextureLibrary } from '../render/textures.ts';
 import { PerfMonitor } from '../render/perfMonitor.ts';
 import { WorldAssets } from '../world/worldAssets.ts';
 import { Outdoors } from '../world/outdoors.ts';
-import { computeOpenness } from '../world/openness.ts';
 import { DebugOverlay } from '../ui/debugOverlay.ts';
 import { ChunkManager } from '../world/chunks.ts';
 import { ExitGate } from '../world/exitGate.ts';
-import { resolvedQuality, saveSettings, settings } from './settings.ts';
+import { buildStairsGeometry } from '../world/stairs.ts';
+import { loadMaterialPicks, resolvedQuality, saveSettings, settings } from './settings.ts';
 import { Autopilot } from './autopilot.ts';
 import { lowerPreset, PRESETS, type Quality } from '../render/quality.ts';
 import { AmbienceDirector } from '../director/director.ts';
 import { AudioManager } from '../audio/audio.ts';
-import { Minimap } from '../ui/minimap.ts';
 import { isTouchOnlyDevice, TouchControls } from '../input/touch.ts';
+import { NavQuery } from '../ai/navQuery.ts';
+import { Senses } from '../ai/senses.ts';
+import { EntityManager, type EntityContext } from '../ai/entities.ts';
+import { MonsterStub } from '../ai/monster.ts';
 
-export type GameState = 'ready' | 'playing' | 'paused' | 'won';
+export type GameState = 'ready' | 'playing' | 'paused' | 'won' | 'caught';
 
 export interface GameHooks {
   onState(state: GameState, game: Game): void;
   onDebugMenu?(): void;
 }
-
 
 export class Game {
   readonly scene: THREE.Scene;
@@ -50,24 +52,27 @@ export class Game {
   readonly input: Input;
   readonly player: Player;
   readonly physics: PhysicsWorld;
-  readonly chunks: ChunkManager;
+  /** One chunk manager per floor; its root sits at the floor's elevation. */
+  readonly floorChunks: ChunkManager[];
   readonly gate: ExitGate;
   readonly env: Atmosphere;
   readonly overlay: DebugOverlay;
   readonly post: PostFX;
   readonly outdoors: Outdoors;
   readonly perf = new PerfMonitor();
-  shafts: LightShafts | null = null;
+  readonly nav: NavQuery;
+  readonly senses: Senses;
+  readonly entities: EntityManager;
   dust: Dust | null = null;
   private gateMat: THREE.MeshStandardMaterial;
+  private stairsMesh: THREE.Mesh | null = null;
   state: GameState = 'ready';
-  /** Elapsed play time in ms; starts on first movement. */
+  /** Play time in ms (not shown; kept for events/stats). */
   elapsedMs = 0;
-  timerRunning = false;
   private acc = 0;
   private last = 0;
   private running = false;
-  private cell = { x: -1, z: -1 };
+  private cell = { floor: -1, x: -1, z: -1 };
   private tmpM = new THREE.Matrix4();
   private tmpQ = new THREE.Quaternion();
   private tmpV = new THREE.Vector3();
@@ -81,17 +86,18 @@ export class Game {
   readonly autopilot: Autopilot;
   readonly director: AmbienceDirector;
   readonly audio = new AudioManager();
-  readonly minimap: Minimap;
   readonly touch: TouchControls;
   private offs: (() => void)[] = [];
-  private openness: number[];
+  /** Nodes near a stairwell (both floors visible from there). */
+  private nearStairs = new Set<number>();
   texVram = 0;
-  /** Eye adaptation: current exposure multiplier, eased towards the target per cell. */
+  /** Eye adaptation: current exposure multiplier, eased towards the target. */
   private adapt = 1;
+  private time = 0;
 
   constructor(
     readonly root: HTMLElement,
-    readonly level: LevelData,
+    readonly building: Building,
     private hooks: GameHooks,
     renderer: THREE.WebGLRenderer,
     readonly textures: TextureLibrary,
@@ -105,41 +111,45 @@ export class Game {
     this.quality = quality;
     this.env = env;
     this.stepHz = quality.physicsHz;
-    this.openness = computeOpenness(level);
-    const pieces = kitPieces(level);
-    this.physics = new PhysicsWorld(level, pieces, this.stepHz);
+    this.nav = new NavQuery(building);
+    this.physics = new PhysicsWorld(building, this.stepHz);
 
-    this.chunks = new ChunkManager(level, pieces, assets);
-    this.chunks.radius = quality.chunkRadius;
-    this.chunks.opts = { decals: quality.decals, vegetation: quality.vegetation };
-    this.chunks.dynamicMatrix = (i) => {
-      const b = this.physics.dynamicProps.get(i);
-      if (!b) return null;
-      const t = b.translation();
-      const r = b.rotation();
-      const p = level.props[i]!;
-      this.tmpQ.set(r.x, r.y, r.z, r.w);
-      this.tmpV.set(t.x, t.y - 0.45 * p.scale, t.z);
-      this.tmpS.setScalar(p.scale);
-      return this.tmpM.compose(this.tmpV, this.tmpQ, this.tmpS);
-    };
-    this.scene.add(this.chunks.root);
+    this.floorChunks = building.floors.map((level) => {
+      const cm = new ChunkManager(level, kitPieces(level), assets);
+      cm.root.position.y = level.elevation;
+      cm.root.updateMatrixWorld();
+      cm.radius = quality.chunkRadius;
+      cm.opts = { decals: quality.decals, vegetation: quality.vegetation };
+      cm.dynamicMatrix = (i) => this.propMatrix(level, i);
+      this.scene.add(cm.root);
+      return cm;
+    });
+    const stairsGeo = buildStairsGeometry(building);
+    if (stairsGeo) {
+      this.stairsMesh = new THREE.Mesh(stairsGeo, assets.kit.get('floor')!);
+      this.stairsMesh.castShadow = this.stairsMesh.receiveShadow = true;
+      this.scene.add(this.stairsMesh);
+    }
+    this.computeNearStairs();
 
+    const ground = building.floors[0]!;
     this.gateMat = assets.kit.get('metal')!.clone();
     this.gateMat.color.set(0xc08070);
-    this.gate = new ExitGate(level, this.gateMat);
-    this.outdoors = new Outdoors(level, assets, quality.vegetation);
+    this.gate = new ExitGate(ground, this.gateMat);
+    this.outdoors = new Outdoors(ground, assets, quality.vegetation);
     this.scene.add(this.outdoors.group);
     this.scene.add(this.gate.object);
     this.physics.setGateBlocker(
       { x: this.gate.position.x, z: this.gate.position.z },
-      level.exit.side === 'N' || level.exit.side === 'S',
+      building.exit.side === 'N' || building.exit.side === 'S',
       this.gate.width,
       this.gate.height,
     );
 
-    const s = cellCenter(level, level.start.x, level.start.z);
-    this.player = new Player(this.physics, s, SIDE_YAW[level.start.facing], settings.fov);
+    const startLevel = building.floors[building.start.floor]!;
+    const s = cellCenter(startLevel, building.start.x, building.start.z);
+    this.player = new Player(this.physics, { ...s, y: startLevel.elevation }, SIDE_YAW[building.start.facing], settings.fov);
+    this.player.floor = building.start.floor;
     this.scene.add(this.player.camera);
     this.post = new PostFX(this.renderer, this.scene, this.player.camera);
     this.unbindResize = bindResize(this.renderer, this.player.camera, root, (w, h) => this.post.setSize(w, h));
@@ -152,36 +162,36 @@ export class Game {
     this.overlay = new DebugOverlay(root);
     this.overlay.extra = () => {
       const f = this.player.feet;
+      const node = this.nav.nodeAt(f.x, f.y, f.z);
       return {
-        chunks: `${this.chunks.loadedCount} (r=${this.chunks.radius})`,
+        chunks: this.floorChunks.map((c, i) => `${i}:${c.loadedCount}${c.root.visible ? '' : '(h)'}`).join(' '),
         colliders: this.physics.staticColliderCount,
-        cell: `${this.cell.x},${this.cell.z} → exit ${this.level.nav.distToExit[cellIndex(this.level, this.cell.x, this.cell.z)] ?? '?'}`,
+        cell: `floor ${this.player.floor} · ${this.cell.x},${this.cell.z} → exit ${node >= 0 ? building.nav.distToExit[node] : '?'}`,
         pos: `${f.x.toFixed(1)}, ${f.y.toFixed(2)}, ${f.z.toFixed(1)}`,
-        speed: `${this.player.speed.toFixed(1)} m/s${this.player.sprinting ? ' sprint' : ''}${this.player.crouching ? ' crouch' : ''}`,
+        speed: `${this.player.speed.toFixed(1)} m/s${this.player.sprinting ? ' sprint' : ''}${this.player.crouching ? ' crouch' : ''} · stamina ${(this.player.stamina * 100).toFixed(0)}%`,
         look: this.input.lookMode,
         quality: `${this.quality.name}${this.post.enabled ? ' +post' : ''} tex ${this.quality.textureTier}`,
-        mood: this.env.mood.toFixed(2),
+        entities: [...this.entities.entities.values()].map((e) => `${e.id}${'state' in e ? `:${String((e as MonsterStub).state)}` : ''}`).join(', ') || 'none',
         assets: this.assets.textured ? `textured, tex VRAM ≈ ${(this.texVram / 1048576).toFixed(0)} MB` : 'greybox',
-        seed: `${level.seed} (${level.size})`,
+        seed: `${building.seed} (${building.size}, ${building.floors.length} floors)`,
       };
     };
 
     this.player.updateCamera(1, 0);
     this.env.follow(this.player.camera.position);
-    this.chunks.update(this.player.feet.x, this.player.feet.z, true);
+    this.updateFloors(true);
 
+    this.senses = new Senses(this.physics);
+    this.entities = new EntityManager(this.scene);
     this.autopilot = new Autopilot(this);
-    this.director = new AmbienceDirector(this.scene, level, quality.lightPool);
+    this.director = new AmbienceDirector(this.scene, building, quality.lightPool);
     this.applyQuality(quality, true);
     void textures.vramEstimate().then((v) => (this.texVram = v));
-    this.minimap = new Minimap(root, level);
-    this.minimap.setVisible(settings.minimap);
     this.touch = new TouchControls(root, this.input, () => this.setState('paused'));
     this.applyTouchSetting();
+    this.maybeSpawnMonster();
     this.offs.push(
-      bus.on('player:enteredCell', (e) => this.minimap.reveal(e.x, e.z)),
       bus.on('settings:changed', ({ key }) => {
-        if (key === 'minimap' || key === '*') this.minimap.setVisible(settings.minimap);
         if (key === 'touchControls' || key === '*') this.applyTouchSetting();
         if (key === 'graphics' || key === '*') this.applyQuality(resolvedQuality());
         if (key === 'mood') this.setMood(settings.graphics.mood);
@@ -194,7 +204,56 @@ export class Game {
       this.stop();
       setTimeout(() => location.reload(), 300);
     });
-    bus.emit('level:loaded', { level });
+    bus.emit('level:loaded', { building });
+  }
+
+  /** Floor 0 for compatibility with single-floor helpers. */
+  get level(): LevelData {
+    return this.building.floors[0]!;
+  }
+
+  /** Debug: ?monster=stub spawns the placeholder monster far from the start; it wakes after 10 s. */
+  private maybeSpawnMonster() {
+    if (new URLSearchParams(location.search).get('monster') !== 'stub') return;
+    const b = this.building;
+    const pts = this.director.spawnPoints.filter((p) => p.floor === b.start.floor);
+    const p = pts[pts.length - 1] ?? this.director.spawnPoints[0];
+    if (!p) return;
+    const pos = this.nav.nodePos(p.floor * this.nav.N + cellIndex(b, p.x, p.z));
+    const m = new MonsterStub(b.seed, pos);
+    this.entities.add(m);
+    setTimeout(() => m.wake(), 10000);
+  }
+
+  private computeNearStairs() {
+    const b = this.building;
+    const N = this.nav.N;
+    for (const s of b.stairs) {
+      const cells: [number, number, number][] = [
+        [s.lower, s.x, s.z - 1],
+        [s.lower, s.x, s.z],
+        [s.lower, s.x, s.z + 1],
+        [s.lower + 1, s.x, s.z + 2],
+      ];
+      for (const [f, x, z] of cells) {
+        const node = f * N + cellIndex(b, x, z);
+        this.nearStairs.add(node);
+        for (const n of this.nav.neighbors(node)) this.nearStairs.add(n);
+      }
+    }
+  }
+
+  /** Physics transform of a dynamic prop, in its floor's local space (chunk roots carry the elevation). */
+  private propMatrix(level: LevelData, i: number): THREE.Matrix4 | null {
+    const b = this.physics.dynamicProps.get(propKey(level.floor, i));
+    if (!b) return null;
+    const t = b.translation();
+    const r = b.rotation();
+    const p = level.props[i]!;
+    this.tmpQ.set(r.x, r.y, r.z, r.w);
+    this.tmpV.set(t.x, t.y - level.elevation - 0.45 * p.scale, t.z);
+    this.tmpS.setScalar(p.scale);
+    return this.tmpM.compose(this.tmpV, this.tmpQ, this.tmpS);
   }
 
   /** Touch controls on when forced on, or on 'auto' for touch-only devices. */
@@ -215,7 +274,7 @@ export class Game {
     } else {
       this.input.enabled = false;
       if (s !== 'won') this.input.releaseLock();
-      // Paused/won: render one last frame for the backdrop, then stop the loop to save power.
+      // Paused/ended: render one last frame for the backdrop, then stop the loop to save power.
       this.renderFrame(0);
       this.stop();
     }
@@ -244,7 +303,7 @@ export class Game {
     }
   };
 
-  /** Apply a quality preset at runtime. Texture tier / HDRI size take effect on the next level load. */
+  /** Apply a quality preset at runtime. Texture tier / HDRI size take effect on the next load. */
   applyQuality(q: Quality, initial = false) {
     const prev = this.quality;
     this.quality = q;
@@ -253,29 +312,25 @@ export class Game {
     this.env.setShadows(q.shadowMapSize, q.shadowDistance);
     this.player.setFlashlightShadows(q.flashlightShadows);
     this.textures.setAnisotropy(q.anisotropy);
-    this.chunks.radius = q.chunkRadius;
     this.outdoors.viewDistance = q.viewDistance;
-    this.chunks.viewDistance = q.viewDistance;
-    const contentChanged = initial || prev.decals !== q.decals || prev.vegetation !== q.vegetation;
-    this.chunks.opts = { decals: q.decals, vegetation: q.vegetation };
-    if (contentChanged && !initial) this.chunks.rebuildAll(this.player.feet.x, this.player.feet.z);
-    else this.chunks.update(this.player.feet.x, this.player.feet.z, true);
+    const contentChanged = !initial && (prev.decals !== q.decals || prev.vegetation !== q.vegetation);
+    for (const cm of this.floorChunks) {
+      cm.radius = q.chunkRadius;
+      cm.viewDistance = q.viewDistance;
+      cm.opts = { decals: q.decals, vegetation: q.vegetation };
+      if (contentChanged) cm.rebuildAll(this.player.feet.x, this.player.feet.z);
+    }
+    this.updateFloors(true);
     this.director.lights.setPoolSize(this.scene, q.lightPool);
-    this.director.lights.assignNear(this.player.feet.x, this.player.feet.z);
+    this.director.lights.assignNear(this.player.feet.x, this.player.feet.y, this.player.feet.z);
     this.stepHz = q.physicsHz;
     this.physics.world.timestep = 1 / q.physicsHz;
-    if (initial || prev.lightShafts !== q.lightShafts) {
-      this.shafts?.dispose();
-      if (this.shafts) this.scene.remove(this.shafts.mesh);
-      this.shafts = q.lightShafts === 'off' ? null : new LightShafts(this.level, this.env.sunDir, q.lightShafts);
-      if (this.shafts) this.scene.add(this.shafts.mesh);
-    }
     if (initial || prev.particles !== q.particles) {
       if (this.dust) {
         this.scene.remove(this.dust.points);
         this.dust.dispose();
       }
-      this.dust = q.particles > 0 ? new Dust(Math.round(900 * q.particles)) : null;
+      this.dust = q.particles > 0 ? new Dust(Math.round(700 * q.particles)) : null;
       if (this.dust) this.scene.add(this.dust.points);
     }
     this.post.configure(q);
@@ -320,18 +375,12 @@ export class Game {
 
   private update(dt: number) {
     const input = this.input;
+    this.time += dt;
     this.autopilot.update();
-    // Edge-triggered actions.
     if (input.pressed('debug')) this.overlay.toggle();
     if (input.pressed('debugMenu')) this.hooks.onDebugMenu?.();
     if (input.pressed('flashlight')) this.player.setFlashlight(!this.player.flashlightOn);
-    if (input.pressed('minimap')) {
-      settings.minimap = !settings.minimap;
-      saveSettings('minimap');
-    }
     if (input.pressed('pause')) {
-      // Esc normally releases pointer lock itself (→ pause via lock change); P or a
-      // non-locked Esc gets here. setState('paused') releases the lock if still held.
       this.setState('paused');
       return;
     }
@@ -349,15 +398,53 @@ export class Game {
       steps++;
     }
     if (steps === 5) this.acc = 0;
-
-    if (!this.timerRunning && this.player.speed > 0.2) this.timerRunning = true;
-    if (this.timerRunning) this.elapsedMs += dt * 1000;
+    this.player.floor = this.nav.floorAt(this.player.feet.y);
+    bus.emit('player:stamina', { value: this.player.stamina, exhausted: this.player.exhausted });
+    this.elapsedMs += dt * 1000;
 
     this.syncDynamicProps();
     this.checkCell();
     this.checkExit();
     this.gate.update(dt);
     this.director.update(dt);
+    this.senses.update(dt);
+    if (this.entities.entities.size) this.entities.update(dt, this.entityContext());
+  }
+
+  private entityContext(): EntityContext {
+    const p = this.player;
+    return {
+      building: this.building,
+      nav: this.nav,
+      senses: this.senses,
+      time: this.time,
+      player: {
+        position: p.feet,
+        eye: p.camera.position,
+        floor: p.floor,
+        crouching: p.crouching,
+        sprinting: p.sprinting,
+        flashlightOn: p.flashlightOn,
+      },
+      catchPlayer: (by) => {
+        if (this.state !== 'playing') return;
+        bus.emit('player:caught', { by });
+        this.setState('caught');
+      },
+    };
+  }
+
+  /** Stream + show the current floor; the adjacent floor too when standing near a stairwell. */
+  updateFloors(force = false, at?: THREE.Vector3) {
+    const f = at ?? this.player.feet;
+    const node = this.nav.nodeAt(f.x, f.y, f.z);
+    const cur = this.nav.floorAt(f.y);
+    const near = node >= 0 && this.nearStairs.has(node);
+    this.floorChunks.forEach((cm, i) => {
+      const show = i === cur || (near && Math.abs(i - cur) === 1);
+      cm.root.visible = show;
+      if (show) cm.update(f.x, f.z, force);
+    });
   }
 
   renderFrame(dt: number) {
@@ -366,32 +453,43 @@ export class Game {
     surfaceUniforms.uTime.value += dt;
     this.env.update();
     this.env.follow(cam);
-    this.chunks.update(cam.x, cam.z);
+    this.updateFloors();
     this.outdoors.update(cam);
-    const shaftLevel = this.env.params.shafts;
-    this.shafts?.setIntensity(shaftLevel);
-    this.dust?.update(cam, 0.25 + shaftLevel * 0.75, this.renderer.domElement.height);
-    // Eye adaptation: enclosed spaces open the "iris", open sky closes it.
-    const pc = worldToCell(this.level, cam.x, cam.z);
-    const inside = pc.x >= 0 && pc.z >= 0 && pc.x < this.level.width && pc.z < this.level.height && this.level.cells[cellIndex(this.level, pc.x, pc.z)]!.kind !== 'void';
-    const open = inside ? this.openness[cellIndex(this.level, pc.x, pc.z)]! : 1.6;
-    const target = THREE.MathUtils.clamp(1.45 - open * 0.6, 0.5, 1.4);
+    this.dust?.update(cam, 0.35, this.renderer.domElement.height);
+
+    // Indoors the sky is shut out: sun, sky fill and reflections only matter near the open gate.
+    const g = this.gate.position;
+    const toGate = Math.hypot(cam.x - g.x, cam.z - g.z);
+    const outdoor = this.gate.opening ? THREE.MathUtils.clamp(1 - (toGate - 2) / 10, 0, 1) * this.gate.openAmount : 0;
+    const groundFloor = this.player.floor === 0 ? 1 : 0;
+    const sky = outdoor * groundFloor;
+    this.env.sun.intensity = this.env.params.sunIntensity * sky;
+    this.env.sun.shadow.autoUpdate = sky > 0.01;
+    this.env.hemi.intensity = this.env.params.hemiIntensity * (0.25 + 0.75 * sky);
+    this.scene.environmentIntensity = this.env.params.envIntensity * (0.18 + 0.82 * sky);
+    // Eye adaptation: dark interiors open the "iris", daylight at the gate closes it.
+    const target = THREE.MathUtils.lerp(1.15, 0.6, sky);
     this.adapt += (target - this.adapt) * Math.min(1, dt * 1.5);
     if (dt === 0) this.adapt = target;
     this.renderer.toneMappingExposure = this.env.params.exposure * this.adapt;
-    // Indoor air is lit by what comes in: darken the fog in enclosed spaces.
-    this.env.fog.color.copy(this.env.params.fogColor).multiplyScalar(THREE.MathUtils.clamp(0.12 + open * 0.75, 0.12, 1));
+    this.env.fog.color.copy(this.env.params.fogColor).multiplyScalar(0.06 + 0.94 * sky);
+    this.env.fog.density = THREE.MathUtils.lerp(0.045, this.env.params.fogDensity, sky);
+
+    for (const e of this.entities.entities.values()) e.object.visible = Math.abs(e.floor - this.player.floor) <= 1;
     this.renderer.info.reset();
     this.post.render(dt);
     this.overlay.frame(this.renderer);
-    this.minimap.draw(this.player.feet.x, this.player.feet.z, this.player.yaw, performance.now());
   }
 
   private syncDynamicProps() {
-    for (const [i, body] of this.physics.dynamicProps) {
+    for (const [key, body] of this.physics.dynamicProps) {
       if (body.isSleeping()) continue;
-      const slots = this.chunks.dynamicSlots.get(i);
-      const m = this.chunks.dynamicMatrix(i);
+      const floor = Math.floor(key / 100000);
+      const i = key % 100000;
+      const level = this.building.floors[floor]!;
+      const cm = this.floorChunks[floor]!;
+      const slots = cm.dynamicSlots.get(i);
+      const m = this.propMatrix(level, i);
       if (!slots || !m) continue;
       for (const slot of slots) {
         const mm = slot.fit !== 1 ? this.tmpM2.copy(m).multiply(this.tmpM3.makeScale(slot.fit, slot.fit, slot.fit)) : m;
@@ -402,15 +500,18 @@ export class Game {
   }
 
   private checkCell() {
-    const c = worldToCell(this.level, this.player.feet.x, this.player.feet.z);
-    if (c.x !== this.cell.x || c.z !== this.cell.z) {
+    const f = this.player.feet;
+    const S = this.building.cellSize;
+    const c = { floor: this.player.floor, x: Math.floor(f.x / S), z: Math.floor(f.z / S) };
+    if (c.x !== this.cell.x || c.z !== this.cell.z || c.floor !== this.cell.floor) {
       const prev = this.cell;
       this.cell = c;
-      bus.emit('player:enteredCell', { x: c.x, z: c.z, prevX: prev.x, prevZ: prev.z });
+      bus.emit('player:enteredCell', { floor: c.floor, x: c.x, z: c.z, prevFloor: prev.floor, prevX: prev.x, prevZ: prev.z });
     }
   }
 
   private checkExit() {
+    if (this.player.floor !== 0) return;
     const f = this.player.feet;
     const g = this.gate.position;
     const dx = f.x - g.x;
@@ -418,14 +519,13 @@ export class Game {
     if (!this.gate.opening && Math.hypot(dx, dz) < 2.6) {
       this.gate.open();
       this.physics.removeGateBlocker();
-      bus.emit('exit:approached', { ...this.level.exit });
+      bus.emit('exit:approached', { x: this.building.exit.x, z: this.building.exit.z, side: this.building.exit.side });
       bus.emit('exit:opened', {});
     }
     // Won once the player is through the gate.
     const out = dx * this.gate.outward.x + dz * this.gate.outward.z;
     if (this.gate.opening && out > 1.2 && this.state === 'playing') {
-      this.timerRunning = false;
-      bus.emit('level:won', { seed: this.level.seed, timeMs: this.elapsedMs });
+      bus.emit('level:won', { seed: this.building.seed, timeMs: this.elapsedMs });
       this.setState('won');
     }
   }
@@ -434,15 +534,16 @@ export class Game {
     this.stop();
     document.removeEventListener('visibilitychange', this.onVisibility);
     for (const off of this.offs) off();
+    this.entities.dispose();
+    this.senses.dispose();
     this.director.dispose();
     this.audio.dispose();
     this.unbindResize();
     this.input.dispose();
-    this.chunks.dispose();
+    for (const cm of this.floorChunks) cm.dispose();
     this.outdoors.dispose();
     this.physics.dispose();
     this.post.dispose();
-    this.shafts?.dispose();
     this.dust?.dispose();
     this.assets.dispose();
     this.env.dispose();
@@ -477,20 +578,22 @@ export async function createGame(
   const renderer = createRenderer(root, { ...DEFAULT_RENDER, pixelRatioCap: quality.pixelRatioCap, shadowMapSize: quality.shadowMapSize });
   renderer.domElement.style.visibility = 'hidden';
   onProgress('Generating building…');
-  const [, level, lib] = await Promise.all([initPhysics(), loadLevel(seed, size), new TextureLibrary(renderer, quality.textureTier).init()]);
+  const [, building, lib] = await Promise.all([initPhysics(), loadBuilding(seed, size), new TextureLibrary(renderer, quality.textureTier).init()]);
   lib.anisotropy = quality.anisotropy;
-  const assets = await WorldAssets.create(lib, renderer, level.dressing.roomLabels, {
+  const labels = building.floors.flatMap((f) => f.dressing.roomLabels);
+  const assets = await WorldAssets.create(lib, renderer, labels, {
     tier: quality.textureTier,
     decalRes: quality.textureTier === '512' ? 128 : quality.textureTier === '1k' ? 256 : 512,
+    config: loadMaterialPicks(),
     onProgress,
   });
   const scene = new THREE.Scene();
-  const env = new Atmosphere(scene, level, renderer, quality.shadowMapSize);
+  const env = new Atmosphere(scene, building.floors[0]!, renderer, quality.shadowMapSize);
   env.setGroundSet(assets.sets.get('moss_ground') ?? null);
   onProgress('Lighting the sky…');
   await env.loadHdris(lib.manifest, quality.hdriRes);
   env.setMood(settings.graphics.mood);
-  const game = new Game(root, level, hooks, renderer, lib, assets, env, quality, scene);
+  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene);
   onProgress('Compiling shaders…');
   await renderer.compileAsync(game.scene, game.player.camera).catch(() => {});
   renderer.domElement.style.visibility = '';

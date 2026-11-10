@@ -29,15 +29,16 @@ export interface PropModel {
 export const PROP_MODEL_IDS: Partial<Record<PropType, string[]>> = {
   chair: ['SchoolChair_01'],
   desk: ['SchoolDesk_01'],
-  barrel: ['Barrel_01', 'barrel_03', 'metal_trash_can'],
-  debris: ['can_rusted', 'cement_bag', 'trashbag', 'old_tyre', 'plastic_crate_02', 'wooden_crate_02', 'cardboard_box_01', 'dry_branches_medium_01'],
-  vegetation: ['fern_02', 'shrub_sorrel_01', 'fern_02', 'weed_plant_02'],
+  classroom_desk: ['SchoolDesk_01'],
+  barrel: ['Barrel_01'],
+  debris: ['cardboard_box_01', 'can_rusted', 'cardboard_box_01'],
+  vegetation: ['fern_02'],
 };
-export const OUTDOOR_SHRUB_IDS = ['fern_02', 'shrub_sorrel_01', 'calathea_orbifolia_01'];
-export const OUTDOOR_ROCK_IDS = ['rock_07', 'rock_09'];
+export const OUTDOOR_SHRUB_IDS = ['fern_02', 'shrub_sorrel_01'];
+export const OUTDOOR_ROCK_IDS: string[] = [];
 
 /** Target footprint radius per prop type (m); models are scaled down if larger. */
-const MAX_RADIUS: Partial<Record<PropType, number>> = { debris: 0.4, barrel: 0.38, vegetation: 0.55, chair: 0.4, desk: 0.65 };
+const MAX_RADIUS: Partial<Record<PropType, number>> = { debris: 0.4, barrel: 0.38, vegetation: 0.55, chair: 0.4, desk: 0.65, classroom_desk: 0.5 };
 
 export class PropLibrary {
   readonly models = new Map<string, PropModel>();

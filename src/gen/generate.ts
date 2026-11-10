@@ -1,39 +1,38 @@
 /**
- * Level generator. Pure: seed + size → LevelData. No three.js, no DOM.
+ * Building generator. Pure: seed + size → Building (several floors joined by stair flights).
+ * No three.js, no DOM.
  *
  * Steps
- *  1. place rooms and multi-cell halls (rejection sampling, 1-cell spacing)
- *  2. link rooms: MST over centre distances + extra edges for loops
- *  3. carve corridors per link with grid A* (reusing corridors is cheap → junctions)
- *  4. dead-end spurs
- *  5. assign edge kinds (wall / door / window / open / broken)
- *  6. start & exit by BFS diameter, exit gate on an outward wall; enforce min path
- *  7. props, lights, spawn points, nav graph (separate RNG sub-streams)
+ *  1. place stair flights between adjacent floors (spread apart so each floor must be crossed)
+ *  2. per floor: reserve stair / shaft / landing cells, place classrooms and pillared halls,
+ *     link rooms + landings (MST + loops), carve corridors with A*, dead-end spurs, assign walls/doors
+ *  3. global nav graph (floors + stairs); start on the top floor far from the stairs down,
+ *     exit gate on an outward ground-floor wall far along the path; enforce a minimum path
+ *  4. per floor: props, lights, spawn points, dressing (separate RNG sub-streams)
  * Any failed check retries with attempt+1, which keeps it deterministic.
  */
 import { streamRng, type Rng } from '../core/rng.ts';
-import { CELL_SIZE, MAX_ATTEMPTS, SIZE_CONFIG, STOREY_HEIGHT, type SizeConfig } from './config.ts';
-import { DIR, OPPOSITE, SIDES, cellIndex, getEdge, inBounds, isPassable, setEdge } from './grid.ts';
+import { CELL_SIZE, FLOOR_STEP, MAX_ATTEMPTS, SIZE_CONFIG, STOREY_HEIGHT, type SizeConfig } from './config.ts';
+import { DIR, OPPOSITE, SIDES, cellIndex, getEdge, inBounds, isPassable, isWalkable, setEdge } from './grid.ts';
 import { buildNav, bfs } from './nav.ts';
 import { placeProps, placeLights, pickSpawnPoints } from './props.ts';
 import { dressLevel } from './dressing.ts';
-import type { Cell, EdgeKind, LevelData, LevelSize, Room, Side } from './types.ts';
+import type { Building, Cell, EdgeKind, LevelData, LevelSize, Room, Side, Stair } from './types.ts';
 
 export class GenerationError extends Error {}
 
-export function generateLevel(seed: string, size: LevelSize = 'medium'): LevelData {
+export function generateBuilding(seed: string, size: LevelSize = 'medium'): Building {
   const cfg = SIZE_CONFIG[size];
   let lastErr: unknown;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      const level = tryGenerate(seed, size, cfg, attempt);
-      if (level) return level;
+      return tryBuilding(seed, size, cfg, attempt);
     } catch (e) {
       if (!(e instanceof GenerationError)) throw e;
       lastErr = e;
     }
   }
-  throw new Error(`generateLevel(${seed}, ${size}) failed after ${MAX_ATTEMPTS} attempts: ${String(lastErr)}`);
+  throw new Error(`generateBuilding(${seed}, ${size}) failed after ${MAX_ATTEMPTS} attempts: ${String(lastErr)}`);
 }
 
 interface Work {
@@ -47,6 +46,14 @@ interface Work {
   traversed: Set<string>;
 }
 
+interface Reservation {
+  kind: 'stair' | 'shaft' | 'landing';
+  x: number;
+  z: number;
+  w: number;
+  h: number;
+}
+
 const edgeKey = (w: Work, x: number, z: number, side: Side) => {
   if (side === 'N') return `z:${z * w.width + x}`;
   if (side === 'S') return `z:${(z + 1) * w.width + x}`;
@@ -54,8 +61,241 @@ const edgeKey = (w: Work, x: number, z: number, side: Side) => {
   return `x:${z * (w.width + 1) + x + 1}`;
 };
 
-function tryGenerate(seed: string, size: LevelSize, cfg: SizeConfig, attempt: number): LevelData | null {
-  const rng = streamRng(seed, 'layout', attempt);
+/** Cells a stair occupies on its lower and upper floor (including landings). */
+function stairFootprint(s: Stair): { lower: Reservation[]; upper: Reservation[] } {
+  return {
+    lower: [
+      { kind: 'landing', x: s.x, z: s.z - 1, w: 1, h: 1 },
+      { kind: 'stair', x: s.x, z: s.z, w: 1, h: 2 },
+    ],
+    upper: [
+      { kind: 'shaft', x: s.x, z: s.z, w: 1, h: 2 },
+      { kind: 'landing', x: s.x, z: s.z + 2, w: 1, h: 1 },
+    ],
+  };
+}
+
+function placeStairs(cfg: SizeConfig, rng: Rng): Stair[] {
+  const stairs: Stair[] = [];
+  const reserved: Reservation[][] = Array.from({ length: cfg.floors }, () => []);
+  const clash = (list: Reservation[], r: Reservation, margin: number) =>
+    list.some((o) => r.x - margin < o.x + o.w && r.x + r.w + margin > o.x && r.z - margin < o.z + o.h && r.z + r.h + margin > o.z);
+  for (let f = 0; f < cfg.floors - 1; f++) {
+    const n = rng.int(cfg.stairsPerLevel[0], cfg.stairsPerLevel[1]);
+    for (let k = 0; k < n; k++) {
+      // Best of several candidates: far from every other stair touching these floors, so each
+      // floor has to be crossed to reach the next flight.
+      let best: Stair | null = null;
+      let bestScore = -1;
+      for (let t = 0; t < 40; t++) {
+        const s: Stair = { x: rng.int(1, cfg.width - 2), z: rng.int(2, cfg.height - 4), lower: f };
+        const fp = stairFootprint(s);
+        if (fp.lower.some((r) => clash(reserved[f]!, r, 2)) || fp.upper.some((r) => clash(reserved[f + 1]!, r, 2))) continue;
+        const others = stairs.filter((o) => Math.abs(o.lower - f) <= 1);
+        const score = others.length ? Math.min(...others.map((o) => Math.hypot(o.x - s.x, o.z - s.z))) : rng.next();
+        if (score > bestScore) {
+          bestScore = score;
+          best = s;
+        }
+      }
+      if (!best) throw new GenerationError('no room for stairs');
+      stairs.push(best);
+      const fp = stairFootprint(best);
+      reserved[f]!.push(...fp.lower);
+      reserved[f + 1]!.push(...fp.upper);
+    }
+  }
+  return stairs;
+}
+
+function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: number): Building {
+  const { width, height } = cfg;
+  const N = width * height;
+  const stairs = placeStairs(cfg, streamRng(seed, 'stairs', attempt));
+
+  // ── per-floor layouts ──
+  const works: Work[] = [];
+  const stats = { loops: 0, deadEnds: 0 };
+  for (let f = 0; f < cfg.floors; f++) {
+    const res: Reservation[] = [];
+    for (const s of stairs) {
+      const fp = stairFootprint(s);
+      if (s.lower === f) res.push(...fp.lower);
+      if (s.lower + 1 === f) res.push(...fp.upper);
+    }
+    const r = generateFloor(seed, cfg, f, res, attempt);
+    works.push(r.w);
+    stats.loops += r.loops;
+    stats.deadEnds += r.deadEnds;
+  }
+
+  // ── global nav: floors + stair links (top of a flight ↔ upper landing) ──
+  const localNav = works.map((w) => buildNav(w));
+  const adj: number[][] = [];
+  works.forEach((_, f) => localNav[f]!.adj.forEach((list, i) => (adj[f * N + i] = list.map((j) => f * N + j))));
+  for (const s of stairs) {
+    const top = s.lower * N + cellIndex(cfg, s.x, s.z + 1);
+    const land = (s.lower + 1) * N + cellIndex(cfg, s.x, s.z + 2);
+    adj[top]!.push(land);
+    adj[land]!.push(top);
+  }
+
+  // ── start: top floor, far from where the stairs arrive ──
+  const topF = cfg.floors - 1;
+  const arrivals = stairs.filter((s) => s.lower + 1 === topF).map((s) => topF * N + cellIndex(cfg, s.x, s.z + 2));
+  const fromArrival = arrivals.length ? bfsMulti(adj, arrivals) : bfs(adj, topF * N + firstWalkable(works[topF]!));
+  let startNode = -1;
+  for (let i = 0; i < N; i++) {
+    const node = topF * N + i;
+    const c = works[topF]!.cells[i]!;
+    if (!isWalkable(c.kind) || c.kind === 'stair' || isLanding(works[topF]!, i)) continue;
+    if (startNode < 0 || fromArrival[node]! > fromArrival[startNode]!) startNode = node;
+  }
+  if (startNode < 0) throw new GenerationError('no start');
+  const dist = bfs(adj, startNode);
+  for (let node = 0; node < adj.length; node++) {
+    const f = Math.floor(node / N);
+    if (isWalkable(works[f]!.cells[node % N]!.kind) && dist[node]! < 0) throw new GenerationError('building not connected');
+  }
+
+  // ── exit: ground floor, far along the path, on an outward wall ──
+  const w0 = works[0]!;
+  const ground = [...Array(N).keys()].filter((i) => w0.cells[i]!.kind !== 'void' && isWalkable(w0.cells[i]!.kind) && w0.cells[i]!.kind !== 'stair' && !isLanding(w0, i));
+  ground.sort((p, q) => dist[q]! - dist[p]! || p - q);
+  const exitRng = streamRng(seed, 'exit', attempt);
+  let exit: Building['exit'] | null = null;
+  for (const ci of ground.slice(0, Math.max(3, Math.ceil(ground.length * 0.12)))) {
+    const x = ci % width;
+    const z = Math.floor(ci / width);
+    const outward = SIDES.filter((sd) => {
+      const nx = x + DIR[sd].dx;
+      const nz = z + DIR[sd].dz;
+      const outside = !inBounds(w0, nx, nz) || w0.cells[cellIndex(w0, nx, nz)]!.kind === 'void';
+      return outside && getEdge(w0, x, z, sd) === 'solid';
+    });
+    if (outward.length) {
+      exit = { floor: 0, x, z, side: exitRng.pick(outward) };
+      break;
+    }
+  }
+  if (!exit) throw new GenerationError('no exit wall');
+  const pathLength = dist[cellIndex(w0, exit.x, exit.z)]!;
+  if (pathLength < cfg.minPath) throw new GenerationError(`path too short (${pathLength})`);
+  setEdge(w0, exit.x, exit.z, exit.side, 'exit');
+  const distToExit = bfs(adj, cellIndex(w0, exit.x, exit.z));
+
+  const sCell = startNode % N;
+  const sx = sCell % width;
+  const sz = Math.floor(sCell / width);
+  const facing = SIDES.find((sd) => isPassable(getEdge(works[topF]!, sx, sz, sd))) ?? 'N';
+  const start = { floor: topF, x: sx, z: sz, facing };
+
+  // ── finish each floor ──
+  const floors: LevelData[] = works.map((w, f) => {
+    decorateCells(w, seed, f, attempt);
+    const level: LevelData = {
+      version: 2,
+      floor: f,
+      elevation: f * FLOOR_STEP,
+      seed,
+      size,
+      width,
+      height,
+      cellSize: CELL_SIZE,
+      storeyHeight: STOREY_HEIGHT,
+      cells: w.cells,
+      edgesX: w.edgesX,
+      edgesZ: w.edgesZ,
+      rooms: w.rooms,
+      pillars: hallPillars(w),
+      start: f === topF ? { x: sx, z: sz, facing } : { x: -1, z: -1, facing: 'N' },
+      exit: f === 0 ? { x: exit.x, z: exit.z, side: exit.side } : { x: -1, z: -1, side: 'N' },
+      props: [],
+      lights: [],
+      spawnPoints: [],
+      nav: { adj: localNav[f]!.adj, distToExit: distToExit.slice(f * N, (f + 1) * N) },
+      dressing: { damp: [], decals: [], vines: [], roots: [], trees: [], shrubs: [], roomLabels: [] },
+      stats: {
+        attempts: attempt + 1,
+        walkable: w.cells.filter((c) => isWalkable(c.kind)).length,
+        rooms: w.rooms.filter((r) => r.kind === 'room').length,
+        halls: w.rooms.filter((r) => r.kind === 'hall').length,
+        corridors: w.cells.filter((c) => c.kind === 'corridor').length,
+        loops: 0,
+        deadEnds: 0,
+        pathLength,
+      },
+    };
+    const sub = (name: string) => streamRng(seed, `${name}:${f}`, attempt);
+    level.props = placeProps(level, sub('props'));
+    level.lights = placeLights(level, sub('lights'));
+    const anchor = f === topF ? cellIndex(level, sx, sz) : firstLanding(w);
+    level.spawnPoints = pickSpawnPoints(level, sub('spawns'), anchor);
+    level.dressing = dressLevel(level, attempt);
+    return level;
+  });
+
+  return {
+    version: 2,
+    seed,
+    size,
+    width,
+    height,
+    cellSize: CELL_SIZE,
+    storeyHeight: STOREY_HEIGHT,
+    floorStep: FLOOR_STEP,
+    floors,
+    stairs,
+    start,
+    exit,
+    nav: { adj, distToExit },
+    stats: {
+      attempts: attempt + 1,
+      floors: cfg.floors,
+      stairs: stairs.length,
+      walkable: floors.reduce((s2, l) => s2 + l.stats.walkable, 0),
+      rooms: floors.reduce((s2, l) => s2 + l.stats.rooms, 0),
+      halls: floors.reduce((s2, l) => s2 + l.stats.halls, 0),
+      loops: stats.loops,
+      deadEnds: stats.deadEnds,
+      pathLength,
+    },
+  };
+}
+
+function bfsMulti(adj: number[][], sources: number[]): number[] {
+  const dist = new Array<number>(adj.length).fill(-1);
+  const q = [...sources];
+  for (const s of sources) dist[s] = 0;
+  for (let h = 0; h < q.length; h++) {
+    const c = q[h]!;
+    for (const n of adj[c] ?? []) {
+      if (dist[n] === -1) {
+        dist[n] = dist[c]! + 1;
+        q.push(n);
+      }
+    }
+  }
+  return dist;
+}
+
+function firstWalkable(w: Work): number {
+  return w.cells.findIndex((c) => isWalkable(c.kind));
+}
+
+function isLanding(w: Work, i: number): boolean {
+  const c = w.cells[i]!;
+  return c.room >= 0 && w.rooms[c.room]?.kind === 'landing';
+}
+
+function firstLanding(w: Work): number {
+  const r = w.rooms.find((x) => x.kind === 'landing');
+  return r ? cellIndex(w, r.x, r.z) : firstWalkable(w);
+}
+
+/** One storey: reservations first, then rooms, corridors, dead ends and edges. */
+function generateFloor(seed: string, cfg: SizeConfig, f: number, res: Reservation[], attempt: number): { w: Work; loops: number; deadEnds: number } {
+  const rng = streamRng(seed, `layout:${f}`, attempt);
   const { width, height } = cfg;
   const w: Work = {
     width,
@@ -66,101 +306,58 @@ function tryGenerate(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
     rooms: [],
     traversed: new Set(),
   };
-
+  for (const r of res) {
+    const room: Room = { id: w.rooms.length, x: r.x, z: r.z, w: r.w, h: r.h, kind: r.kind };
+    w.rooms.push(room);
+    for (let zz = r.z; zz < r.z + r.h; zz++) {
+      for (let xx = r.x; xx < r.x + r.w; xx++) {
+        const c = w.cells[cellIndex(w, xx, zz)]!;
+        c.kind = r.kind === 'landing' ? 'corridor' : r.kind;
+        c.room = room.id;
+      }
+    }
+  }
   placeRooms(w, cfg, rng);
-  if (w.rooms.length < 3) throw new GenerationError('too few rooms');
-
-  const links = linkRooms(w.rooms, cfg, rng);
+  const linkable = w.rooms.filter((r) => r.kind === 'room' || r.kind === 'hall' || r.kind === 'landing');
+  if (linkable.filter((r) => r.kind !== 'landing').length < 3) throw new GenerationError('too few rooms');
+  const links = linkRooms(linkable, cfg, rng);
   let loops = 0;
   for (const link of links) {
-    const ok = carveCorridor(w, w.rooms[link.a]!, w.rooms[link.b]!, rng);
+    const ok = carveCorridor(w, linkable[link.a]!, linkable[link.b]!, rng);
     if (!ok && link.mst) throw new GenerationError('mst corridor failed');
     if (ok && !link.mst) loops++;
   }
   const deadEnds = addDeadEnds(w, cfg, rng);
   assignEdges(w, rng);
-
-  // Connectivity: every walkable cell reachable from the first walkable cell.
-  const walkable: number[] = [];
-  w.cells.forEach((c, i) => c.kind !== 'void' && walkable.push(i));
-  const navTmp = buildNav(w);
-  const d0 = bfs(navTmp.adj, walkable[0]!);
-  if (walkable.some((i) => d0[i]! < 0)) throw new GenerationError('not connected');
-
-  // Start = one end of the BFS diameter, exit = the far end with an outward-facing wall.
-  const a = argmax(d0);
-  const dA = bfs(navTmp.adj, a);
-  const sortedFar = walkable.slice().sort((p, q) => dA[q]! - dA[p]! || p - q);
-  let exit: { x: number; z: number; side: Side } | null = null;
-  const topN = Math.max(3, Math.ceil(sortedFar.length * 0.1));
-  for (const ci of sortedFar.slice(0, topN)) {
-    const x = ci % width;
-    const z = Math.floor(ci / width);
-    const outward = SIDES.filter((s) => {
-      const nx = x + DIR[s].dx;
-      const nz = z + DIR[s].dz;
-      const outside = !inBounds(w, nx, nz) || w.cells[cellIndex(w, nx, nz)]!.kind === 'void';
-      return outside && getEdge(w, x, z, s) === 'solid';
-    });
-    if (outward.length) {
-      exit = { x, z, side: rng.pick(outward) };
-      break;
-    }
-  }
-  if (!exit) throw new GenerationError('no exit wall');
-  const pathLength = dA[cellIndex(w, exit.x, exit.z)]!;
-  if (pathLength < cfg.minPath) throw new GenerationError(`path too short (${pathLength})`);
-  setEdge(w, exit.x, exit.z, exit.side, 'exit');
-
-  const sx = a % width;
-  const sz = Math.floor(a / width);
-  const facing = SIDES.find((s) => isPassable(getEdge(w, sx, sz, s))) ?? 'N';
-
-  decorateCells(w, seed, attempt);
-
-  const level: LevelData = {
-    version: 1,
-    seed,
-    size,
-    width,
-    height,
-    cellSize: CELL_SIZE,
-    storeyHeight: STOREY_HEIGHT,
-    cells: w.cells,
-    edgesX: w.edgesX,
-    edgesZ: w.edgesZ,
-    rooms: w.rooms,
-    pillars: hallPillars(w),
-    start: { x: sx, z: sz, facing },
-    exit,
-    props: [],
-    lights: [],
-    spawnPoints: [],
-    nav: { adj: [], distToExit: [] },
-    dressing: { damp: [], decals: [], vines: [], roots: [], trees: [], shrubs: [], roomLabels: [] },
-    stats: {
-      attempts: attempt + 1,
-      walkable: walkable.length,
-      rooms: w.rooms.filter((r) => r.kind === 'room').length,
-      halls: w.rooms.filter((r) => r.kind === 'hall').length,
-      corridors: w.cells.filter((c) => c.kind === 'corridor').length,
-      loops,
-      deadEnds,
-      pathLength,
-    },
-  };
-  level.nav = buildNav(level, cellIndex(level, exit.x, exit.z));
-  level.props = placeProps(level, streamRng(seed, 'props', attempt));
-  level.lights = placeLights(level, streamRng(seed, 'lights', attempt));
-  level.spawnPoints = pickSpawnPoints(level, streamRng(seed, 'spawns', attempt));
-  level.dressing = dressLevel(level, attempt);
-  return level;
+  applyStairEdges(w);
+  const nav = buildNav(w);
+  const first = firstWalkable(w);
+  const d0 = bfs(nav.adj, first);
+  if (w.cells.some((c, i) => isWalkable(c.kind) && d0[i]! < 0)) throw new GenerationError(`floor ${f} not connected`);
+  return { w, loops, deadEnds };
 }
 
-function argmax(arr: number[]): number {
-  let best = 0;
-  for (let i = 1; i < arr.length; i++) if (arr[i]! > arr[best]!) best = i;
-  return best;
+/** Stairs are walled in except their entrance; shafts open only towards the upper landing. */
+function applyStairEdges(w: Work) {
+  for (const r of w.rooms) {
+    if (r.kind === 'stair') {
+      for (const zz of [r.z, r.z + 1]) {
+        setEdge(w, r.x, zz, 'W', 'solid');
+        setEdge(w, r.x, zz, 'E', 'solid');
+      }
+      setEdge(w, r.x, r.z, 'N', 'open');
+      setEdge(w, r.x, r.z, 'S', 'open');
+      setEdge(w, r.x, r.z + 1, 'S', 'solid');
+    } else if (r.kind === 'shaft') {
+      for (const zz of [r.z, r.z + 1]) {
+        setEdge(w, r.x, zz, 'W', 'solid');
+        setEdge(w, r.x, zz, 'E', 'solid');
+      }
+      setEdge(w, r.x, r.z, 'N', 'solid');
+      setEdge(w, r.x, r.z, 'S', 'none');
+      setEdge(w, r.x, r.z + 1, 'S', 'open');
+    }
+  }
 }
 
 // ───────────────────────── 1. rooms ─────────────────────────
@@ -265,7 +462,7 @@ function carveCorridor(w: Work, from: Room, to: Room, rng: Rng): boolean {
   const cost = (ci: number): number => {
     const c = w.cells[ci]!;
     if (c.room === from.id || c.room === to.id) return 0.2;
-    if (c.kind === 'room' || c.kind === 'hall') return Infinity;
+    if (c.kind === 'room' || c.kind === 'hall' || c.kind === 'stair' || c.kind === 'shaft') return Infinity;
     if (c.kind === 'corridor') return 0.6; // reuse → junctions
     return 1 + rng.next() * 0.3; // jitter gives less robotic corridors
   };
@@ -446,15 +643,13 @@ function assignEdges(w: Work, rng: Rng) {
         const nx = x + DIR[s].dx;
         const nz = z + DIR[s].dz;
         const n = inBounds(w, nx, nz) ? w.cells[cellIndex(w, nx, nz)]! : null;
-        const aWalk = c.kind !== 'void';
-        const bWalk = !!n && n.kind !== 'void';
+        const aWalk = isWalkable(c.kind);
+        const bWalk = !!n && isWalkable(n.kind);
         let kind: EdgeKind;
         if (!aWalk && !bWalk) kind = 'none';
         else if (aWalk !== bWalk) {
-          const inner = aWalk ? c : n!;
-          // Mostly enclosed: the game happens inside; windows are rare glimpses out.
-          const p = inner.kind === 'corridor' ? 0.04 : inner.kind === 'hall' ? 0.16 : 0.12;
-          kind = rng.chance(p) ? 'window' : 'solid';
+          // Fully enclosed: no windows (the only way out is the exit gate).
+          kind = 'solid';
         } else {
           const nn = n!;
           const walked = w.traversed.has(edgeKey(w, x, z, s));
@@ -472,13 +667,21 @@ function assignEdges(w: Work, rng: Rng) {
 
 // ───────────────────────── decoration ─────────────────────────
 
-function decorateCells(w: Work, seed: string, attempt: number) {
-  const rng = streamRng(seed, 'cells', attempt);
+function decorateCells(w: Work, seed: string, f: number, attempt: number) {
+  const rng = streamRng(seed, `cells:${f}`, attempt);
   for (const c of w.cells) {
     if (c.kind === 'void') continue;
+    if (c.kind === 'shaft') {
+      c.floor = 'none';
+      continue;
+    }
+    if (c.kind === 'stair') {
+      c.ceiling = 'none';
+      continue;
+    }
     const r = rng.next();
-    c.floor = r < 0.12 ? 'puddle' : r < 0.3 ? 'cracked' : 'intact';
-    c.ceiling = rng.chance(c.kind === 'hall' ? 0.15 : c.kind === 'room' ? 0.08 : 0.04) ? 'hole' : 'intact';
+    c.floor = r < 0.1 ? 'puddle' : r < 0.28 ? 'cracked' : 'intact';
+    c.ceiling = 'intact';
   }
 }
 

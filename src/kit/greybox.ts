@@ -33,7 +33,9 @@ export interface Box {
 const L = CELL_SIZE;
 const H = STOREY_HEIGHT;
 const T = WALL_THICKNESS;
-const SLAB = 0.25;
+const SLAB = 0.12;
+const FLOOR_SLAB = 0.13;
+const CEIL_SLAB = 0.12;
 const h = L / 2;
 const t = T / 2;
 
@@ -62,10 +64,11 @@ function wallWithOpening(ox0: number, ox1: number, oy0: number, oy1: number, fra
 const DW = DOOR_WIDTH / 2;
 
 export const KIT: Record<KitId, Box[]> = {
-  floor: [box(-h, -SLAB, -h, h, 0, h, 'floor')],
-  floor_cracked: [box(-h, -SLAB, -h, h, 0, h, 'floor_cracked')],
-  floor_puddle: [box(-h, -SLAB, -h, h, 0, h, 'floor'), box(-1.75, 0, -1.75, 1.75, 0.006, 1.75, 'puddle', false)],
-  ceiling: [box(-h, H, -h, h, H + SLAB, h, 'ceiling')],
+  // Floor slab 0.13 + ceiling slab 0.12 = FLOOR_STEP - STOREY_HEIGHT, so storeys stack without overlap.
+  floor: [box(-h, -FLOOR_SLAB, -h, h, 0, h, 'floor')],
+  floor_cracked: [box(-h, -FLOOR_SLAB, -h, h, 0, h, 'floor_cracked')],
+  floor_puddle: [box(-h, -FLOOR_SLAB, -h, h, 0, h, 'floor')],
+  ceiling: [box(-h, H, -h, h, H + CEIL_SLAB, h, 'ceiling')],
   ceiling_hole: [
     // 4 slabs around a 2.0 × 2.0 m hole.
     box(-h, H, -h, h, H + SLAB, -1, 'ceiling'),

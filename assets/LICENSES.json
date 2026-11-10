@@ -48,18 +48,6 @@
     "attributionRequired": false
   },
   {
-    "id": "barrel_03",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:barrel",
-    "name": "Barrel 03",
-    "sourceUrl": "https://polyhaven.com/a/barrel_03",
-    "author": "Serhii Khromov",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
     "id": "broken_brick_wall",
     "source": "polyhaven",
     "kind": "texture",
@@ -67,18 +55,6 @@
     "name": "Broken Brick Wall",
     "sourceUrl": "https://polyhaven.com/a/broken_brick_wall",
     "author": "Amal Kumar",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "calathea_orbifolia_01",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "plant:fern",
-    "name": "Calathea Orbifolia 01",
-    "sourceUrl": "https://polyhaven.com/a/calathea_orbifolia_01",
-    "author": "Rob Tuytel, Rico Cilliers",
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "attributionRequired": false
@@ -103,18 +79,6 @@
     "name": "Cardboard Box 01",
     "sourceUrl": "https://polyhaven.com/a/cardboard_box_01",
     "author": "Rahul Chaudhary",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "cement_bag",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:debris",
-    "name": "Cement Bag",
-    "sourceUrl": "https://polyhaven.com/a/cement_bag",
-    "author": "PierreB3D",
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "attributionRequired": false
@@ -276,18 +240,6 @@
     "attributionRequired": false
   },
   {
-    "id": "dry_branches_medium_01",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:debris",
-    "name": "Dry Branches Medium 01",
-    "sourceUrl": "https://polyhaven.com/a/dry_branches_medium_01",
-    "author": "Rico Cilliers",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
     "id": "fern_02",
     "source": "polyhaven",
     "kind": "model",
@@ -372,18 +324,6 @@
     "attributionRequired": false
   },
   {
-    "id": "metal_trash_can",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:barrel",
-    "name": "Metal Trash Can",
-    "sourceUrl": "https://polyhaven.com/a/metal_trash_can",
-    "author": "GurJas Studios",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
     "id": "misty_pines",
     "source": "polyhaven",
     "kind": "hdri",
@@ -391,18 +331,6 @@
     "name": "Misty Pines",
     "sourceUrl": "https://polyhaven.com/a/misty_pines",
     "author": "Greg Zaal",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "modular_industrial_pipes_01",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:pipe",
-    "name": "Modular Industrial Pipes 01",
-    "sourceUrl": "https://polyhaven.com/a/modular_industrial_pipes_01",
-    "author": "Jorge Camacho",
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "attributionRequired": false
@@ -420,18 +348,6 @@
     "attributionRequired": false
   },
   {
-    "id": "old_tyre",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:debris",
-    "name": "Old Tyre",
-    "sourceUrl": "https://polyhaven.com/a/old_tyre",
-    "author": "MP",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
     "id": "patterned_concrete_wall",
     "source": "polyhaven",
     "kind": "texture",
@@ -439,18 +355,6 @@
     "name": "Patterned Concrete Wall",
     "sourceUrl": "https://polyhaven.com/a/patterned_concrete_wall",
     "author": "Dimitrios Savva",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "plastic_crate_02",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:debris",
-    "name": "Plastic Crate 02",
-    "sourceUrl": "https://polyhaven.com/a/plastic_crate_02",
-    "author": "Fabi_G",
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "attributionRequired": false
@@ -475,30 +379,6 @@
     "name": "Ribbed Concrete Wall",
     "sourceUrl": "https://polyhaven.com/a/ribbed_concrete_wall",
     "author": "Charlotte Baglioni",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "rock_07",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "rock",
-    "name": "Rock 07",
-    "sourceUrl": "https://polyhaven.com/a/rock_07",
-    "author": "Jenelle van Heerden",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "rock_09",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "rock",
-    "name": "Rock 09",
-    "sourceUrl": "https://polyhaven.com/a/rock_09",
-    "author": "Jenelle van Heerden",
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "attributionRequired": false
@@ -619,42 +499,6 @@
     "name": "Smooth Concrete Floor",
     "sourceUrl": "https://polyhaven.com/a/smooth_concrete_floor",
     "author": "Dimitrios Savva",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "trashbag",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:debris",
-    "name": "Trashbag",
-    "sourceUrl": "https://polyhaven.com/a/trashbag",
-    "author": "Benny Weimer",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "weed_plant_02",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "plant:groundcover",
-    "name": "Weed Plant 02",
-    "sourceUrl": "https://polyhaven.com/a/weed_plant_02",
-    "author": "Rob Tuytel, Rico Cilliers",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "wooden_crate_02",
-    "source": "polyhaven",
-    "kind": "model",
-    "category": "prop:debris",
-    "name": "Wooden Crate 02",
-    "sourceUrl": "https://polyhaven.com/a/wooden_crate_02",
-    "author": "James Ray Cock, Jurita Burger",
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "attributionRequired": false

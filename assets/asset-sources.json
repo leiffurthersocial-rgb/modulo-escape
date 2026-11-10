@@ -479,64 +479,7 @@
  },
  {
   "source": "polyhaven",
-  "id": "barrel_03",
-  "kind": "model",
-  "category": "prop:barrel",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
   "id": "can_rusted",
-  "kind": "model",
-  "category": "prop:debris",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
-  "id": "cement_bag",
-  "kind": "model",
-  "category": "prop:debris",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
-  "id": "trashbag",
-  "kind": "model",
-  "category": "prop:debris",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
-  "id": "old_tyre",
-  "kind": "model",
-  "category": "prop:debris",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
-  "id": "metal_trash_can",
-  "kind": "model",
-  "category": "prop:barrel",
-  "res": "1k",
-  "textureSize": 512,
-  "simplify": 0.4
- },
- {
-  "source": "polyhaven",
-  "id": "plastic_crate_02",
-  "kind": "model",
-  "category": "prop:debris",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
-  "id": "wooden_crate_02",
   "kind": "model",
   "category": "prop:debris",
   "res": "1k",
@@ -553,14 +496,6 @@
  },
  {
   "source": "polyhaven",
-  "id": "modular_industrial_pipes_01",
-  "kind": "model",
-  "category": "prop:pipe",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
   "id": "fern_02",
   "kind": "model",
   "category": "plant:fern",
@@ -574,48 +509,5 @@
   "category": "plant:groundcover",
   "res": "1k",
   "textureSize": 512
- },
- {
-  "source": "polyhaven",
-  "id": "calathea_orbifolia_01",
-  "kind": "model",
-  "category": "plant:fern",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
-  "id": "weed_plant_02",
-  "kind": "model",
-  "category": "plant:groundcover",
-  "res": "1k",
-  "textureSize": 512
- },
- {
-  "source": "polyhaven",
-  "id": "rock_07",
-  "kind": "model",
-  "category": "rock",
-  "res": "1k",
-  "textureSize": 512,
-  "simplify": 0.25
- },
- {
-  "source": "polyhaven",
-  "id": "rock_09",
-  "kind": "model",
-  "category": "rock",
-  "res": "1k",
-  "textureSize": 512,
-  "simplify": 0.25
- },
- {
-  "source": "polyhaven",
-  "id": "dry_branches_medium_01",
-  "kind": "model",
-  "category": "prop:debris",
-  "res": "1k",
-  "textureSize": 512,
-  "simplify": 0.4
  }
 ]

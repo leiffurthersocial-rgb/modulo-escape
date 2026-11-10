@@ -5,7 +5,7 @@
 import licenses from '../../assets/LICENSES.json';
 import { bus } from '../core/events.ts';
 import type { Game, GameState } from '../game/game.ts';
-import { ACTIONS, DEFAULT_BINDINGS, keyLabel, resetSettings, resolvedQuality, saveSettings, settings, type Action } from '../game/settings.ts';
+import { ACTIONS, DEFAULT_BINDINGS, keyLabel, loadMaterialPicks, resetSettings, resolvedQuality, saveSettings, settings, type Action } from '../game/settings.ts';
 import type { PresetName, Quality } from '../render/quality.ts';
 import { surfaceUniforms } from '../render/surface.ts';
 import type { LevelSize } from '../gen/types.ts';
@@ -24,12 +24,6 @@ function h<K extends keyof HTMLElementTagNameMap>(
   Object.assign(el, rest);
   for (const c of children) if (c !== null && c !== undefined && c !== false) el.append(c);
   return el;
-}
-
-export function formatTime(ms: number): string {
-  const s = ms / 1000;
-  const m = Math.floor(s / 60);
-  return `${m}:${(s % 60).toFixed(1).padStart(4, '0')}`;
 }
 
 export function shareLink(seed: string, size: LevelSize): string {
@@ -55,12 +49,12 @@ export class UI {
   private winScreen!: HTMLElement;
   private creditsScreen!: HTMLElement;
   private hud!: HTMLElement;
-  private timerEl!: HTMLElement;
+  private staminaEl!: HTMLElement;
+  private staminaFill!: HTMLElement;
   private hintEl!: HTMLElement;
   private toastEl = h('div', { class: 'toast', style: 'opacity:0' });
   private game: Game | null = null;
   private settingsReturn: HTMLElement | null = null;
-  private rafTimer = 0;
 
   constructor(private root: HTMLElement) {
     this.loadingScreen = h(
@@ -108,14 +102,15 @@ export class UI {
   onState(state: GameState, game: Game) {
     if (state === 'playing') {
       this.show(null);
-      this.startTimer();
     } else if (state === 'paused') {
       this.show(this.pauseScreen);
     } else if (state === 'won') {
-      this.buildWin(game);
+      this.buildWin(game, true);
+      this.show(this.winScreen);
+    } else if (state === 'caught') {
+      this.buildWin(game, false);
       this.show(this.winScreen);
     }
-    if (state !== 'playing') cancelAnimationFrame(this.rafTimer);
   }
 
   private suggestBattery(reason: 'frametime' | 'battery') {
@@ -210,9 +205,9 @@ export class UI {
         { class: 'panel' },
         h('div', {}, h('span', { class: 'stencil' }, 'KZU')),
         h('h1', {}, 'Modulo: Escape', h('small', {}, 'Wing C · closed since the flood')),
-        h('p', {}, 'The east wing of the KZU school has been sealed for years. Find the way out.'),
+        h('p', {}, 'The east wing of the KZU school has been sealed for years. You wake up on the top floor. Find the way out.'),
         this.seedBox(game),
-        h('p', {}, `WASD move · Shift sprint · C crouch · F flashlight · M minimap · F3 debug. ${lockNote}`),
+        h('p', {}, `WASD move · Shift sprint (stamina) · C crouch · F flashlight · F3 debug · F4 materials/mood. Find the stairs down; the way out is on the ground floor. ${lockNote}`),
         h('div', { class: 'row' }, h('button', { class: 'primary', id: 'btn-enter', onclick: () => void this.play(game) }, 'Enter the building')),
         this.sizePicker(game),
         h(
@@ -248,16 +243,15 @@ export class UI {
     );
   }
 
-  private buildWin(game: Game) {
+  private buildWin(game: Game, escaped: boolean) {
     this.winScreen.replaceChildren(
       h(
         'div',
         { class: 'panel' },
-        h('div', {}, h('span', { class: 'stencil' }, 'KZU · EXIT')),
-        h('h2', {}, 'You got out'),
-        h('div', { class: 'big-time', id: 'win-time' }, formatTime(game.elapsedMs)),
+        h('div', {}, h('span', { class: 'stencil' }, escaped ? 'KZU · EXIT' : 'KZU')),
+        h('h2', {}, escaped ? 'You got out' : 'It found you'),
         this.seedBox(game),
-        h('p', {}, 'Share the link: same seed, same building.'),
+        h('p', {}, escaped ? 'Share the link: same seed, same building.' : 'Same building, another try?'),
         h(
           'div',
           { class: 'row' },
@@ -312,7 +306,7 @@ export class UI {
       });
       return [input, val] as const;
     };
-    const check = (key: 'headBob' | 'invertY' | 'minimap') => {
+    const check = (key: 'headBob' | 'invertY') => {
       const input = h('input', { type: 'checkbox', checked: settings[key], style: 'width:22px;height:22px;accent-color:var(--accent)' });
       input.addEventListener('change', () => {
         settings[key] = input.checked;
@@ -338,7 +332,6 @@ export class UI {
       ...field('Volume', vol, volV),
       ...field('Head-bob', check('headBob')),
       ...field('Invert look Y', check('invertY')),
-      ...field('Minimap', check('minimap')),
       ...field('Touch controls', touchSel),
     );
 
@@ -517,12 +510,66 @@ export class UI {
         ...slider('Wetness override', surfaceUniforms.uWetness.value, (v) => (surfaceUniforms.uWetness.value = v)),
         ...slider('Moss amount', surfaceUniforms.uMoss.value, (v) => (surfaceUniforms.uMoss.value = v)),
       ),
-      h('p', {}, 'F4 closes. Mood is saved; wetness/moss reset on reload (mood drives wetness).'),
+      h('h2', {}, 'Materials'),
+      h('p', {}, 'Swap any surface live; your choice is remembered. "Copy my picks" puts them on the clipboard to send me.'),
+      this.materialPicker(),
+      h('p', {}, 'F4 closes. Mood and materials are saved; wetness/moss reset on reload (mood drives wetness).'),
     );
     this.el.append(this.debugMenu);
   }
 
   private debugMenu: HTMLElement | null = null;
+
+  /** Per-category texture switcher (walls, floor, plaster, metal, brick, rubble, moss). */
+  private materialPicker(): HTMLElement {
+    const game = this.game!;
+    const cats: [string, string][] = [
+      ['concrete_wall', 'Concrete walls'],
+      ['concrete_floor', 'Floor'],
+      ['plaster', 'Plaster (classrooms)'],
+      ['rusted_metal', 'Metal (frames, gate)'],
+      ['brick', 'Brick (broken walls)'],
+      ['rubble', 'Rubble'],
+      ['moss_ground', 'Moss / dirt'],
+    ];
+    const wrap = h('div', { class: 'field mat-picker' });
+    for (const [cat, label] of cats) {
+      const ids = game.textures.idsInCategory(cat);
+      if (!ids.length) continue;
+      const sel = h('select', {});
+      const current = loadMaterialPicks().picks[cat];
+      for (const id of ids) sel.append(h('option', { value: id, selected: id === current }, id));
+      const apply = () => {
+        settings.materialPicks[cat] = sel.value;
+        saveSettings('materials');
+        const scale = loadMaterialPicks().tuning[cat]?.scale ?? 0.5;
+        void game.assets.swapCategory(cat, sel.value, game.quality.textureTier, scale).then(() => game.renderFrame(0));
+      };
+      sel.onchange = apply;
+      const step = (d: number) => () => {
+        sel.selectedIndex = (sel.selectedIndex + d + ids.length) % ids.length;
+        apply();
+      };
+      wrap.append(h('label', {}, label), h('div', { class: 'row', style: 'flex-wrap:nowrap;gap:6px' }, h('button', { onclick: step(-1) }, '◀'), sel, h('button', { onclick: step(1) }, '▶')));
+    }
+    const copy = h('button', {
+      onclick: () => {
+        const json = JSON.stringify(loadMaterialPicks().picks, null, 2);
+        navigator.clipboard?.writeText(json).then(
+          () => this.toast('Material picks copied: paste them to Claude'),
+          () => prompt('Copy your picks:', json),
+        );
+      },
+    }, 'Copy my picks');
+    const reset = h('button', {
+      onclick: () => {
+        settings.materialPicks = {};
+        saveSettings('materials');
+        location.reload();
+      },
+    }, 'Reset to defaults');
+    return h('div', {}, wrap, h('div', { class: 'row', style: 'margin-top:8px' }, copy, reset));
+  }
 
   private captureKey(action: Action, slot: number, btn: HTMLButtonElement, done: () => void) {
     const g = this.game;
@@ -548,17 +595,27 @@ export class UI {
   // ───────── HUD ─────────
 
   private buildHud(game: Game) {
-    this.timerEl = h('span', { class: 'timer' }, '0:00.0');
+    this.staminaFill = h('div', { class: 'stamina-fill' });
+    this.staminaEl = h('div', { class: 'stamina', title: 'Stamina' }, this.staminaFill);
     this.hintEl = h('div', { class: 'hint' }, '');
     const pauseBtn = h('button', { class: 'hudbtn', onclick: () => game.setState('paused'), title: 'Pause' }, '❚❚');
     this.hud = h(
       'div',
       { class: 'hud', hidden: true },
       h('div', { class: 'crosshair' }),
-      h('div', { class: 'topbar' }, h('span', { class: 'seedtag' }, `seed ${game.level.seed}`), this.timerEl, pauseBtn),
+      h('div', { class: 'topbar' }, pauseBtn),
+      this.staminaEl,
       this.hintEl,
     );
     this.root.insertBefore(this.hud, this.el);
+    let shown = 1;
+    bus.on('player:stamina', ({ value, exhausted }) => {
+      if (Math.abs(value - shown) < 0.004 && !exhausted) return;
+      shown = value;
+      this.staminaFill.style.transform = `scaleX(${value.toFixed(3)})`;
+      this.staminaEl.classList.toggle('full', value >= 0.999);
+      this.staminaEl.classList.toggle('exhausted', exhausted);
+    });
   }
 
   get hudElement(): HTMLElement {
@@ -569,12 +626,4 @@ export class UI {
     this.hintEl.textContent = t;
   }
 
-  private startTimer() {
-    const loop = () => {
-      if (this.game) this.timerEl.textContent = formatTime(this.game.elapsedMs);
-      this.rafTimer = requestAnimationFrame(loop);
-    };
-    cancelAnimationFrame(this.rafTimer);
-    this.rafTimer = requestAnimationFrame(loop);
-  }
 }

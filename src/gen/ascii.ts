@@ -1,5 +1,5 @@
 import { cellIndex, getEdge } from './grid.ts';
-import type { EdgeKind, LevelData } from './types.ts';
+import type { Building, EdgeKind, LevelData } from './types.ts';
 
 const H: Record<EdgeKind, string> = { none: '   ', solid: '───', window: '┄┄┄', door: '   ', open: '   ', broken: ' ╳ ', exit: '▓▓▓' };
 const V: Record<EdgeKind, string> = { none: ' ', solid: '│', window: '┆', door: ' ', open: ' ', broken: '╳', exit: '▓' };
@@ -19,7 +19,7 @@ export function asciiMap(l: LevelData): string {
       row += V[x < l.width ? getEdge(l, x, z, 'W') : getEdge(l, x - 1, z, 'E')];
       if (x === l.width) break;
       const c = l.cells[cellIndex(l, x, z)]!;
-      let ch = c.kind === 'void' ? '   ' : c.kind === 'corridor' ? ' · ' : c.kind === 'hall' ? '▒▒▒' : '░░░';
+      let ch = c.kind === 'void' ? '   ' : c.kind === 'corridor' ? ' · ' : c.kind === 'hall' ? '▒▒▒' : c.kind === 'stair' ? ' ▲ ' : c.kind === 'shaft' ? ' ▫ ' : '░░░';
       if (c.ceiling === 'hole' && c.kind !== 'void') ch = ch[0] + '◘' + ch[2];
       if (x === l.start.x && z === l.start.z) ch = ' S ';
       if (x === l.exit.x && z === l.exit.z) ch = ' X ';
@@ -28,4 +28,12 @@ export function asciiMap(l: LevelData): string {
     lines.push(row);
   }
   return lines.join('\n');
+}
+
+/** All floors, top first. ▲ stair up, ▫ shaft (stair arriving from below). */
+export function asciiBuilding(b: Building): string {
+  return [...b.floors]
+    .reverse()
+    .map((f) => `Floor ${f.floor}${f.floor === b.start.floor ? ' (start)' : ''}${f.floor === b.exit.floor ? ' (exit)' : ''}\n${asciiMap(f)}`)
+    .join('\n\n');
 }

@@ -11,7 +11,7 @@ import type { PbrSet } from './textures.ts';
 export const surfaceUniforms = {
   uTime: { value: 0 },
   uWetness: { value: 0.35 },
-  uMoss: { value: 0.6 },
+  uMoss: { value: 0.3 },
   uMossMap: { value: null as THREE.Texture | null },
   uMossScale: { value: 0.5 },
 };

@@ -840,13 +840,6 @@
       "bytes": 425748,
       "triangles": 2682
     },
-    "barrel_03": {
-      "category": "prop:barrel",
-      "source": "polyhaven",
-      "url": "/assets/models/barrel_03.7f2e9ee5.glb",
-      "bytes": 397068,
-      "triangles": 1473
-    },
     "can_rusted": {
       "category": "prop:debris",
       "source": "polyhaven",
@@ -854,61 +847,12 @@
       "bytes": 470188,
       "triangles": 3520
     },
-    "cement_bag": {
-      "category": "prop:debris",
-      "source": "polyhaven",
-      "url": "/assets/models/cement_bag.1af194b9.glb",
-      "bytes": 346964,
-      "triangles": 844
-    },
-    "trashbag": {
-      "category": "prop:debris",
-      "source": "polyhaven",
-      "url": "/assets/models/trashbag.996838de.glb",
-      "bytes": 452484,
-      "triangles": 4482
-    },
-    "old_tyre": {
-      "category": "prop:debris",
-      "source": "polyhaven",
-      "url": "/assets/models/old_tyre.ba0640f4.glb",
-      "bytes": 439628,
-      "triangles": 2880
-    },
-    "metal_trash_can": {
-      "category": "prop:barrel",
-      "source": "polyhaven",
-      "url": "/assets/models/metal_trash_can.e027e7b3.glb",
-      "bytes": 1038860,
-      "triangles": 6732
-    },
-    "plastic_crate_02": {
-      "category": "prop:debris",
-      "source": "polyhaven",
-      "url": "/assets/models/plastic_crate_02.40d0255b.glb",
-      "bytes": 429484,
-      "triangles": 5840
-    },
-    "wooden_crate_02": {
-      "category": "prop:debris",
-      "source": "polyhaven",
-      "url": "/assets/models/wooden_crate_02.609ce150.glb",
-      "bytes": 410692,
-      "triangles": 5176
-    },
     "cardboard_box_01": {
       "category": "prop:debris",
       "source": "polyhaven",
       "url": "/assets/models/cardboard_box_01.5d374c05.glb",
       "bytes": 484004,
       "triangles": 5084
-    },
-    "modular_industrial_pipes_01": {
-      "category": "prop:pipe",
-      "source": "polyhaven",
-      "url": "/assets/models/modular_industrial_pipes_01.e9e2bd19.glb",
-      "bytes": 1119320,
-      "triangles": 12340
     },
     "fern_02": {
       "category": "plant:fern",
@@ -923,41 +867,6 @@
       "url": "/assets/models/shrub_sorrel_01.92347f14.glb",
       "bytes": 407772,
       "triangles": 3319
-    },
-    "calathea_orbifolia_01": {
-      "category": "plant:fern",
-      "source": "polyhaven",
-      "url": "/assets/models/calathea_orbifolia_01.e547bc0e.glb",
-      "bytes": 649120,
-      "triangles": 16688
-    },
-    "weed_plant_02": {
-      "category": "plant:groundcover",
-      "source": "polyhaven",
-      "url": "/assets/models/weed_plant_02.6f03d2ea.glb",
-      "bytes": 613580,
-      "triangles": 11116
-    },
-    "rock_07": {
-      "category": "rock",
-      "source": "polyhaven",
-      "url": "/assets/models/rock_07.8736735b.glb",
-      "bytes": 502904,
-      "triangles": 5524
-    },
-    "rock_09": {
-      "category": "rock",
-      "source": "polyhaven",
-      "url": "/assets/models/rock_09.867a1d6a.glb",
-      "bytes": 488656,
-      "triangles": 5148
-    },
-    "dry_branches_medium_01": {
-      "category": "prop:debris",
-      "source": "polyhaven",
-      "url": "/assets/models/dry_branches_medium_01.598cf63c.glb",
-      "bytes": 613816,
-      "triangles": 6721
     }
   },
   "hdris": {

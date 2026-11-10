@@ -7,8 +7,6 @@
 import '../style.css';
 import * as THREE from 'three';
 import { createGame } from '../game/game.ts';
-import { cellCenter } from '../gen/grid.ts';
-import { pathToExit } from '../gen/nav.ts';
 import { cellIndex } from '../gen/grid.ts';
 import { isLevelSize } from '../gen/config.ts';
 import { PRESETS, PRESET_ORDER, type Quality } from '../render/quality.ts';
@@ -44,12 +42,11 @@ async function main() {
   // Textures/HDRI load once at the tier of the first preset (tier changes need a reload in-game too).
   const game = await createGame(root, seed, size, { onState: () => {} }, (m) => (panel.textContent = m), presets[0]);
   game.overlay.toggle(false);
-  const l = game.level;
-  // Camera path: cell centres along the shortest path, eye height, constant speed.
-  const path = pathToExit(l.nav, cellIndex(l, l.start.x, l.start.z)).map((i) => {
-    const c = cellCenter(l, i % l.width, Math.floor(i / l.width));
-    return new THREE.Vector3(c.x, 1.6, c.z);
-  });
+  const b = game.building;
+  // Camera path: node centres along the shortest path across floors and stairs, eye height.
+  const startNode = b.start.floor * game.nav.N + cellIndex(b, b.start.x, b.start.z);
+  const exitNode = cellIndex(b, b.exit.x, b.exit.z);
+  const path = game.nav.path(startNode, exitNode).map((n) => game.nav.nodePos(n).add(new THREE.Vector3(0, 1.6, 0)));
   const curve = new THREE.CatmullRomCurve3(path, false, 'centripetal', 0.3);
   const length = curve.getLength();
   const cam = game.player.camera;
@@ -69,13 +66,14 @@ async function main() {
       const u = Math.min(1, ((f / 60) * 3) / length); // 3 m/s of sim time
       curve.getPointAt(u, cam.position);
       curve.getPointAt(Math.min(1, u + 0.01), look);
-      look.y = 1.5;
+      look.y -= 0.1;
       if (look.distanceToSquared(cam.position) > 1e-4) cam.lookAt(look);
       game.env.follow(cam.position);
       game.env.update();
-      game.chunks.update(cam.position.x, cam.position.z);
+      const feet = cam.position.clone().setY(cam.position.y - 1.6);
+      game.updateFloors(false, feet);
+      if (f % 30 === 0) game.director.lights.assignNear(feet.x, feet.y, feet.z);
       game.director.update(1 / 60);
-      game.shafts?.setIntensity(game.env.params.shafts);
       game.dust?.update(cam.position, 0.6, game.renderer.domElement.height);
       game.renderer.info.reset();
       game.post.render(1 / 60);

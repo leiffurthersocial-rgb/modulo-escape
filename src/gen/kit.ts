@@ -4,7 +4,7 @@
  * Every piece occupies exactly one slot (cell floor, cell ceiling, edge, vertex);
  * unique slots ⇒ no overlapping geometry (asserted by tests).
  */
-import { cellIndex } from './grid.ts';
+import { cellIndex, isWalkable } from './grid.ts';
 import type { EdgeKind, LevelData, Side } from './types.ts';
 
 export type KitId =
@@ -63,7 +63,7 @@ const WALL_ID: Partial<Record<EdgeKind, KitId>> = {
 export function kitPieces(l: LevelData): KitPiece[] {
   const out: KitPiece[] = [];
   const S = l.cellSize;
-  const walk = (x: number, z: number) => x >= 0 && z >= 0 && x < l.width && z < l.height && l.cells[cellIndex(l, x, z)]!.kind !== 'void';
+  const walk = (x: number, z: number) => x >= 0 && z >= 0 && x < l.width && z < l.height && isWalkable(l.cells[cellIndex(l, x, z)]!.kind);
   const clampX = (x: number) => Math.min(Math.max(x, 0), l.width - 1);
   const clampZ = (z: number) => Math.min(Math.max(z, 0), l.height - 1);
 
@@ -74,9 +74,12 @@ export function kitPieces(l: LevelData): KitPiece[] {
     const cz = Math.floor(i / l.width);
     const x = (cx + 0.5) * S;
     const z = (cz + 0.5) * S;
-    const floorId: KitId = c.floor === 'cracked' ? 'floor_cracked' : c.floor === 'puddle' ? 'floor_puddle' : 'floor';
-    out.push({ id: floorId, slot: `f:${i}`, x, z, yaw: 0, cx, cz });
-    out.push({ id: c.ceiling === 'hole' ? 'ceiling_hole' : 'ceiling', slot: `c:${i}`, x, z, yaw: 0, cx, cz });
+    // Shafts have no floor (the stair below rises through); stair cells have no ceiling.
+    if (c.floor !== 'none') {
+      const floorId: KitId = c.floor === 'cracked' ? 'floor_cracked' : c.floor === 'puddle' ? 'floor_puddle' : 'floor';
+      out.push({ id: floorId, slot: `f:${i}`, x, z, yaw: 0, cx, cz });
+    }
+    if (c.ceiling !== 'none') out.push({ id: c.ceiling === 'hole' ? 'ceiling_hole' : 'ceiling', slot: `c:${i}`, x, z, yaw: 0, cx, cz });
   });
 
   // Walls on horizontal edges (edgesZ): run along X, between (x,z-1) and (x,z).

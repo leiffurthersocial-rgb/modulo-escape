@@ -11,7 +11,6 @@ export type Action =
   | 'flashlight'
   | 'interact'
   | 'pause'
-  | 'minimap'
   | 'debug'
   | 'debugMenu';
 
@@ -24,7 +23,6 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'crouch', label: 'Crouch' },
   { id: 'flashlight', label: 'Flashlight' },
   { id: 'interact', label: 'Interact' },
-  { id: 'minimap', label: 'Minimap' },
   { id: 'pause', label: 'Pause' },
   { id: 'debug', label: 'Debug overlay' },
   { id: 'debugMenu', label: 'Debug menu (mood)' },
@@ -39,13 +37,18 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   crouch: ['KeyC', 'KeyZ'],
   flashlight: ['KeyF'],
   interact: ['KeyE'],
-  minimap: ['KeyM'],
   pause: ['Escape', 'KeyP'],
   debug: ['F3', 'Backquote'],
   debugMenu: ['F4'],
 };
 
 import { PRESETS, defaultPreset, type PresetName, type Quality } from '../render/quality.ts';
+import materialsConfig from '../config/materials.json';
+
+/** Material config = repo defaults (src/config/materials.json) + the player's F4 picks. */
+export function loadMaterialPicks(): { picks: Record<string, string>; tuning: Record<string, { scale: number }> } {
+  return { picks: { ...materialsConfig.picks, ...settings.materialPicks }, tuning: { ...materialsConfig.tuning } };
+}
 
 export interface GraphicsSettings {
   preset: PresetName;
@@ -64,7 +67,8 @@ export interface Settings {
   fov: number;
   headBob: boolean;
   touchControls: 'auto' | 'on' | 'off';
-  minimap: boolean;
+  /** In-game material choices (category → asset id), set from the F4 menu. */
+  materialPicks: Record<string, string>;
   masterVolume: number;
   bindings: Record<Action, string[]>;
   graphics: GraphicsSettings;
@@ -76,7 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fov: 75,
   headBob: true,
   touchControls: 'auto',
-  minimap: false,
+  materialPicks: {},
   masterVolume: 0.8,
   bindings: DEFAULT_BINDINGS,
   graphics: { preset: defaultPreset(), customBase: 'high', custom: {}, watchdog: false, mood: 0.35 },

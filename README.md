@@ -9,7 +9,9 @@ brutalist wing of the KZU school. Three.js + Rapier + Vite + TypeScript.
 - Force a preset for one load: `?quality=ultra|high|medium|low|battery`
 - Tests: `npm test` (generator, 1000 seeds × 3 sizes), `npm run e2e` (Playwright smoke + screenshots)
 
-Controls: WASD move · Shift sprint · C/Z crouch · F flashlight · M minimap · Esc/P pause · F3 debug overlay · F4 debug menu (mood).
+Controls: WASD move · Shift sprint (stamina) · C/Z crouch · F flashlight · Esc/P pause · F3 debug overlay · F4 debug menu (mood + live material switcher).
+
+Debug: `?monster=stub` spawns the placeholder monster (patrols, hears footsteps, chases on sight).
 
 All third-party assets are CC0 (Poly Haven, ambientCG); see `assets/LICENSES.json` and the in-game Credits.
 Touch controls are enabled automatically on touch-only devices (Settings → Touch controls).

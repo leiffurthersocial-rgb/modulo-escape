@@ -42,19 +42,28 @@ export class Player {
   private bobPhase = 0;
   private bobAmount = 0;
   grounded = true;
+  /** 0..1. Sprinting drains it; it refills after a short rest. */
+  stamina = 1;
+  /** Ran dry: no sprinting until stamina recovers to 30%. */
+  exhausted = false;
+  private sinceSprint = 10;
+  private lastStep = 0;
+  /** Floor the player is on (set by the game from the feet height). */
+  floor = 0;
 
   constructor(
     private physics: PhysicsWorld,
-    spawn: { x: number; z: number },
+    spawn: { x: number; z: number; y?: number },
     yaw: number,
     fov: number,
   ) {
+    const sy = spawn.y ?? 0;
     this.camera = new THREE.PerspectiveCamera(fov, 1, 0.05, 250);
     this.camera.rotation.order = 'YXZ';
     this.yaw = yaw;
     const w = physics.world;
     this.body = w.createRigidBody(
-      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(spawn.x, STAND_HEIGHT / 2 + 0.02, spawn.z),
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(spawn.x, sy + STAND_HEIGHT / 2 + 0.02, spawn.z),
     );
     this.collider = w.createCollider(RAPIER.ColliderDesc.capsule(halfH(STAND_HEIGHT), RADIUS).setFriction(0), this.body);
     this.controller = w.createCharacterController(0.02);
@@ -63,7 +72,7 @@ export class Player {
     this.controller.setMaxSlopeClimbAngle((50 * Math.PI) / 180);
     this.controller.setApplyImpulsesToDynamicBodies(true);
     this.controller.setCharacterMass(70);
-    this.feet.set(spawn.x, 0, spawn.z);
+    this.feet.set(spawn.x, sy, spawn.z);
     this.prevFeet.copy(this.feet);
 
     this.flashlight = new THREE.SpotLight(0xfff4e0, 0, 28, 0.48, 0.55, 1.6);
@@ -102,11 +111,11 @@ export class Player {
     return this.flashlight.intensity > 0;
   }
 
-  /** Debug/test helper: move the player to a floor position and set the view. */
-  teleport(x: number, z: number, yaw: number, pitch = 0) {
-    this.body.setTranslation({ x, y: this.height / 2 + 0.02, z }, true);
-    this.body.setNextKinematicTranslation({ x, y: this.height / 2 + 0.02, z });
-    this.feet.set(x, 0, z);
+  /** Move the player to a floor position (y = floor elevation) and set the view. */
+  teleport(x: number, z: number, yaw: number, pitch = 0, y = this.feet.y) {
+    this.body.setTranslation({ x, y: y + this.height / 2 + 0.02, z }, true);
+    this.body.setNextKinematicTranslation({ x, y: y + this.height / 2 + 0.02, z });
+    this.feet.set(x, y, z);
     this.prevFeet.copy(this.feet);
     this.yaw = yaw;
     this.pitch = pitch;
@@ -130,7 +139,18 @@ export class Player {
       if (wantCrouch || this.canStand()) this.setCrouch(wantCrouch);
     }
     const mv = input.moveVector();
-    this.sprinting = input.isDown('sprint') && !this.crouching && mv.y > 0.2;
+    const wantSprint = input.isDown('sprint') && !this.crouching && mv.y > 0.2;
+    this.sprinting = wantSprint && !this.exhausted && this.stamina > 0;
+    // Stamina: ~5.5 s of sprint, refills in ~6 s after 0.9 s of rest.
+    if (this.sprinting) {
+      this.stamina = Math.max(0, this.stamina - dt * 0.18);
+      this.sinceSprint = 0;
+      if (this.stamina === 0) this.exhausted = true;
+    } else {
+      this.sinceSprint += dt;
+      if (this.sinceSprint > 0.9) this.stamina = Math.min(1, this.stamina + dt * (this.exhausted ? 0.12 : 0.16));
+      if (this.exhausted && this.stamina >= 0.3) this.exhausted = false;
+    }
     const speed = this.crouching ? CROUCH_SPEED : this.sprinting ? SPRINT : WALK;
 
     // Desired horizontal velocity in world space.
@@ -162,6 +182,13 @@ export class Player {
     // Head-bob.
     const hs = Math.hypot(this.vel.x, this.vel.z);
     this.bobPhase += hs * dt * (this.sprinting ? 2.2 : 2.6);
+    // Footsteps make noise (monsters listen): one event per stride.
+    const stride = Math.floor(this.bobPhase / Math.PI);
+    if (stride !== this.lastStep && this.grounded && hs > 0.4) {
+      this.lastStep = stride;
+      const radius = this.crouching ? 2 : this.sprinting ? 16 : 7;
+      bus.emit('noise', { x: this.feet.x, y: this.feet.y, z: this.feet.z, floor: this.floor, radius, source: 'player' });
+    }
     this.bobAmount += ((this.grounded && hs > 0.3 ? 1 : 0) - this.bobAmount) * Math.min(1, dt * 6);
     // Eye height eases between stand and crouch.
     const targetEye = this.crouching ? EYE_CROUCH : EYE_STAND;

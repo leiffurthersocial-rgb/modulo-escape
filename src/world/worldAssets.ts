@@ -158,6 +158,13 @@ export class WorldAssets {
       old.customProgramCacheKey = m.customProgramCacheKey;
       old.needsUpdate = true;
     }
+    if (cat === 'rubble') {
+      const m = createSurfaceMaterial({ set, scale, color: 0x7a7266, mossFactor: 1, tint: 0x8a857c });
+      this.rubbleMat.copy(m);
+      this.rubbleMat.onBeforeCompile = m.onBeforeCompile;
+      this.rubbleMat.customProgramCacheKey = m.customProgramCacheKey;
+      this.rubbleMat.needsUpdate = true;
+    }
     if (cat === 'moss_ground') surfaceUniforms.uMossMap.value = set?.map ?? null;
   }
 
@@ -180,6 +187,7 @@ const GREY_PROP: Record<PropType, number> = {
   vegetation: 0x3f7a2f,
   chair: 0x3c6e9e,
   desk: 0x8a6a45,
+  classroom_desk: 0x8a6a45,
   pipe: 0x5e6266,
 };
 

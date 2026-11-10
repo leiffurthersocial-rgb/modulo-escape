@@ -332,3 +332,22 @@ Render scale is capped so the internal resolution stays ≤ ~3.2 MP on iPad.
 4. **More realistic school:** room types with layouts (classrooms with desk rows and a
    blackboard, toilets, gym, staircase hall, offices, lockers in corridors), signage
    (room plates, fire exit signs, notice boards), consistent corridor widths.
+
+## 10. Review 2 changes (2026-11-10) — indoor horror base
+- **Completely indoors:** no windows, no ceiling holes; the exit gate is the only opening.
+  Sun, sky light and HDRI reflections fade in only near the opened gate.
+- **Multiple floors:** small 2 / medium 3 / large 4 storeys (`Building`), joined by straight
+  concrete stair flights (2 cells, 22 steps, smooth ramp collider). Start on the top floor,
+  exit on the ground floor; flights between floors are placed far apart so every floor has to be
+  crossed. Global nav graph across floors; only the current floor is drawn (plus the adjacent one
+  near a stairwell).
+- **Darker:** lit by fluorescent tubes (most of them failing: buzz dips, stutter bursts, dead
+  tubes) and the flashlight; dark fog indoors.
+- **Less moss/vines; fewer random props:** props are school chairs/desks (classrooms get desk
+  rows), a few barrels, boxes, cans, rubble.
+- **UI:** no minimap, no timer; sprint stamina bar; F4 menu swaps every material live.
+- **Monster-ready:** `src/ai/` — EntityManager, NavQuery (cross-floor A*, node positions,
+  random nodes), Senses (line of sight via Rapier rays, hearing via `noise` events from
+  footsteps: crouch 2 m, walk 7 m, sprint 16 m), `caught` game state, spawn points per floor,
+  and `MonsterStub` with a dormant/patrol/investigate/chase/search state machine
+  (`?monster=stub` to try it).

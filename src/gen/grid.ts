@@ -48,6 +48,11 @@ export function isPassable(e: EdgeKind): boolean {
   return e === 'door' || e === 'open' || e === 'broken';
 }
 
+/** Cells you can stand in (stair ramps included, shafts are holes). */
+export function isWalkable(kind: string): boolean {
+  return kind !== 'void' && kind !== 'shaft';
+}
+
 export function inBounds(g: GridDims, x: number, z: number): boolean {
   return x >= 0 && z >= 0 && x < g.width && z < g.height;
 }

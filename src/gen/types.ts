@@ -5,7 +5,8 @@ export type LevelSize = 'small' | 'medium' | 'large';
 /** What sits on a cell edge. Passable: door, open, broken, exit (once opened). */
 export type EdgeKind = 'none' | 'solid' | 'window' | 'door' | 'open' | 'broken' | 'exit';
 
-export type CellKind = 'void' | 'room' | 'hall' | 'corridor';
+/** stair = ramp cells on the lower floor; shaft = the opening above them on the upper floor (not walkable). */
+export type CellKind = 'void' | 'room' | 'hall' | 'corridor' | 'stair' | 'shaft';
 
 export type Side = 'N' | 'E' | 'S' | 'W';
 
@@ -13,8 +14,8 @@ export interface Cell {
   kind: CellKind;
   /** Room id for room/hall cells, -1 otherwise. */
   room: number;
-  floor: 'intact' | 'cracked' | 'puddle';
-  ceiling: 'intact' | 'hole';
+  floor: 'intact' | 'cracked' | 'puddle' | 'none';
+  ceiling: 'intact' | 'hole' | 'none';
 }
 
 export interface Room {
@@ -23,7 +24,8 @@ export interface Room {
   z: number;
   w: number;
   h: number;
-  kind: 'room' | 'hall';
+  /** stair/shaft/landing are reserved by the building-level stair placement. */
+  kind: 'room' | 'hall' | 'stair' | 'shaft' | 'landing';
 }
 
 export type PropType =
@@ -34,6 +36,7 @@ export type PropType =
   | 'vegetation'
   | 'chair'
   | 'desk'
+  | 'classroom_desk'
   | 'pipe';
 
 export interface PropSlot {
@@ -83,8 +86,13 @@ export interface LevelStats {
 
 import type { Dressing } from './dressing.ts';
 
+/** One storey of the building. */
 export interface LevelData {
-  version: 1;
+  version: 2;
+  /** Floor index (0 = ground floor). */
+  floor: number;
+  /** World Y of this floor's walking surface (m). */
+  elevation: number;
   seed: string;
   size: LevelSize;
   width: number;
@@ -100,6 +108,7 @@ export interface LevelData {
   rooms: Room[];
   /** Interior pillars at grid vertices (vertex coordinates). */
   pillars: { x: number; z: number }[];
+  /** Start / exit cell on this floor, or x = -1 when it is on another floor. */
   start: { x: number; z: number; facing: Side };
   exit: { x: number; z: number; side: Side };
   props: PropSlot[];
@@ -110,4 +119,46 @@ export interface LevelData {
   stats: LevelStats;
   /** Decals, damp map, vines, roots, trees, shrubs (separate RNG streams). */
   dressing: Dressing;
+}
+
+/**
+ * A straight stair flight: ramp cells (x,z) and (x,z+1) on floor `lower`, rising towards +z.
+ * Lower landing (x,z-1) on `lower`; upper landing (x,z+2) on `lower + 1`, where (x,z..z+1) is a shaft.
+ */
+export interface Stair {
+  x: number;
+  z: number;
+  lower: number;
+}
+
+export interface BuildingStats {
+  attempts: number;
+  floors: number;
+  stairs: number;
+  walkable: number;
+  rooms: number;
+  halls: number;
+  loops: number;
+  deadEnds: number;
+  /** Shortest start → exit path in cells, across floors. */
+  pathLength: number;
+}
+
+/** The whole generated building: floors connected by stairs. Global node id = floor * width * height + cell. */
+export interface Building {
+  version: 2;
+  seed: string;
+  size: LevelSize;
+  width: number;
+  height: number;
+  cellSize: number;
+  storeyHeight: number;
+  /** Vertical distance between floors (m). */
+  floorStep: number;
+  floors: LevelData[];
+  stairs: Stair[];
+  start: { floor: number; x: number; z: number; facing: Side };
+  exit: { floor: number; x: number; z: number; side: Side };
+  nav: NavGraph;
+  stats: BuildingStats;
 }
