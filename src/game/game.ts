@@ -30,6 +30,7 @@ import { ExitGate } from '../world/exitGate.ts';
 import { buildStairsGeometry } from '../world/stairs.ts';
 import { loadMaterialPicks, resolvedQuality, saveSettings, settings } from './settings.ts';
 import { Autopilot } from './autopilot.ts';
+import { JumpScare } from './jumpscare.ts';
 import { lowerPreset, PRESETS, type Quality } from '../render/quality.ts';
 import { AmbienceDirector } from '../director/director.ts';
 import { AudioManager } from '../audio/audio.ts';
@@ -40,7 +41,7 @@ import { EntityManager, type EntityContext } from '../ai/entities.ts';
 import { Monster } from '../ai/monster.ts';
 import { loadMonsterModel, type MonsterModel } from '../ai/monsterModel.ts';
 
-export type GameState = 'ready' | 'playing' | 'paused' | 'won' | 'caught';
+export type GameState = 'ready' | 'playing' | 'paused' | 'won' | 'scare' | 'caught';
 
 export interface GameHooks {
   onState(state: GameState, game: Game): void;
@@ -235,6 +236,7 @@ export class Game {
     this.monster = m;
   }
   private monster: Monster | null = null;
+  readonly scare = new JumpScare();
   private monsterWakeAt = Infinity;
 
   private computeNearStairs() {
@@ -282,6 +284,12 @@ export class Game {
     if (s === 'playing') {
       this.input.enabled = true;
       this.input.clearTransient();
+      this.start();
+    } else if (s === 'scare') {
+      // Keep rendering (the scare is animated) but freeze the player.
+      this.input.enabled = false;
+      this.input.clearTransient();
+      this.input.virtualMove.x = this.input.virtualMove.y = 0;
       this.start();
     } else {
       this.input.enabled = false;
@@ -388,6 +396,12 @@ export class Game {
   private update(dt: number) {
     const input = this.input;
     this.time += dt;
+    if (this.state === 'scare') {
+      // Only the scare runs: monster animation + camera; then the caught screen.
+      for (const e of this.entities.entities.values()) e.update(dt, this.entityContext());
+      if (this.scare.update(dt, this.player)) this.setState('caught');
+      return;
+    }
     this.autopilot.update();
     if (input.pressed('debug')) this.overlay.toggle();
     if (input.pressed('debugMenu')) this.hooks.onDebugMenu?.();
@@ -421,6 +435,14 @@ export class Game {
     this.director.update(dt);
     this.senses.update(dt);
     if (this.monster && this.monster.state === 'dormant' && this.time > this.monsterWakeAt) this.monster.wake();
+    if (this.monster) {
+      // Tension for the ambience: chase = 1, otherwise rises as it gets close on the same floor.
+      const m = this.monster;
+      const sameFloor = m.floor === this.player.floor;
+      const d = m.position.distanceTo(this.player.feet);
+      const near = sameFloor ? Math.max(0, 1 - d / 22) * 0.6 : 0;
+      this.audio.setTension(m.state === 'chase' ? 1 : m.state === 'investigate' ? Math.max(near, 0.4) : near);
+    }
     if (this.entities.entities.size) this.entities.update(dt, this.entityContext());
   }
 
@@ -442,7 +464,8 @@ export class Game {
       catchPlayer: (by) => {
         if (this.state !== 'playing') return;
         bus.emit('player:caught', { by });
-        this.setState('caught');
+        this.setState('scare');
+        this.scare.start(by, this.monster, this.player);
       },
     };
   }

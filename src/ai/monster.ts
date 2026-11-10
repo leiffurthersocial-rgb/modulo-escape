@@ -12,7 +12,7 @@ import { streamRng, type Rng } from '../core/rng.ts';
 import type { Entity, EntityContext } from './entities.ts';
 import type { MonsterModel } from './monsterModel.ts';
 
-export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search';
+export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search' | 'attack';
 
 export interface MonsterTuning {
   walkSpeed: number;
@@ -143,6 +143,28 @@ export class Monster implements Entity {
     this.current = a;
   }
 
+  /** Jump scare: stand at `at` facing `look` and attack (the AI stops). */
+  lunge(at: THREE.Vector3, look: THREE.Vector3) {
+    this.state = 'attack';
+    this.path = [];
+    this.position.copy(at);
+    this.object.position.copy(at);
+    this.object.rotation.y = Math.atan2(look.x - at.x, look.z - at.z);
+    this.play('Punch', 1.4, 0.05);
+    setTimeout(() => this.state === 'attack' && this.play('Idle_Attack', 1.2, 0.15), 450);
+  }
+
+  /** World position of the head (for the scare camera); falls back to a fixed height. */
+  headPosition(out: THREE.Vector3): THREE.Vector3 {
+    let head: THREE.Object3D | null = null;
+    this.object.traverse((o) => {
+      if (!head && /^head$/i.test(o.name)) head = o;
+    });
+    this.object.updateMatrixWorld(true);
+    if (head) return (head as THREE.Object3D).getWorldPosition(out);
+    return out.copy(this.position).setY(this.position.y + 1.9);
+  }
+
   wake() {
     if (this.state === 'dormant') this.setState('patrol');
   }
@@ -157,7 +179,7 @@ export class Monster implements Entity {
     this.stateTime += dt;
     this.time += dt;
     this.mixer?.update(dt);
-    if (this.state === 'dormant') return;
+    if (this.state === 'dormant' || this.state === 'attack') return;
     this.floor = ctx.nav.floorAt(this.position.y);
     const me = ctx.nav.nodeAt(this.position.x, this.position.y, this.position.z);
     const eye = this.tmp.copy(this.position).setY(this.position.y + 1.7);
@@ -185,10 +207,7 @@ export class Monster implements Entity {
       speed = this.tuning.chaseSpeed;
       if (!sees && this.stateTime > 1.5) this.setState('search');
       this.goTo(ctx, me, this.lastKnown);
-      if (dist < this.tuning.catchDistance + 0.6) {
-        this.play('Punch', 1.2, 0.1);
-        ctx.catchPlayer(this.id);
-      }
+      if (dist < this.tuning.catchDistance + 0.6) ctx.catchPlayer(this.id);
     } else if (this.state === 'investigate') {
       this.goTo(ctx, me, this.lastKnown);
       if (!this.path.length || this.position.distanceTo(this.lastKnown) < 1.2) this.setState('search');

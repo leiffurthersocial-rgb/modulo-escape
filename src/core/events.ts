@@ -12,6 +12,9 @@ export interface GameEvents {
   /** Something made a sound at a world position (footsteps, doors, props). Monsters listen. */
   'noise': { x: number; y: number; z: number; floor: number; radius: number; source: 'player' | 'prop' | 'world' };
   'player:caught': { by: string };
+  /** Jump scare begins (input frozen, camera on the monster) / ends (→ caught screen). */
+  'scare:start': { by: string };
+  'scare:end': { by: string };
   'player:stamina': { value: number; exhausted: boolean };
   'player:flashlight': { on: boolean };
   'player:sprint': { on: boolean };

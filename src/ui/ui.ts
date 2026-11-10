@@ -107,9 +107,15 @@ export class UI {
     } else if (state === 'won') {
       this.buildWin(game, true);
       this.show(this.winScreen);
+    } else if (state === 'scare') {
+      this.show(null);
+      this.hud.hidden = true;
+      this.playScareOverlay(game);
     } else if (state === 'caught') {
       this.buildWin(game, false);
       this.show(this.winScreen);
+      this.scareEl?.remove();
+      this.scareEl = null;
     }
   }
 
@@ -531,6 +537,18 @@ export class UI {
   }
 
   private debugMenu: HTMLElement | null = null;
+  private scareEl: HTMLElement | null = null;
+
+  /** Flash → shake (game side) → cut to black, timed from the jump-scare config. */
+  private playScareOverlay(game: Game) {
+    this.scareEl?.remove();
+    const c = game.scare.config;
+    const el = h('div', { class: 'scare' }, h('div', { class: 'scare-flash' }), h('div', { class: 'scare-vignette' }), h('div', { class: 'scare-black' }));
+    el.style.setProperty('--black-at', `${c.blackAt}s`);
+    el.style.setProperty('--black-len', `${Math.max(0.1, c.duration - c.blackAt)}s`);
+    this.el.append(el);
+    this.scareEl = el;
+  }
 
   /** Per-category texture switcher (walls, floor, plaster, metal, brick, rubble, moss). */
   private materialPicker(): HTMLElement {
