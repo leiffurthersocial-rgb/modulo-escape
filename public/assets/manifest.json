@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-10T18:25:32.894Z",
+  "generated": "2026-11-10T18:36:01.649Z",
   "textures": {
     "concrete_wall_008": {
       "category": "concrete_wall",
@@ -867,6 +867,13 @@
       "url": "/assets/models/shrub_sorrel_01.92347f14.glb",
       "bytes": 407772,
       "triangles": 3319
+    },
+    "quaternius_zombie": {
+      "category": "monster",
+      "source": "url",
+      "url": "/assets/models/quaternius_zombie.deefb34a.glb",
+      "bytes": 413400,
+      "triangles": 7822
     }
   },
   "hdris": {

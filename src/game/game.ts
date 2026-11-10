@@ -37,7 +37,8 @@ import { isTouchOnlyDevice, TouchControls } from '../input/touch.ts';
 import { NavQuery } from '../ai/navQuery.ts';
 import { Senses } from '../ai/senses.ts';
 import { EntityManager, type EntityContext } from '../ai/entities.ts';
-import { MonsterStub } from '../ai/monster.ts';
+import { Monster } from '../ai/monster.ts';
+import { loadMonsterModel, type MonsterModel } from '../ai/monsterModel.ts';
 
 export type GameState = 'ready' | 'playing' | 'paused' | 'won' | 'caught';
 
@@ -105,6 +106,7 @@ export class Game {
     env: Atmosphere,
     quality: Quality,
     scene: THREE.Scene,
+    private monsterModel: MonsterModel | null = null,
   ) {
     this.scene = scene;
     this.renderer = renderer;
@@ -136,7 +138,7 @@ export class Game {
     this.gateMat = assets.kit.get('metal')!.clone();
     this.gateMat.color.set(0xc08070);
     this.gate = new ExitGate(ground, this.gateMat);
-    this.outdoors = new Outdoors(ground, assets, quality.vegetation);
+    this.outdoors = new Outdoors(ground, assets, quality.vegetation, building.floors);
     this.scene.add(this.outdoors.group);
     this.scene.add(this.gate.object);
     this.physics.setGateBlocker(
@@ -171,7 +173,7 @@ export class Game {
         speed: `${this.player.speed.toFixed(1)} m/s${this.player.sprinting ? ' sprint' : ''}${this.player.crouching ? ' crouch' : ''} · stamina ${(this.player.stamina * 100).toFixed(0)}%`,
         look: this.input.lookMode,
         quality: `${this.quality.name}${this.post.enabled ? ' +post' : ''} tex ${this.quality.textureTier}`,
-        entities: [...this.entities.entities.values()].map((e) => `${e.id}${'state' in e ? `:${String((e as MonsterStub).state)}` : ''}`).join(', ') || 'none',
+        entities: [...this.entities.entities.values()].map((e) => `${e.id}${'state' in e ? `:${String((e as Monster).state)}` : ''}`).join(', ') || 'none',
         assets: this.assets.textured ? `textured, tex VRAM ≈ ${(this.texVram / 1048576).toFixed(0)} MB` : 'greybox',
         seed: `${building.seed} (${building.size}, ${building.floors.length} floors)`,
       };
@@ -212,18 +214,28 @@ export class Game {
     return this.building.floors[0]!;
   }
 
-  /** Debug: ?monster=stub spawns the placeholder monster far from the start; it wakes after 10 s. */
+  /**
+   * The monster spawns on the start floor, as far from the player as the nav graph allows, and
+   * wakes after 20 s. Settings → Monster turns it off (exploring); ?monster=off/on overrides.
+   */
   private maybeSpawnMonster() {
-    if (new URLSearchParams(location.search).get('monster') !== 'stub') return;
+    const q = new URLSearchParams(location.search).get('monster');
+    if (q === 'off' || (q !== 'on' && q !== 'stub' && !settings.monster)) return;
     const b = this.building;
-    const pts = this.director.spawnPoints.filter((p) => p.floor === b.start.floor);
-    const p = pts[pts.length - 1] ?? this.director.spawnPoints[0];
-    if (!p) return;
-    const pos = this.nav.nodePos(p.floor * this.nav.N + cellIndex(b, p.x, p.z));
-    const m = new MonsterStub(b.seed, pos);
+    const startNode = b.start.floor * this.nav.N + cellIndex(b, b.start.x, b.start.z);
+    const dist = bfsFrom(b.nav.adj, startNode);
+    const cands = this.director.spawnPoints
+      .map((p) => p.floor * this.nav.N + cellIndex(b, p.x, p.z))
+      .filter((n) => Math.floor(n / this.nav.N) === b.start.floor && (dist[n] ?? -1) > 0);
+    const node = cands.sort((x, y) => dist[y]! - dist[x]!)[0] ?? dist.indexOf(Math.max(...dist));
+    if (node < 0) return;
+    const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel);
     this.entities.add(m);
-    setTimeout(() => m.wake(), 10000);
+    this.monsterWakeAt = 20;
+    this.monster = m;
   }
+  private monster: Monster | null = null;
+  private monsterWakeAt = Infinity;
 
   private computeNearStairs() {
     const b = this.building;
@@ -408,6 +420,7 @@ export class Game {
     this.gate.update(dt);
     this.director.update(dt);
     this.senses.update(dt);
+    if (this.monster && this.monster.state === 'dormant' && this.time > this.monsterWakeAt) this.monster.wake();
     if (this.entities.entities.size) this.entities.update(dt, this.entityContext());
   }
 
@@ -594,9 +607,27 @@ export async function createGame(
   onProgress('Lighting the sky…');
   await env.loadHdris(lib.manifest, quality.hdriRes);
   env.setMood(settings.graphics.mood);
-  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene);
+  onProgress('Waking something up…');
+  const monsterModel = await loadMonsterModel(renderer, lib.manifest);
+  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel);
   onProgress('Compiling shaders…');
   await renderer.compileAsync(game.scene, game.player.camera).catch(() => {});
   renderer.domElement.style.visibility = '';
   return game;
+}
+
+function bfsFrom(adj: number[][], from: number): number[] {
+  const dist = new Array<number>(adj.length).fill(-1);
+  dist[from] = 0;
+  const q = [from];
+  for (let h = 0; h < q.length; h++) {
+    const c = q[h]!;
+    for (const n of adj[c] ?? []) {
+      if (dist[n] === -1) {
+        dist[n] = dist[c]! + 1;
+        q.push(n);
+      }
+    }
+  }
+  return dist;
 }

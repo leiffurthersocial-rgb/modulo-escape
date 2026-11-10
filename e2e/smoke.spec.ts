@@ -16,7 +16,7 @@ const ready = (page: Page) => page.waitForFunction(() => (window as unknown as {
 test('loads a fixed seed, enters the building, no console errors', async ({ page }, info) => {
   test.setTimeout(300_000);
   const errors = watchErrors(page);
-  await page.goto('/?seed=kzu&size=small&quality=battery');
+  await page.goto('/?seed=kzu&size=small&quality=battery&monster=off');
   await ready(page);
   await expect(page.locator('#btn-enter')).toBeVisible();
   await page.screenshot({ path: `docs/screenshots/${info.project.name}-title.png` });
@@ -40,7 +40,7 @@ test('loads a fixed seed, enters the building, no console errors', async ({ page
 });
 
 test('same seed builds the same level in the browser', async ({ page }) => {
-  await page.goto('/?seed=determinism&size=medium&quality=battery');
+  await page.goto('/?seed=determinism&size=medium&quality=battery&monster=off');
   await ready(page);
   const a = await page.evaluate(() => JSON.stringify((window as any).__game.level.cells));
   await page.reload();
@@ -55,7 +55,7 @@ test('autopilot escapes a small building and sees the win screen', async ({ page
   const errors = watchErrors(page);
   // Software rendering in CI is slow and sim time is capped per frame: keep the canvas small.
   await page.setViewportSize({ width: 480, height: 300 });
-  await page.goto('/?seed=kzu&size=small&quality=battery');
+  await page.goto('/?seed=kzu&size=small&quality=battery&monster=off');
   await ready(page);
   await page.click('#btn-enter');
   await page.evaluate(() => ((window as any).__game.game.autopilot.active = true));
@@ -69,7 +69,7 @@ test('autopilot escapes a small building and sees the win screen', async ({ page
 test('bench route produces results', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'desktop only');
   const errors = watchErrors(page);
-  await page.goto('/bench/?frames=20&presets=low,battery');
+  await page.goto('/bench/?frames=20&presets=low,battery&monster=off');
   test.setTimeout(300_000);
   await page.waitForFunction(() => (window as any).__bench?.done, null, { timeout: 280_000 });
   const results = await page.evaluate(() => (window as any).__bench.results as { preset: string; avgMs: number }[]);

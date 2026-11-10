@@ -31,6 +31,12 @@ export interface SourceEntry {
   /** Models: max texture size, and meshoptimizer simplify ratio (0..1). */
   textureSize?: number;
   simplify?: number;
+  /** source 'url': direct download plus the licence facts we verified by hand. */
+  url?: string;
+  name?: string;
+  author?: string;
+  license?: 'cc0' | 'by';
+  sourceUrl?: string;
 }
 
 const SOURCES_PATH = join(process.cwd(), 'assets', 'asset-sources.json');
@@ -261,6 +267,28 @@ async function sfFetch(e: SourceEntry, dry: boolean) {
   });
 }
 
+// ───────────────────────────── direct URL (hand-verified licence) ─────────────────────────────
+
+async function urlFetch(e: SourceEntry, dry: boolean) {
+  if (!e.url || !e.license || !e.author || !e.sourceUrl) throw new Error(`${e.id}: url sources need url, license, author, sourceUrl`);
+  const L = ALLOWED_LICENSES[e.license];
+  if (!L) throw new Error(`${e.id}: licence ${e.license} not allowed`);
+  const ext = e.url.split('?')[0]!.split('.').pop();
+  if (!dry) await cachedDownload(e.url, `url/${e.id}/model.${ext}`);
+  await upsertLicense({
+    id: e.id,
+    source: 'url',
+    kind: e.kind,
+    category: e.category,
+    name: e.name ?? e.id,
+    sourceUrl: e.sourceUrl,
+    author: e.author,
+    license: L.label,
+    licenseUrl: L.url,
+    attributionRequired: L.attribution,
+  });
+}
+
 // ───────────────────────────── CLI ─────────────────────────────
 
 async function readSources(): Promise<SourceEntry[]> {
@@ -299,6 +327,7 @@ async function main() {
       try {
         if (e.source === 'polyhaven') await phFetch(e, res, dry);
         else if (e.source === 'ambientcg') await acgFetch(e, res, dry);
+        else if (e.source === 'url') await urlFetch(e, dry);
         else await sfFetch(e, dry);
         ok++;
       } catch (err) {

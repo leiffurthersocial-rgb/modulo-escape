@@ -54,10 +54,13 @@ function wallWithOpening(ox0: number, ox1: number, oy0: number, oy1: number, fra
   out.push(box(ox0, oy1, -t, ox1, H, t, 'wall'));
   if (oy0 > 0) out.push(box(ox0, 0, -t, ox1, oy0, t, 'wall'));
   // Frame / reveal trims, slightly proud of the wall so they read in greybox.
+  // The frame sits 2.5 cm proud of the reveal on every side: no face may be coplanar with a wall
+  // face (or with another frame piece), otherwise the jambs z-fight ("flicker") up close.
   const f = 0.08;
-  out.push(box(ox0 - f, oy0, -t - 0.02, ox0, oy1, t + 0.02, frame, false));
-  out.push(box(ox1, oy0, -t - 0.02, ox1 + f, oy1, t + 0.02, frame, false));
-  out.push(box(ox0 - f, oy1, -t - 0.02, ox1 + f, oy1 + f, t + 0.02, frame, false));
+  const p = 0.025;
+  out.push(box(ox0 - f, oy0, -t - 0.02, ox0 + p, oy1 - p, t + 0.02, frame, false));
+  out.push(box(ox1 - p, oy0, -t - 0.02, ox1 + f, oy1 - p, t + 0.02, frame, false));
+  out.push(box(ox0 - f, oy1 - p, -t - 0.03, ox1 + f, oy1 + f, t + 0.03, frame, false));
   return out;
 }
 

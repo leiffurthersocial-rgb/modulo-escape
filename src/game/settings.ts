@@ -69,6 +69,8 @@ export interface Settings {
   touchControls: 'auto' | 'on' | 'off';
   /** In-game material choices (category → asset id), set from the F4 menu. */
   materialPicks: Record<string, string>;
+  /** Monster on (horror) or off (just explore). Applies to the next building. */
+  monster: boolean;
   masterVolume: number;
   bindings: Record<Action, string[]>;
   graphics: GraphicsSettings;
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
   headBob: true,
   touchControls: 'auto',
   materialPicks: {},
+  monster: true,
   masterVolume: 0.8,
   bindings: DEFAULT_BINDINGS,
   graphics: { preset: defaultPreset(), customBase: 'high', custom: {}, watchdog: false, mood: 0.35 },

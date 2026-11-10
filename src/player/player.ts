@@ -70,6 +70,8 @@ export class Player {
     this.controller.enableAutostep(0.32, 0.15, false);
     this.controller.enableSnapToGround(0.35);
     this.controller.setMaxSlopeClimbAngle((50 * Math.PI) / 180);
+    // Never slide on anything we can walk (the stair ramps are ~26°): only near-vertical faces slide.
+    this.controller.setMinSlopeSlideAngle((60 * Math.PI) / 180);
     this.controller.setApplyImpulsesToDynamicBodies(true);
     this.controller.setCharacterMass(70);
     this.feet.set(spawn.x, sy, spawn.z);
@@ -166,7 +168,10 @@ export class Player {
     this.vel.x += (tx - this.vel.x) * a;
     this.vel.z += (tz - this.vel.z) * a;
 
-    this.vy = this.grounded ? -1 : this.vy - GRAVITY * dt;
+    // Grounded: a gentle pull keeps contact (snap-to-ground does the rest) without pushing the
+    // capsule down a slope; airborne: gravity.
+    const moving = Math.abs(tx) + Math.abs(tz) > 0.01;
+    this.vy = this.grounded ? (moving ? -0.3 : 0) : this.vy - GRAVITY * dt;
     const desired = { x: this.vel.x * dt, y: this.vy * dt, z: this.vel.z * dt };
     this.controller.computeColliderMovement(this.collider, desired);
     const m = this.controller.computedMovement();

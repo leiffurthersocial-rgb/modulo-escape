@@ -509,5 +509,17 @@
   "category": "plant:groundcover",
   "res": "1k",
   "textureSize": 512
+ },
+ {
+  "source": "url",
+  "id": "quaternius_zombie",
+  "kind": "model",
+  "category": "monster",
+  "textureSize": 512,
+  "url": "https://raw.githubusercontent.com/huynguyen03dev/godot-ai-playground/HEAD/assets/horror/3d/monsters/zombie_quaternius.glb",
+  "name": "Zombie (animated)",
+  "author": "Quaternius",
+  "license": "cc0",
+  "sourceUrl": "https://poly.pizza/m/VlXjG0N8Eg"
  }
 ]

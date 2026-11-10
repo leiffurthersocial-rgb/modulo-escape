@@ -118,8 +118,8 @@ export function placeLights(l: LevelData, rng: Rng): LightSlot[] {
     if (c.kind === 'corridor') want = (cx + cz) % 2 === 0 && rng.chance(0.85);
     else if (c.kind === 'stair') want = cz === room!.z;
     else if (room && (room.kind === 'room' || room.kind === 'hall')) want = (cx - room.x) % 2 === 0 && (cz - room.z) % 2 === 0;
-    // decay > 0.8 = dead, > 0.35 = flickering. Skewed so most of the building flickers.
-    if (want) out.push({ id: out.length, cx, cz, kind: 'ceiling', decay: Math.pow(rng.next(), 0.7) });
+    // decay > 0.9 = dead (~10%), > 0.75 = flickering (~15%); the rest burn steadily.
+    if (want) out.push({ id: out.length, cx, cz, kind: 'ceiling', decay: rng.next() });
   });
   return out;
 }

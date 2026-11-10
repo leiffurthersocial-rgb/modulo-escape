@@ -41,14 +41,14 @@ export class AmbienceDirector {
       if (s.dead) continue;
       const decay = s.slot.decay;
       let lv = 1;
-      if (decay > 0.35) {
-        // Failing tubes: buzzy dips, stutter bursts, and long drop-outs on the worst ones.
-        const w = decay - 0.35;
-        const buzz = Math.sin(t * 37 + i * 7.1) * Math.sin(t * 11.3 + i) * Math.sin(t * 2.7 + i * 3.3);
-        if (buzz > 0.62 - w) lv = 0.15 + 0.2 * Math.abs(Math.sin(t * 90 + i));
-        const burst = Math.sin(t * 0.7 + i * 1.9) > 0.93 - w * 0.3;
+      if (decay > 0.75) {
+        // Failing tubes: now and then a short buzz dip or a stutter burst; the worst ones drop out.
+        const w = (decay - 0.75) / 0.15; // 0..1
+        const buzz = Math.sin(t * 37 + i * 7.1) * Math.sin(t * 11.3 + i) * Math.sin(t * 1.3 + i * 3.3);
+        if (buzz > 0.9 - w * 0.12) lv = 0.2 + 0.2 * Math.abs(Math.sin(t * 90 + i));
+        const burst = Math.sin(t * 0.37 + i * 1.9) > 0.985 - w * 0.01;
         if (burst) lv *= Math.sin(t * 55 + i) > 0 ? 1 : 0.05;
-        if (decay > 0.68 && Math.sin(t * 0.23 + i * 5.1) > 0.75) lv = 0.02;
+        if (w > 0.7 && Math.sin(t * 0.11 + i * 5.1) > 0.93) lv = 0.03;
       }
       const f = this.flickers.get(i);
       if (f) {
@@ -58,7 +58,7 @@ export class AmbienceDirector {
       s.level = lv;
     }
     // Occasional random flicker event (ambience now; the horror layer will drive these).
-    if (this.rng.next() < dt * 0.08 && this.lights.states.length) {
+    if (this.rng.next() < dt * 0.015 && this.lights.states.length) {
       const id = Math.floor(this.rng.next() * this.lights.states.length);
       bus.emit('light:flicker', { id, intensity: 0, ms: 300 + this.rng.next() * 900 });
     }

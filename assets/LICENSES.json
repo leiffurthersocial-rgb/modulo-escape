@@ -562,5 +562,17 @@
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "attributionRequired": false
+  },
+  {
+    "id": "quaternius_zombie",
+    "source": "url",
+    "kind": "model",
+    "category": "monster",
+    "name": "Zombie (animated)",
+    "sourceUrl": "https://poly.pizza/m/VlXjG0N8Eg",
+    "author": "Quaternius",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attributionRequired": false
   }
 ]

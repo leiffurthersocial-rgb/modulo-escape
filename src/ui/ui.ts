@@ -306,7 +306,7 @@ export class UI {
       });
       return [input, val] as const;
     };
-    const check = (key: 'headBob' | 'invertY') => {
+    const check = (key: 'headBob' | 'invertY' | 'monster') => {
       const input = h('input', { type: 'checkbox', checked: settings[key], style: 'width:22px;height:22px;accent-color:var(--accent)' });
       input.addEventListener('change', () => {
         settings[key] = input.checked;
@@ -332,6 +332,7 @@ export class UI {
       ...field('Volume', vol, volV),
       ...field('Head-bob', check('headBob')),
       ...field('Invert look Y', check('invertY')),
+      ...field('Monster (next building)', check('monster')),
       ...field('Touch controls', touchSel),
     );
 
@@ -368,12 +369,22 @@ export class UI {
     );
     const graphics = this.buildGraphics();
     graphics.hidden = true;
-    const panes: [string, HTMLElement][] = [['General', general], ['Graphics', graphics], ['Keys', controls]];
+    const materials = h(
+      'div',
+      { style: 'display:flex;flex-direction:column;gap:10px' },
+      h('p', {}, 'Compare surfaces live: ◀ / ▶ switch the texture in the building behind this menu. Your choice is remembered; "Copy my picks" puts them on the clipboard to send me.'),
+      this.game ? this.materialPicker() : h('p', {}, 'Load a building first.'),
+    );
+    materials.hidden = true;
+    const panes: [string, HTMLElement][] = [['General', general], ['Graphics', graphics], ['Materials', materials], ['Keys', controls]];
     const tabs = panes.map(([label], i) => {
       const b = h('button', { class: i === 0 ? 'active' : '' }, label);
       b.onclick = () => {
         panes.forEach(([, p], j) => (p.hidden = j !== i));
         tabs.forEach((t, j) => t.classList.toggle('active', j === i));
+        // Materials: clear backdrop, panel to the side, so the building is visible while comparing.
+        b.closest('.screen')?.classList.toggle('compare', label === 'Materials');
+        if (label === 'Materials') this.game?.renderFrame(0);
       };
       return b;
     });
@@ -387,6 +398,7 @@ export class UI {
         h('div', { class: 'tabs' }, ...tabs),
         general,
         graphics,
+        materials,
         controls,
         h(
           'div',

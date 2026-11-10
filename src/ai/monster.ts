@@ -1,14 +1,16 @@
 /**
- * Monster stub: the full state machine and movement plumbing, deliberately simple. Off by default
- * (enable with ?monster=stub for testing). The real monster (model, animation, audio, tuning)
- * replaces the placeholder body and the per-state behaviour; the senses, nav and catch hooks stay.
+ * The monster: Quaternius' CC0 zombie made tall, gaunt and dark with glowing eyes (placeholder capsule
+ * if the model is missing). On by default (Settings → Monster, or ?monster=off). Swap the model in
+ * MONSTER_MODEL_ID; the senses, nav and catch hooks stay.
  *
  * States: dormant → patrol (random reachable nodes) → investigate (last heard noise) →
  * chase (sees the player) → search (lost them; sweeps around the last known position) → patrol.
  */
 import * as THREE from 'three';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { streamRng, type Rng } from '../core/rng.ts';
 import type { Entity, EntityContext } from './entities.ts';
+import type { MonsterModel } from './monsterModel.ts';
 
 export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search';
 
@@ -22,9 +24,9 @@ export interface MonsterTuning {
   searchTime: number;
 }
 
-export const DEFAULT_TUNING: MonsterTuning = { walkSpeed: 1.6, chaseSpeed: 4.6, sightRange: 18, fov: 1.1, catchDistance: 1.0, searchTime: 9 };
+export const DEFAULT_TUNING: MonsterTuning = { walkSpeed: 1.3, chaseSpeed: 3.9, sightRange: 16, fov: 1.0, catchDistance: 1.0, searchTime: 10 };
 
-export class MonsterStub implements Entity {
+export class Monster implements Entity {
   readonly id = 'monster';
   readonly object = new THREE.Group();
   position = new THREE.Vector3();
@@ -37,21 +39,108 @@ export class MonsterStub implements Entity {
   private heading = new THREE.Vector3(0, 0, 1);
   private rng: Rng;
   private tmp = new THREE.Vector3();
+  private mixer: THREE.AnimationMixer | null = null;
+  private actions = new Map<string, THREE.AnimationAction>();
+  private current: THREE.AnimationAction | null = null;
+  private time = 0;
 
   constructor(
     seed: string,
     spawn: THREE.Vector3,
+    model: MonsterModel | null = null,
     readonly tuning: MonsterTuning = DEFAULT_TUNING,
   ) {
     this.rng = streamRng(seed, 'monster');
     this.position.copy(spawn);
-    // Placeholder body: a dark, tall capsule with faint eyes.
+    if (model) this.buildFromModel(model);
+    else this.buildPlaceholder();
+    this.object.position.copy(spawn);
+    this.play('Idle');
+  }
+
+  /** Tall, gaunt and dark: the stylised zombie pushed towards horror. */
+  private buildFromModel(model: MonsterModel) {
+    const body = cloneSkinned(model.scene) as THREE.Group;
+    body.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.castShadow = true;
+      m.frustumCulled = false; // skinned bounds don't follow the animation
+      // Near-black, wet skin: the cartoon colours are mostly desaturated away and only a
+      // greenish sheen survives in the flashlight.
+      const mat = (m.material as THREE.MeshStandardMaterial).clone();
+      mat.color.set(0x262a24);
+      mat.roughness = 0.42;
+      mat.metalness = 0;
+      mat.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <map_fragment>',
+          `#include <map_fragment>
+  float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+  diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 0.25) * vec3(0.85, 0.95, 0.85);`,
+        );
+      };
+      mat.customProgramCacheKey = () => 'monster-skin';
+      m.material = mat;
+    });
+    this.object.add(body);
+    this.mixer = new THREE.AnimationMixer(body);
+    for (const clip of model.animations) this.actions.set(clip.name, this.mixer.clipAction(clip));
+    // Measure the *posed* skinned mesh (bones applied), then scale to 2.15 m, gaunt, feet on y = 0.
+    const measure = () => {
+      this.mixer!.update(0);
+      this.object.updateMatrixWorld(true);
+      body.traverse((o) => (o as THREE.SkinnedMesh).isSkinnedMesh && (o as THREE.SkinnedMesh).skeleton.update());
+      return new THREE.Box3().setFromObject(body, true);
+    };
+    this.actions.get('Idle')?.play();
+    const box = measure();
+    const h = Math.max(0.01, box.max.y - box.min.y);
+    const s = 2.15 / h;
+    body.scale.set(s * 0.8, s * 1.2, s * 0.8);
+    const posed = measure();
+    body.position.y -= posed.min.y;
+    body.updateMatrixWorld(true);
+    this.actions.get('Idle')?.stop();
+    // Glowing eyes on the head bone.
+    let head: THREE.Object3D | null = null;
+    body.traverse((o) => {
+      if (!head && /^head$/i.test(o.name)) head = o;
+    });
+    if (head) {
+      const hb = head as THREE.Object3D;
+      const hp = hb.getWorldPosition(new THREE.Vector3());
+      const ws = hb.getWorldScale(new THREE.Vector3()).x || 1;
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
+      for (const side of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), eyeMat);
+        const wp = hp.clone().add(new THREE.Vector3(side * 0.07, 0.1, 0.26));
+        eye.position.copy(hb.worldToLocal(wp));
+        eye.scale.setScalar(1 / ws);
+        hb.add(eye);
+      }
+      const glow = new THREE.PointLight(0xff9a60, 0.6, 2.2, 2);
+      glow.position.copy(hb.worldToLocal(hp.clone().add(new THREE.Vector3(0, 0.05, 0.3))));
+      hb.add(glow);
+    }
+  }
+
+  private buildPlaceholder() {
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.5, 4, 10), new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.9 }));
     body.position.y = 1.1;
     const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xff3020 }));
     eyes.position.set(0, 1.7, 0.33);
     this.object.add(body, eyes);
-    this.object.position.copy(spawn);
+  }
+
+  private play(name: string, timeScale = 1, fade = 0.35) {
+    const a = this.actions.get(name);
+    if (!a) return;
+    a.timeScale = timeScale;
+    if (a === this.current) return;
+    a.reset().setEffectiveWeight(1).fadeIn(fade).play();
+    this.current?.fadeOut(fade);
+    this.current = a;
   }
 
   wake() {
@@ -66,6 +155,8 @@ export class MonsterStub implements Entity {
 
   update(dt: number, ctx: EntityContext) {
     this.stateTime += dt;
+    this.time += dt;
+    this.mixer?.update(dt);
     if (this.state === 'dormant') return;
     this.floor = ctx.nav.floorAt(this.position.y);
     const me = ctx.nav.nodeAt(this.position.x, this.position.y, this.position.z);
@@ -94,7 +185,10 @@ export class MonsterStub implements Entity {
       speed = this.tuning.chaseSpeed;
       if (!sees && this.stateTime > 1.5) this.setState('search');
       this.goTo(ctx, me, this.lastKnown);
-      if (dist < this.tuning.catchDistance + 0.6) ctx.catchPlayer(this.id);
+      if (dist < this.tuning.catchDistance + 0.6) {
+        this.play('Punch', 1.2, 0.1);
+        ctx.catchPlayer(this.id);
+      }
     } else if (this.state === 'investigate') {
       this.goTo(ctx, me, this.lastKnown);
       if (!this.path.length || this.position.distanceTo(this.lastKnown) < 1.2) this.setState('search');
@@ -108,6 +202,12 @@ export class MonsterStub implements Entity {
     } else if (this.state === 'patrol' && !this.path.length) {
       this.path = ctx.nav.path(me, ctx.nav.randomNode(this.rng)).slice(1);
     }
+    // Lurch: speed swells and drops with each step; the chase is a relentless arms-out run.
+    if (this.state === 'chase') this.play('Run_Arms', 1.05);
+    else if (this.path.length) {
+      speed *= 0.75 + 0.35 * Math.max(0, Math.sin(this.time * 2.6));
+      this.play('Walk', 0.8);
+    } else this.play('Idle', 0.7);
     this.follow(ctx, dt, speed);
   }
 
@@ -137,12 +237,10 @@ export class MonsterStub implements Entity {
   }
 
   dispose() {
+    this.mixer?.stopAllAction();
     this.object.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        m.geometry.dispose();
-        (m.material as THREE.Material).dispose();
-      }
+      if (m.isMesh) (m.material as THREE.Material).dispose();
     });
   }
 }

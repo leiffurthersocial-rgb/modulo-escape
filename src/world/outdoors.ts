@@ -24,8 +24,26 @@ export class Outdoors {
   /** Tiles farther than this (m, from the camera) are hidden. */
   viewDistance = 60;
 
-  constructor(level: LevelData, assets: WorldAssets, density: number) {
+  /**
+   * @param footprints every floor of the building: upper floors can overhang the ground floor,
+   *   so plants must keep clear of all of them (a palm grew through an upper floor once).
+   */
+  constructor(level: LevelData, assets: WorldAssets, density: number, footprints: LevelData[] = [level]) {
     this.group.name = 'outdoors';
+    const S0 = level.cellSize;
+    const built = (x: number, z: number) =>
+      footprints.some((f) => {
+        const cx = Math.floor(x / S0);
+        const cz = Math.floor(z / S0);
+        return inBounds(f, cx, cz) && f.cells[cellIndex(f, cx, cz)]!.kind !== 'void';
+      });
+    const clear = (x: number, z: number, r: number) => {
+      for (let a = 0; a < 8; a++) {
+        const ang = (a / 8) * Math.PI * 2;
+        if (built(x + Math.cos(ang) * r, z + Math.sin(ang) * r)) return false;
+      }
+      return !built(x, z);
+    };
     const q = new THREE.Quaternion();
     const Y = new THREE.Vector3(0, 1, 0);
     const keep = (i: number) => density >= 1 || frac(i * 0.618034) < density;
@@ -43,7 +61,7 @@ export class Outdoors {
 
     // Trees (variants 0–2).
     level.dressing.trees.forEach((t, i) => {
-      if (!keep(i)) return;
+      if (!keep(i) || !clear(t.x, t.z, 3.5)) return;
       const v = assets.trees[t.variant]!;
       const m = mat4(t.x, t.z, t.rot, t.scale);
       add(t.x, t.z, { geo: v.trunk, mat: assets.bark, m, shadow: true });
@@ -65,7 +83,7 @@ export class Outdoors {
     };
     const bush = assets.trees[3]!;
     level.dressing.shrubs.forEach((s, i) => {
-      if (!keep(i)) return;
+      if (!keep(i) || !clear(s.x, s.z, 0.8)) return;
       if (models.length && nearFacade(s.x, s.z) && i % 3 === 0) {
         const model = models[s.variant % models.length]!;
         const m = mat4(s.x, s.z, s.rot, s.scale);

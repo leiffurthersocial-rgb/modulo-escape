@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export type AssetSource = 'polyhaven' | 'ambientcg' | 'sketchfab';
+export type AssetSource = 'polyhaven' | 'ambientcg' | 'sketchfab' | 'url';
 export type AssetKind = 'texture' | 'model' | 'hdri';
 
 export interface LicenseEntry {

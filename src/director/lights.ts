@@ -42,7 +42,7 @@ export class LightRegistry {
           floor: level.floor,
           pos: new THREE.Vector3((slot.cx + 0.5) * S, level.elevation + b.storeyHeight - 0.05, (slot.cz + 0.5) * S),
           level: 1,
-          dead: slot.decay > 0.8,
+          dead: slot.decay > 0.9,
         });
       }
     }
