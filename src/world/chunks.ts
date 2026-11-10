@@ -26,7 +26,11 @@ export class ChunkManager {
   buildBudget = 2;
   private chunks = new Map<string, Chunk>();
   private piecesByChunk = new Map<string, KitPiece[]>();
-  private propsByChunk = new Map<string, LevelData['props']>();
+  private propsByChunk = new Map<string, { p: LevelData['props'][number]; i: number }[]>();
+  /** Live instance slots for dynamic props (prop index → mesh + instance index). */
+  readonly dynamicSlots = new Map<number, { mesh: THREE.InstancedMesh; index: number }>();
+  /** Current transform of a dynamic prop, or null to use its authored slot. */
+  dynamicMatrix: (propIndex: number) => THREE.Matrix4 | null = () => null;
   private propGeo = makePropGeometries();
   private cx = Number.NaN;
   private cz = Number.NaN;
@@ -42,7 +46,7 @@ export class ChunkManager {
     this.chunksX = Math.ceil(level.width / CHUNK_CELLS);
     this.chunksZ = Math.ceil(level.height / CHUNK_CELLS);
     for (const p of pieces) push(this.piecesByChunk, chunkKey(p.cx, p.cz), p);
-    for (const p of level.props) push(this.propsByChunk, chunkKey(p.cx, p.cz), p);
+    level.props.forEach((p, i) => push(this.propsByChunk, chunkKey(p.cx, p.cz), { p, i }));
   }
 
   get loadedCount(): number {
@@ -109,11 +113,16 @@ export class ChunkManager {
       group.add(mesh);
     }
     // Props, instanced per type.
-    const byType = new Map<PropType, LevelData['props']>();
-    for (const p of this.propsByChunk.get(key) ?? []) push(byType, p.type, p);
+    const byType = new Map<PropType, { p: LevelData['props'][number]; i: number }[]>();
+    for (const e of this.propsByChunk.get(key) ?? []) push(byType, e.p.type, e);
     for (const [type, list] of byType) {
       const im = new THREE.InstancedMesh(this.propGeo.get(type)!, this.mats.props.get(type)!, list.length);
-      list.forEach((p, i) => im.setMatrixAt(i, propMatrix(p, this.level.cellSize)));
+      list.forEach(({ p, i }, k) => {
+        const dyn = this.dynamicMatrix(i);
+        im.setMatrixAt(k, dyn ?? propMatrix(p, this.level.cellSize));
+        if (dyn) this.dynamicSlots.set(i, { mesh: im, index: k });
+      });
+      im.userData.chunk = key;
       im.instanceMatrix.needsUpdate = true;
       im.castShadow = true;
       im.receiveShadow = true;
@@ -127,6 +136,7 @@ export class ChunkManager {
   }
 
   private unload(key: string, ch: Chunk): void {
+    for (const [i, slot] of this.dynamicSlots) if (slot.mesh.userData.chunk === key) this.dynamicSlots.delete(i);
     for (const o of ch.group.children) {
       // Merged geometry is chunk-owned; prop geometry and materials are shared.
       if (o instanceof THREE.InstancedMesh) o.dispose();

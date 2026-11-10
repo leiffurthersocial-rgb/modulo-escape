@@ -22,3 +22,9 @@ Running log of technical decisions. Newest at the bottom.
 | 16 | 2026-11-10 | Kit pieces are lists of axis-aligned boxes; the same boxes build render geometry and physics colliders | Render and collision can never disagree; trivial to rotate by 90° steps. |
 | 17 | 2026-11-10 | Greybox: one vertex-coloured material per chunk (+ puddles), props as InstancedMesh per type per chunk | Cut draw calls from 169 to 64 at a typical view. Phase 2 swaps to a handful of PBR materials per chunk. |
 | 18 | 2026-11-10 | Level origin at the NW grid corner, +X east, +Z south, cell (x,z) centre at ((x+.5)·4, (z+.5)·4) | One convention for generator, builder, physics and minimap. |
+| 19 | 2026-11-10 | Kinematic character controller (capsule r 0.32 m, 1.75 m / 1.1 m crouched), fixed 60 Hz step with camera interpolation | Stable collisions independent of frame rate; the step rate drops to 30 Hz for Battery Saver later. |
+| 20 | 2026-11-10 | Changing seed/size or restarting does a full page navigation | Guarantees every GPU/WASM resource of the old level is freed (iPad memory), and the URL is always the share link. |
+| 21 | 2026-11-10 | Pause stops `setAnimationLoop` entirely (one backdrop frame is rendered first); hidden tab auto-pauses | Zero GPU work while paused: battery. |
+| 22 | 2026-11-10 | Pointer Lock first; on missing API or `pointerlockerror` fall back to click-drag look, with a toast | Never hard-fails on iPadOS Safari or locked-down browsers. |
+| 23 | 2026-11-10 | Crouch defaults to C / Z, not Ctrl | Ctrl+W closes the browser tab. |
+| 24 | 2026-11-10 | Autopilot that follows the generator's nav graph | Lets Playwright play every seed end to end and drives the /bench camera path. |

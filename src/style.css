@@ -13,6 +13,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body {
   margin: 0;
   height: 100%;
@@ -56,3 +57,87 @@ button.primary:hover { background: #e7c260; }
   border-radius: 4px;
   z-index: 50;
 }
+
+/* ───────── UI layer ───────── */
+.ui { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
+.ui > * { pointer-events: auto; }
+.screen {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal));
+  background: rgba(8, 10, 8, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.screen[hidden] { display: none; }
+.panel {
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 22px;
+  display: flex; flex-direction: column; gap: 14px;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+.panel h1 { margin: 0; font-size: 26px; letter-spacing: 0.08em; text-transform: uppercase; }
+.panel h1 small { display: block; font-size: 12px; color: var(--muted); letter-spacing: 0.3em; margin-top: 6px; }
+.panel h2 { margin: 0; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; }
+.panel p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row > button { flex: 1 1 140px; }
+.stencil {
+  font-weight: 900; letter-spacing: 0.25em; color: var(--accent);
+  border: 2px solid var(--accent); padding: 2px 8px; display: inline-block; font-size: 13px;
+}
+.seed-box {
+  display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  padding: 10px 12px; background: rgba(255,255,255,0.05); border-radius: 6px; font-size: 14px;
+}
+.seed-box code { font-size: 16px; color: var(--accent); word-break: break-all; }
+.field { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; font-size: 14px; }
+.field label { color: var(--fg); }
+.field input[type=range] { width: 180px; accent-color: var(--accent); }
+.field select, .field input[type=text] {
+  font: inherit; color: var(--fg); background: #222; border: 1px solid var(--panel-border);
+  border-radius: 6px; padding: 8px; min-height: 40px;
+}
+.field .val { color: var(--muted); min-width: 3ch; text-align: right; }
+.keys { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 8px; align-items: center; font-size: 14px; }
+.keys button { min-height: 36px; padding: 6px 10px; min-width: 86px; }
+.keys button.listening { background: var(--accent); color: #111; }
+.tabs { display: flex; gap: 6px; }
+.tabs button.active { background: rgba(216, 176, 74, 0.25); border-color: var(--accent); }
+.big-time { font-size: 44px; color: var(--accent); font-weight: 800; letter-spacing: 0.04em; }
+.toast {
+  position: absolute; left: 50%; bottom: calc(24px + var(--sab)); transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px;
+  padding: 10px 16px; font-size: 14px; pointer-events: none; transition: opacity 0.3s;
+}
+
+/* HUD */
+.hud { position: absolute; inset: 0; pointer-events: none; }
+.hud .crosshair {
+  position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px;
+  border-radius: 50%; background: rgba(255,255,255,0.7); box-shadow: 0 0 2px #000;
+}
+.hud .topbar {
+  position: absolute; top: calc(10px + var(--sat)); right: calc(12px + var(--sar));
+  display: flex; gap: 12px; align-items: center; font-size: 14px;
+  text-shadow: 0 1px 2px #000;
+}
+.hud .timer { font-size: 18px; font-variant-numeric: tabular-nums; }
+.hud .seedtag { color: var(--muted); }
+.hud .hudbtn { pointer-events: auto; min-height: 40px; padding: 6px 12px; }
+.hud .hint {
+  position: absolute; left: 50%; bottom: calc(18px + var(--sab)); transform: translateX(-50%);
+  color: var(--muted); font-size: 13px; text-shadow: 0 1px 2px #000; text-align: center;
+}
+.minimap {
+  position: absolute; right: calc(12px + var(--sar)); top: calc(56px + var(--sat));
+  width: 200px; height: 200px; border: 1px solid var(--panel-border); border-radius: 6px;
+  background: rgba(0,0,0,0.55); image-rendering: pixelated;
+}
+@media (max-width: 700px) { .minimap { width: 140px; height: 140px; } }
