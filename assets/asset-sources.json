@@ -1,0 +1,5 @@
+[
+  { "source": "polyhaven", "id": "concrete_wall_008", "kind": "texture", "category": "concrete" },
+  { "source": "ambientcg", "id": "Concrete049", "kind": "texture", "category": "concrete" },
+  { "source": "polyhaven", "id": "Barrel_01", "kind": "model", "category": "prop:barrel" }
+]

@@ -13,3 +13,9 @@ Running log of technical decisions. Newest at the bottom.
 | 7 | 2026-11-10 | Cell 4 m, storey 3.6 m, walls on cell edges, 4×4-cell chunks | Matches brutalist proportions; edges make door/window/wall assignment and overlap tests simple. |
 | 8 | 2026-11-10 | KTX2: UASTC for normals, ETC1S/UASTC+RDO for albedo & ORM | Normal maps break badly under ETC1S; albedo/ORM tolerate it and download much smaller. |
 | 9 | 2026-11-10 | Perf numbers come from real devices via `/bench`, not from the cloud container | Headless Chromium here renders on the CPU (SwiftShader). |
+| 10 | 2026-11-10 | Hint system dropped | Your call at plan review. |
+| 11 | 2026-11-10 | `@dimforge/rapier3d-compat` (WASM inlined as base64) instead of the bundler build | No separate .wasm fetch to break under Safari/Vercel/Vite; ~0.6 MB extra gzip is acceptable for now. Revisit if load time matters. |
+| 12 | 2026-11-10 | Asset scripts use Node fetch with `NODE_USE_ENV_PROXY=1` | Node's built-in fetch ignores HTTPS_PROXY otherwise; harmless without a proxy. |
+| 13 | 2026-11-10 | Poly Haven sources: JPG for albedo/ARM, PNG for normals, prefer packed ARM over separate maps | PNG everywhere was ~6× the download; JPG blocks only hurt normals. ARM is already our ORM layout. |
+| 14 | 2026-11-10 | Hashed output names (`albedo_1k.<hash>.ktx2`) + manifest.json | Makes `/assets/*` safe to cache immutably. |
+| 15 | 2026-11-10 | Models: `gltf-transform optimize` (meshopt default, `--draco` optional, KTX2 textures ≤ 1k) | One battle-tested pipeline; meshopt decodes faster and its decoder is smaller than Draco's. |

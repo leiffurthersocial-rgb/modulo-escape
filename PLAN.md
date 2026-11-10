@@ -4,7 +4,7 @@ First-person browser game. Escape a procedurally generated, derelict, overgrown,
 wet-tropical brutalist wing of the **KZU** school. Horror comes later; this plan
 prepares hooks for it but does not build it.
 
-Status: **draft, waiting for approval.** No game code is written until you OK this.
+Status: **approved 2026-11-10** (hint system dropped; all other defaults accepted).
 
 ---
 
@@ -103,7 +103,7 @@ tests/         vitest unit tests; e2e/ Playwright
 6. Stretch: a stairwell (2×2 cells) with stairs/ramp to a mezzanine level.
    LevelData supports `floors[]` from day one, so this is additive.
 7. Export a nav graph: nodes = cells, edges = passable edges, plus precomputed
-   distance-to-exit (used for the hint, later for AI).
+   distance-to-exit (for future AI).
 
 **Tests (vitest, 1000+ seeds × 3 sizes):** solvable, fully connected (every
 walkable cell is reachable), deterministic (same seed → deep-equal LevelData and the
@@ -127,7 +127,7 @@ rooms don't overlap), minimum path length met, generation time under budget.
   1.1 m with a headroom check before standing). Fixed 60 Hz step, 30 Hz in Battery
   Saver, with render interpolation.
 - Input action map: `moveF/B/L/R, sprint, crouch, flashlight, interact, pause,
-  minimap, hint, debug`. Remappable, persisted in localStorage.
+  minimap, debug`. Remappable, persisted in localStorage.
 - **Pointer Lock** on desktop and iPadOS Safari with trackpad/mouse. If
   `requestPointerLock` is missing, rejects, or fires `pointerlockerror`, the game
   falls back to click-drag look with a small notice, and never hard-fails.
@@ -165,10 +165,9 @@ taken and checked by me after every visual change.
 - **M4 Game loop and UI.** Seed in URL/HUD, copy link, new seed, exit gate that opens
   on approach, win screen (time + seed), pause/settings (sensitivity, FOV, head-bob,
   key remap), localStorage persistence, credits page stub.
-- **M5 Extras and hooks.** Touch controls, minimap (off by default), costly hint
-  (shows the direction to the next cell on the shortest path, adds +60 s to the
-  timer, 90 s cooldown), placeholder props from the seeded slots, event bus,
-  ambience director stub, audio stub.
+- **M5 Extras and hooks.** Touch controls, minimap (off by default), placeholder
+  props from the seeded slots, event bus, ambience director stub, audio stub.
+  (No hint system: dropped at review.)
 - **M6 QA and deploy.** Playwright smoke (fixed seed, desktop 1920×1080 and iPad
   1180×820 / 1366×1024, fails on console errors), `/bench` route (fixed seed,
   fixed spline camera, avg/p95 per preset), deploy check.
@@ -299,9 +298,8 @@ Render scale is capped so the internal resolution stays ≤ ~3.2 MP on iPad.
 
 ---
 
-## 7. Open questions (defaults I'll use if you don't answer)
+## 7. Answered questions
 1. Default map size: **medium**.
-2. Timer counts from first movement, not from page load: **yes**.
-3. Hint cost: **+60 s penalty, 90 s cooldown**.
-4. Do you already have a Vercel project linked to this repo? Default: **no**, and
-   I'll give you the steps in M6.
+2. Timer counts from first movement: **yes**.
+3. Hint system: **dropped**.
+4. Vercel: not linked yet; steps given in M6.
