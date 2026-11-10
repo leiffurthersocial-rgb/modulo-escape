@@ -26,6 +26,11 @@ export interface SourceEntry {
   category: string;
   /** Override download resolution ("1k" | "2k" | "4k") */
   res?: string;
+  /** Texture tiers to ship (process step). Default 512 + 1k. */
+  tiers?: string[];
+  /** Models: max texture size, and meshoptimizer simplify ratio (0..1). */
+  textureSize?: number;
+  simplify?: number;
 }
 
 const SOURCES_PATH = join(process.cwd(), 'assets', 'asset-sources.json');

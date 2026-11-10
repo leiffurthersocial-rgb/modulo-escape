@@ -1,0 +1,991 @@
+{
+  "generated": "2026-11-10T16:48:41.248Z",
+  "textures": {
+    "concrete_wall_008": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_wall_008/albedo_512.05de5cca.ktx2",
+          "normal": "/assets/tex/concrete_wall_008/normal_512.01f290bc.ktx2",
+          "orm": "/assets/tex/concrete_wall_008/orm_512.6b0b4c3a.ktx2",
+          "bytes": 198299,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_wall_008/albedo_1k.53e8e089.ktx2",
+          "normal": "/assets/tex/concrete_wall_008/normal_1k.e5d7a0e5.ktx2",
+          "orm": "/assets/tex/concrete_wall_008/orm_1k.76945d76.ktx2",
+          "bytes": 710972,
+          "px": 1024
+        }
+      }
+    },
+    "concrete_wall_006": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_wall_006/albedo_512.31557311.ktx2",
+          "normal": "/assets/tex/concrete_wall_006/normal_512.fbf97e31.ktx2",
+          "orm": "/assets/tex/concrete_wall_006/orm_512.13496569.ktx2",
+          "bytes": 443112,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_wall_006/albedo_1k.37ca3a44.ktx2",
+          "normal": "/assets/tex/concrete_wall_006/normal_1k.43fb71dc.ktx2",
+          "orm": "/assets/tex/concrete_wall_006/orm_1k.f5f16163.ktx2",
+          "bytes": 1653963,
+          "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/concrete_wall_006/albedo_2k.15ab9bae.ktx2",
+          "normal": "/assets/tex/concrete_wall_006/normal_2k.33a6d33c.ktx2",
+          "orm": "/assets/tex/concrete_wall_006/orm_2k.84606ad0.ktx2",
+          "bytes": 6166822,
+          "px": 2048
+        }
+      }
+    },
+    "concrete_wall_004": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_wall_004/albedo_512.dea5cb1a.ktx2",
+          "normal": "/assets/tex/concrete_wall_004/normal_512.d5fa99c3.ktx2",
+          "orm": "/assets/tex/concrete_wall_004/orm_512.84a856bd.ktx2",
+          "bytes": 369394,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_wall_004/albedo_1k.ac40d126.ktx2",
+          "normal": "/assets/tex/concrete_wall_004/normal_1k.d2b7b771.ktx2",
+          "orm": "/assets/tex/concrete_wall_004/orm_1k.1e1b800a.ktx2",
+          "bytes": 1503670,
+          "px": 1024
+        }
+      }
+    },
+    "concrete_wall_003": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_wall_003/albedo_512.01067fb6.ktx2",
+          "normal": "/assets/tex/concrete_wall_003/normal_512.e8db8027.ktx2",
+          "orm": "/assets/tex/concrete_wall_003/orm_512.b1d20dd3.ktx2",
+          "bytes": 411296,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_wall_003/albedo_1k.e60bd37d.ktx2",
+          "normal": "/assets/tex/concrete_wall_003/normal_1k.57f25ee5.ktx2",
+          "orm": "/assets/tex/concrete_wall_003/orm_1k.1d32702d.ktx2",
+          "bytes": 1540416,
+          "px": 1024
+        }
+      }
+    },
+    "rough_concrete": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/rough_concrete/albedo_512.038617ae.ktx2",
+          "normal": "/assets/tex/rough_concrete/normal_512.a13db104.ktx2",
+          "orm": "/assets/tex/rough_concrete/orm_512.d796cded.ktx2",
+          "bytes": 473772,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/rough_concrete/albedo_1k.cde9b1e6.ktx2",
+          "normal": "/assets/tex/rough_concrete/normal_1k.12d8e4ca.ktx2",
+          "orm": "/assets/tex/rough_concrete/orm_1k.a363a8e1.ktx2",
+          "bytes": 1748979,
+          "px": 1024
+        }
+      }
+    },
+    "ribbed_concrete_wall": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/ribbed_concrete_wall/albedo_512.a0a7fcfe.ktx2",
+          "normal": "/assets/tex/ribbed_concrete_wall/normal_512.21b056dd.ktx2",
+          "orm": "/assets/tex/ribbed_concrete_wall/orm_512.9e5009e6.ktx2",
+          "bytes": 431319,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/ribbed_concrete_wall/albedo_1k.5683a94f.ktx2",
+          "normal": "/assets/tex/ribbed_concrete_wall/normal_1k.7983cf62.ktx2",
+          "orm": "/assets/tex/ribbed_concrete_wall/orm_1k.8438ced8.ktx2",
+          "bytes": 1565392,
+          "px": 1024
+        }
+      }
+    },
+    "concrete_slab_wall": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_slab_wall/albedo_512.95a5ef8e.ktx2",
+          "normal": "/assets/tex/concrete_slab_wall/normal_512.0596f973.ktx2",
+          "orm": "/assets/tex/concrete_slab_wall/orm_512.2ffc9bb7.ktx2",
+          "bytes": 244938,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_slab_wall/albedo_1k.ba5f14ce.ktx2",
+          "normal": "/assets/tex/concrete_slab_wall/normal_1k.497b478c.ktx2",
+          "orm": "/assets/tex/concrete_slab_wall/orm_1k.a1ae0819.ktx2",
+          "bytes": 1100537,
+          "px": 1024
+        }
+      }
+    },
+    "preconcrete_wall_001": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/preconcrete_wall_001/albedo_512.14877fb0.ktx2",
+          "normal": "/assets/tex/preconcrete_wall_001/normal_512.d22461c4.ktx2",
+          "orm": "/assets/tex/preconcrete_wall_001/orm_512.b286f01f.ktx2",
+          "bytes": 290676,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/preconcrete_wall_001/albedo_1k.72cd542d.ktx2",
+          "normal": "/assets/tex/preconcrete_wall_001/normal_1k.2cf3d619.ktx2",
+          "orm": "/assets/tex/preconcrete_wall_001/orm_1k.44f24b78.ktx2",
+          "bytes": 1259840,
+          "px": 1024
+        }
+      }
+    },
+    "cracked_concrete_wall": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/cracked_concrete_wall/albedo_512.96900527.ktx2",
+          "normal": "/assets/tex/cracked_concrete_wall/normal_512.1db45d13.ktx2",
+          "orm": "/assets/tex/cracked_concrete_wall/orm_512.cbd159b3.ktx2",
+          "bytes": 427367,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/cracked_concrete_wall/albedo_1k.d3356b6b.ktx2",
+          "normal": "/assets/tex/cracked_concrete_wall/normal_1k.ba97cc4f.ktx2",
+          "orm": "/assets/tex/cracked_concrete_wall/orm_1k.b4cd91c1.ktx2",
+          "bytes": 1566622,
+          "px": 1024
+        }
+      }
+    },
+    "patterned_concrete_wall": {
+      "category": "concrete_wall",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/patterned_concrete_wall/albedo_512.f9c61008.ktx2",
+          "normal": "/assets/tex/patterned_concrete_wall/normal_512.3b0b7327.ktx2",
+          "orm": "/assets/tex/patterned_concrete_wall/orm_512.c4bb4d81.ktx2",
+          "bytes": 439789,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/patterned_concrete_wall/albedo_1k.b18b6854.ktx2",
+          "normal": "/assets/tex/patterned_concrete_wall/normal_1k.4865ecba.ktx2",
+          "orm": "/assets/tex/patterned_concrete_wall/orm_1k.0068d1c1.ktx2",
+          "bytes": 1597729,
+          "px": 1024
+        }
+      }
+    },
+    "Concrete049": {
+      "category": "concrete_wall",
+      "source": "ambientcg",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/Concrete049/albedo_512.9ef22562.ktx2",
+          "normal": "/assets/tex/Concrete049/normal_512.9fc81779.ktx2",
+          "orm": "/assets/tex/Concrete049/orm_512.3f7251e9.ktx2",
+          "bytes": 439004,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/Concrete049/albedo_1k.1e18ca95.ktx2",
+          "normal": "/assets/tex/Concrete049/normal_1k.fb5bc13e.ktx2",
+          "orm": "/assets/tex/Concrete049/orm_1k.4622f7fa.ktx2",
+          "bytes": 1679304,
+          "px": 1024
+        }
+      }
+    },
+    "concrete_floor_worn_001": {
+      "category": "concrete_floor",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_floor_worn_001/albedo_512.c51b892d.ktx2",
+          "normal": "/assets/tex/concrete_floor_worn_001/normal_512.c6fce959.ktx2",
+          "orm": "/assets/tex/concrete_floor_worn_001/orm_512.f978e134.ktx2",
+          "bytes": 229866,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_floor_worn_001/albedo_1k.b1faadda.ktx2",
+          "normal": "/assets/tex/concrete_floor_worn_001/normal_1k.8adfa5b0.ktx2",
+          "orm": "/assets/tex/concrete_floor_worn_001/orm_1k.72c88771.ktx2",
+          "bytes": 1011142,
+          "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/concrete_floor_worn_001/albedo_2k.8dc3cf4f.ktx2",
+          "normal": "/assets/tex/concrete_floor_worn_001/normal_2k.8474d3c3.ktx2",
+          "orm": "/assets/tex/concrete_floor_worn_001/orm_2k.17b57cee.ktx2",
+          "bytes": 5394890,
+          "px": 2048
+        }
+      }
+    },
+    "damaged_concrete_floor": {
+      "category": "concrete_floor",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/damaged_concrete_floor/albedo_512.b8cd0199.ktx2",
+          "normal": "/assets/tex/damaged_concrete_floor/normal_512.2dbbeeb6.ktx2",
+          "orm": "/assets/tex/damaged_concrete_floor/orm_512.c275cc17.ktx2",
+          "bytes": 252520,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/damaged_concrete_floor/albedo_1k.d436e02f.ktx2",
+          "normal": "/assets/tex/damaged_concrete_floor/normal_1k.b1cc47e0.ktx2",
+          "orm": "/assets/tex/damaged_concrete_floor/orm_1k.8374aefa.ktx2",
+          "bytes": 915544,
+          "px": 1024
+        }
+      }
+    },
+    "worn_concrete_floor": {
+      "category": "concrete_floor",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/worn_concrete_floor/albedo_512.57cfb542.ktx2",
+          "normal": "/assets/tex/worn_concrete_floor/normal_512.7f659c2a.ktx2",
+          "orm": "/assets/tex/worn_concrete_floor/orm_512.aa0380e9.ktx2",
+          "bytes": 247128,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/worn_concrete_floor/albedo_1k.d375218e.ktx2",
+          "normal": "/assets/tex/worn_concrete_floor/normal_1k.d7f9a8d4.ktx2",
+          "orm": "/assets/tex/worn_concrete_floor/orm_1k.f855e53d.ktx2",
+          "bytes": 919612,
+          "px": 1024
+        }
+      }
+    },
+    "concrete_floor_damaged_01": {
+      "category": "concrete_floor",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_floor_damaged_01/albedo_512.8fdfb286.ktx2",
+          "normal": "/assets/tex/concrete_floor_damaged_01/normal_512.730a4d1e.ktx2",
+          "orm": "/assets/tex/concrete_floor_damaged_01/orm_512.707a192f.ktx2",
+          "bytes": 287419,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_floor_damaged_01/albedo_1k.b847b09b.ktx2",
+          "normal": "/assets/tex/concrete_floor_damaged_01/normal_1k.49b73556.ktx2",
+          "orm": "/assets/tex/concrete_floor_damaged_01/orm_1k.6d2434ea.ktx2",
+          "bytes": 1074035,
+          "px": 1024
+        }
+      }
+    },
+    "hangar_concrete_floor": {
+      "category": "concrete_floor",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/hangar_concrete_floor/albedo_512.90a315cf.ktx2",
+          "normal": "/assets/tex/hangar_concrete_floor/normal_512.6af6b7da.ktx2",
+          "orm": "/assets/tex/hangar_concrete_floor/orm_512.89860f3d.ktx2",
+          "bytes": 359389,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/hangar_concrete_floor/albedo_1k.6ab08b41.ktx2",
+          "normal": "/assets/tex/hangar_concrete_floor/normal_1k.4b71273d.ktx2",
+          "orm": "/assets/tex/hangar_concrete_floor/orm_1k.97253b04.ktx2",
+          "bytes": 1283060,
+          "px": 1024
+        }
+      }
+    },
+    "smooth_concrete_floor": {
+      "category": "concrete_floor",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/smooth_concrete_floor/albedo_512.7ef68f52.ktx2",
+          "normal": "/assets/tex/smooth_concrete_floor/normal_512.f55fab33.ktx2",
+          "orm": "/assets/tex/smooth_concrete_floor/orm_512.b48702d3.ktx2",
+          "bytes": 236794,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/smooth_concrete_floor/albedo_1k.a2424ab1.ktx2",
+          "normal": "/assets/tex/smooth_concrete_floor/normal_1k.687bd9b8.ktx2",
+          "orm": "/assets/tex/smooth_concrete_floor/orm_1k.0c6eab36.ktx2",
+          "bytes": 877635,
+          "px": 1024
+        }
+      }
+    },
+    "worn_mossy_plasterwall": {
+      "category": "plaster",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/worn_mossy_plasterwall/albedo_512.91bcf263.ktx2",
+          "normal": "/assets/tex/worn_mossy_plasterwall/normal_512.0bd44e3d.ktx2",
+          "orm": "/assets/tex/worn_mossy_plasterwall/orm_512.de127581.ktx2",
+          "bytes": 319647,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/worn_mossy_plasterwall/albedo_1k.0e501334.ktx2",
+          "normal": "/assets/tex/worn_mossy_plasterwall/normal_1k.2da2c6ab.ktx2",
+          "orm": "/assets/tex/worn_mossy_plasterwall/orm_1k.6353368f.ktx2",
+          "bytes": 1442381,
+          "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/worn_mossy_plasterwall/albedo_2k.138acb17.ktx2",
+          "normal": "/assets/tex/worn_mossy_plasterwall/normal_2k.7faebdbf.ktx2",
+          "orm": "/assets/tex/worn_mossy_plasterwall/orm_2k.02e47d87.ktx2",
+          "bytes": 5969001,
+          "px": 2048
+        }
+      }
+    },
+    "worn_plaster_wall": {
+      "category": "plaster",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/worn_plaster_wall/albedo_512.ce2fd019.ktx2",
+          "normal": "/assets/tex/worn_plaster_wall/normal_512.9c960d33.ktx2",
+          "orm": "/assets/tex/worn_plaster_wall/orm_512.bb883fd8.ktx2",
+          "bytes": 249632,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/worn_plaster_wall/albedo_1k.3f262ba2.ktx2",
+          "normal": "/assets/tex/worn_plaster_wall/normal_1k.95d84fa7.ktx2",
+          "orm": "/assets/tex/worn_plaster_wall/orm_1k.b38c96af.ktx2",
+          "bytes": 1007763,
+          "px": 1024
+        }
+      }
+    },
+    "worn_cracked_plaster": {
+      "category": "plaster",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/worn_cracked_plaster/albedo_512.dceda9b6.ktx2",
+          "normal": "/assets/tex/worn_cracked_plaster/normal_512.223dd7a7.ktx2",
+          "orm": "/assets/tex/worn_cracked_plaster/orm_512.9a8cb401.ktx2",
+          "bytes": 292138,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/worn_cracked_plaster/albedo_1k.fec76862.ktx2",
+          "normal": "/assets/tex/worn_cracked_plaster/normal_1k.3a07a633.ktx2",
+          "orm": "/assets/tex/worn_cracked_plaster/orm_1k.c198b4b9.ktx2",
+          "bytes": 1322059,
+          "px": 1024
+        }
+      }
+    },
+    "damaged_plaster": {
+      "category": "plaster",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/damaged_plaster/albedo_512.391b0269.ktx2",
+          "normal": "/assets/tex/damaged_plaster/normal_512.8f893f37.ktx2",
+          "orm": "/assets/tex/damaged_plaster/orm_512.3d4dc324.ktx2",
+          "bytes": 410380,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/damaged_plaster/albedo_1k.e46bc21b.ktx2",
+          "normal": "/assets/tex/damaged_plaster/normal_1k.a5107bac.ktx2",
+          "orm": "/assets/tex/damaged_plaster/orm_1k.672fea84.ktx2",
+          "bytes": 1463633,
+          "px": 1024
+        }
+      }
+    },
+    "rusty_metal_02": {
+      "category": "rusted_metal",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/rusty_metal_02/albedo_512.f4f52c1f.ktx2",
+          "normal": "/assets/tex/rusty_metal_02/normal_512.3d2422ad.ktx2",
+          "orm": "/assets/tex/rusty_metal_02/orm_512.d1ba3169.ktx2",
+          "bytes": 279981,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/rusty_metal_02/albedo_1k.5acc3fe6.ktx2",
+          "normal": "/assets/tex/rusty_metal_02/normal_1k.85d6a294.ktx2",
+          "orm": "/assets/tex/rusty_metal_02/orm_1k.92452e8d.ktx2",
+          "bytes": 1003539,
+          "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/rusty_metal_02/albedo_2k.a20f5c9e.ktx2",
+          "normal": "/assets/tex/rusty_metal_02/normal_2k.6a6df184.ktx2",
+          "orm": "/assets/tex/rusty_metal_02/orm_2k.d79a17eb.ktx2",
+          "bytes": 3501976,
+          "px": 2048
+        }
+      }
+    },
+    "rusty_metal_sheet": {
+      "category": "rusted_metal",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/rusty_metal_sheet/albedo_512.a0a8173a.ktx2",
+          "normal": "/assets/tex/rusty_metal_sheet/normal_512.4afcc23a.ktx2",
+          "orm": "/assets/tex/rusty_metal_sheet/orm_512.051aef92.ktx2",
+          "bytes": 285143,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/rusty_metal_sheet/albedo_1k.883193b1.ktx2",
+          "normal": "/assets/tex/rusty_metal_sheet/normal_1k.685b62d7.ktx2",
+          "orm": "/assets/tex/rusty_metal_sheet/orm_1k.c1274cf4.ktx2",
+          "bytes": 747331,
+          "px": 1024
+        }
+      }
+    },
+    "green_metal_rust": {
+      "category": "rusted_metal",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/green_metal_rust/albedo_512.a6894e82.ktx2",
+          "normal": "/assets/tex/green_metal_rust/normal_512.89eac4ae.ktx2",
+          "orm": "/assets/tex/green_metal_rust/orm_512.9f02c5da.ktx2",
+          "bytes": 226007,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/green_metal_rust/albedo_1k.513903b3.ktx2",
+          "normal": "/assets/tex/green_metal_rust/normal_1k.f732b01b.ktx2",
+          "orm": "/assets/tex/green_metal_rust/orm_1k.046f86e9.ktx2",
+          "bytes": 766134,
+          "px": 1024
+        }
+      }
+    },
+    "rusty_painted_metal": {
+      "category": "rusted_metal",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/rusty_painted_metal/albedo_512.8e48ae1a.ktx2",
+          "normal": "/assets/tex/rusty_painted_metal/normal_512.00fd9b4e.ktx2",
+          "orm": "/assets/tex/rusty_painted_metal/orm_512.528e0d80.ktx2",
+          "bytes": 218747,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/rusty_painted_metal/albedo_1k.f4d52cc7.ktx2",
+          "normal": "/assets/tex/rusty_painted_metal/normal_1k.a4e54e6b.ktx2",
+          "orm": "/assets/tex/rusty_painted_metal/orm_1k.0f84a30b.ktx2",
+          "bytes": 788517,
+          "px": 1024
+        }
+      }
+    },
+    "dirty_concrete": {
+      "category": "wet_floor",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/dirty_concrete/albedo_512.d829b3eb.ktx2",
+          "normal": "/assets/tex/dirty_concrete/normal_512.56a6e1ec.ktx2",
+          "orm": "/assets/tex/dirty_concrete/orm_512.e5f068a6.ktx2",
+          "bytes": 433186,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/dirty_concrete/albedo_1k.eb8dfe45.ktx2",
+          "normal": "/assets/tex/dirty_concrete/normal_1k.f52420a0.ktx2",
+          "orm": "/assets/tex/dirty_concrete/orm_1k.51ae3b0b.ktx2",
+          "bytes": 1653780,
+          "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/dirty_concrete/albedo_2k.17223950.ktx2",
+          "normal": "/assets/tex/dirty_concrete/normal_2k.a4f83535.ktx2",
+          "orm": "/assets/tex/dirty_concrete/orm_2k.de0d8a59.ktx2",
+          "bytes": 6448901,
+          "px": 2048
+        }
+      }
+    },
+    "garage_floor": {
+      "category": "wet_floor",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/garage_floor/albedo_512.46a85ff1.ktx2",
+          "normal": "/assets/tex/garage_floor/normal_512.d6ec4412.ktx2",
+          "orm": "/assets/tex/garage_floor/orm_512.c79debfb.ktx2",
+          "bytes": 265294,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/garage_floor/albedo_1k.4396ee0a.ktx2",
+          "normal": "/assets/tex/garage_floor/normal_1k.e0238cf7.ktx2",
+          "orm": "/assets/tex/garage_floor/orm_1k.792ebc1a.ktx2",
+          "bytes": 916487,
+          "px": 1024
+        }
+      }
+    },
+    "Ground094A": {
+      "category": "wet_floor",
+      "source": "ambientcg",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/Ground094A/albedo_512.086aa197.ktx2",
+          "normal": "/assets/tex/Ground094A/normal_512.d6c34cb7.ktx2",
+          "orm": "/assets/tex/Ground094A/orm_512.fc78a503.ktx2",
+          "bytes": 313755,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/Ground094A/albedo_1k.6acc4a52.ktx2",
+          "normal": "/assets/tex/Ground094A/normal_1k.43c0f522.ktx2",
+          "orm": "/assets/tex/Ground094A/orm_1k.50714302.ktx2",
+          "bytes": 1025552,
+          "px": 1024
+        }
+      }
+    },
+    "Moss002": {
+      "category": "moss_ground",
+      "source": "ambientcg",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/Moss002/albedo_512.524d34af.ktx2",
+          "normal": "/assets/tex/Moss002/normal_512.ac6765e9.ktx2",
+          "orm": "/assets/tex/Moss002/orm_512.e5da6f51.ktx2",
+          "bytes": 469350,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/Moss002/albedo_1k.b4b14117.ktx2",
+          "normal": "/assets/tex/Moss002/normal_1k.a615d64a.ktx2",
+          "orm": "/assets/tex/Moss002/orm_1k.bbfaba56.ktx2",
+          "bytes": 1740707,
+          "px": 1024
+        }
+      }
+    },
+    "forest_ground_04": {
+      "category": "moss_ground",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/forest_ground_04/albedo_512.7bf7ba6f.ktx2",
+          "normal": "/assets/tex/forest_ground_04/normal_512.d669d4f5.ktx2",
+          "orm": "/assets/tex/forest_ground_04/orm_512.17442982.ktx2",
+          "bytes": 472999,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/forest_ground_04/albedo_1k.9e1ba294.ktx2",
+          "normal": "/assets/tex/forest_ground_04/normal_1k.c0479847.ktx2",
+          "orm": "/assets/tex/forest_ground_04/orm_1k.d929038a.ktx2",
+          "bytes": 1724915,
+          "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/forest_ground_04/albedo_2k.5dbbe2b2.ktx2",
+          "normal": "/assets/tex/forest_ground_04/normal_2k.66b6bf65.ktx2",
+          "orm": "/assets/tex/forest_ground_04/orm_2k.39badb8d.ktx2",
+          "bytes": 6149641,
+          "px": 2048
+        }
+      }
+    },
+    "leaves_forest_ground": {
+      "category": "moss_ground",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/leaves_forest_ground/albedo_512.5425aaf3.ktx2",
+          "normal": "/assets/tex/leaves_forest_ground/normal_512.009ee631.ktx2",
+          "orm": "/assets/tex/leaves_forest_ground/orm_512.206fd172.ktx2",
+          "bytes": 494592,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/leaves_forest_ground/albedo_1k.a98222c0.ktx2",
+          "normal": "/assets/tex/leaves_forest_ground/normal_1k.6311e689.ktx2",
+          "orm": "/assets/tex/leaves_forest_ground/orm_1k.ce47e975.ktx2",
+          "bytes": 1800074,
+          "px": 1024
+        }
+      }
+    },
+    "concrete_moss": {
+      "category": "moss_ground",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_moss/albedo_512.fed57923.ktx2",
+          "normal": "/assets/tex/concrete_moss/normal_512.84f7c533.ktx2",
+          "orm": "/assets/tex/concrete_moss/orm_512.f066fe14.ktx2",
+          "bytes": 336104,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_moss/albedo_1k.363afcf9.ktx2",
+          "normal": "/assets/tex/concrete_moss/normal_1k.9d5f90da.ktx2",
+          "orm": "/assets/tex/concrete_moss/orm_1k.eff4448e.ktx2",
+          "bytes": 1371754,
+          "px": 1024
+        }
+      }
+    },
+    "mossy_brick": {
+      "category": "brick",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/mossy_brick/albedo_512.d7d83aa4.ktx2",
+          "normal": "/assets/tex/mossy_brick/normal_512.decb2443.ktx2",
+          "orm": "/assets/tex/mossy_brick/orm_512.222b4dd8.ktx2",
+          "bytes": 442064,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/mossy_brick/albedo_1k.38d0688c.ktx2",
+          "normal": "/assets/tex/mossy_brick/normal_1k.166ee561.ktx2",
+          "orm": "/assets/tex/mossy_brick/orm_1k.823c69a8.ktx2",
+          "bytes": 1589681,
+          "px": 1024
+        }
+      }
+    },
+    "worn_brick_wall": {
+      "category": "brick",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/worn_brick_wall/albedo_512.4ea4439c.ktx2",
+          "normal": "/assets/tex/worn_brick_wall/normal_512.e9ba291e.ktx2",
+          "orm": "/assets/tex/worn_brick_wall/orm_512.30d44b47.ktx2",
+          "bytes": 450098,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/worn_brick_wall/albedo_1k.964c7799.ktx2",
+          "normal": "/assets/tex/worn_brick_wall/normal_1k.1f617a97.ktx2",
+          "orm": "/assets/tex/worn_brick_wall/orm_1k.5db004c6.ktx2",
+          "bytes": 1646874,
+          "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/worn_brick_wall/albedo_2k.aa8f4e03.ktx2",
+          "normal": "/assets/tex/worn_brick_wall/normal_2k.218f6c3f.ktx2",
+          "orm": "/assets/tex/worn_brick_wall/orm_2k.16545a25.ktx2",
+          "bytes": 6306381,
+          "px": 2048
+        }
+      }
+    },
+    "broken_brick_wall": {
+      "category": "brick",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/broken_brick_wall/albedo_512.f3d7087e.ktx2",
+          "normal": "/assets/tex/broken_brick_wall/normal_512.744304db.ktx2",
+          "orm": "/assets/tex/broken_brick_wall/orm_512.44710f3e.ktx2",
+          "bytes": 454640,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/broken_brick_wall/albedo_1k.31ef2ed6.ktx2",
+          "normal": "/assets/tex/broken_brick_wall/normal_1k.4993e09d.ktx2",
+          "orm": "/assets/tex/broken_brick_wall/orm_1k.29d32cd6.ktx2",
+          "bytes": 1663603,
+          "px": 1024
+        }
+      }
+    },
+    "rubble": {
+      "category": "rubble",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/rubble/albedo_512.db4ac729.ktx2",
+          "normal": "/assets/tex/rubble/normal_512.07541944.ktx2",
+          "orm": "/assets/tex/rubble/orm_512.6ce10486.ktx2",
+          "bytes": 449611,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/rubble/albedo_1k.df89dda1.ktx2",
+          "normal": "/assets/tex/rubble/normal_1k.60ef969f.ktx2",
+          "orm": "/assets/tex/rubble/orm_1k.17d31b68.ktx2",
+          "bytes": 1574278,
+          "px": 1024
+        }
+      }
+    },
+    "concrete_debris": {
+      "category": "rubble",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/concrete_debris/albedo_512.e00e4efe.ktx2",
+          "normal": "/assets/tex/concrete_debris/normal_512.289ab943.ktx2",
+          "orm": "/assets/tex/concrete_debris/orm_512.72b4bf05.ktx2",
+          "bytes": 484204,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/concrete_debris/albedo_1k.fe1fd84b.ktx2",
+          "normal": "/assets/tex/concrete_debris/normal_1k.824baa0f.ktx2",
+          "orm": "/assets/tex/concrete_debris/orm_1k.82ef7c00.ktx2",
+          "bytes": 1760295,
+          "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/concrete_debris/albedo_2k.9119d34e.ktx2",
+          "normal": "/assets/tex/concrete_debris/normal_2k.289cd7dd.ktx2",
+          "orm": "/assets/tex/concrete_debris/orm_2k.d68d9ab4.ktx2",
+          "bytes": 6586796,
+          "px": 2048
+        }
+      }
+    },
+    "rocky_gravel": {
+      "category": "rubble",
+      "source": "polyhaven",
+      "tiers": {
+        "512": {
+          "albedo": "/assets/tex/rocky_gravel/albedo_512.78cf96ab.ktx2",
+          "normal": "/assets/tex/rocky_gravel/normal_512.64a20dc6.ktx2",
+          "orm": "/assets/tex/rocky_gravel/orm_512.5ece4c5e.ktx2",
+          "bytes": 490264,
+          "px": 512
+        },
+        "1k": {
+          "albedo": "/assets/tex/rocky_gravel/albedo_1k.48bbe98b.ktx2",
+          "normal": "/assets/tex/rocky_gravel/normal_1k.f21c97a9.ktx2",
+          "orm": "/assets/tex/rocky_gravel/orm_1k.cca49200.ktx2",
+          "bytes": 1790375,
+          "px": 1024
+        }
+      }
+    }
+  },
+  "models": {
+    "SchoolChair_01": {
+      "category": "prop:chair",
+      "source": "polyhaven",
+      "url": "/assets/models/SchoolChair_01.8efa0d37.glb",
+      "bytes": 451476,
+      "triangles": 5072
+    },
+    "SchoolDesk_01": {
+      "category": "prop:desk",
+      "source": "polyhaven",
+      "url": "/assets/models/SchoolDesk_01.08d816f7.glb",
+      "bytes": 303384,
+      "triangles": 4162
+    },
+    "Barrel_01": {
+      "category": "prop:barrel",
+      "source": "polyhaven",
+      "url": "/assets/models/Barrel_01.ac01d645.glb",
+      "bytes": 425748,
+      "triangles": 2682
+    },
+    "barrel_03": {
+      "category": "prop:barrel",
+      "source": "polyhaven",
+      "url": "/assets/models/barrel_03.7f2e9ee5.glb",
+      "bytes": 397068,
+      "triangles": 1473
+    },
+    "can_rusted": {
+      "category": "prop:debris",
+      "source": "polyhaven",
+      "url": "/assets/models/can_rusted.e5d319b2.glb",
+      "bytes": 470188,
+      "triangles": 3520
+    },
+    "cement_bag": {
+      "category": "prop:debris",
+      "source": "polyhaven",
+      "url": "/assets/models/cement_bag.1af194b9.glb",
+      "bytes": 346964,
+      "triangles": 844
+    },
+    "trashbag": {
+      "category": "prop:debris",
+      "source": "polyhaven",
+      "url": "/assets/models/trashbag.996838de.glb",
+      "bytes": 452484,
+      "triangles": 4482
+    },
+    "old_tyre": {
+      "category": "prop:debris",
+      "source": "polyhaven",
+      "url": "/assets/models/old_tyre.ba0640f4.glb",
+      "bytes": 439628,
+      "triangles": 2880
+    },
+    "metal_trash_can": {
+      "category": "prop:barrel",
+      "source": "polyhaven",
+      "url": "/assets/models/metal_trash_can.e027e7b3.glb",
+      "bytes": 1038860,
+      "triangles": 6732
+    },
+    "plastic_crate_02": {
+      "category": "prop:debris",
+      "source": "polyhaven",
+      "url": "/assets/models/plastic_crate_02.40d0255b.glb",
+      "bytes": 429484,
+      "triangles": 5840
+    },
+    "wooden_crate_02": {
+      "category": "prop:debris",
+      "source": "polyhaven",
+      "url": "/assets/models/wooden_crate_02.609ce150.glb",
+      "bytes": 410692,
+      "triangles": 5176
+    },
+    "cardboard_box_01": {
+      "category": "prop:debris",
+      "source": "polyhaven",
+      "url": "/assets/models/cardboard_box_01.5d374c05.glb",
+      "bytes": 484004,
+      "triangles": 5084
+    },
+    "modular_industrial_pipes_01": {
+      "category": "prop:pipe",
+      "source": "polyhaven",
+      "url": "/assets/models/modular_industrial_pipes_01.e9e2bd19.glb",
+      "bytes": 1119320,
+      "triangles": 12340
+    },
+    "fern_02": {
+      "category": "plant:fern",
+      "source": "polyhaven",
+      "url": "/assets/models/fern_02.95d3e6e3.glb",
+      "bytes": 348124,
+      "triangles": 6232
+    },
+    "shrub_sorrel_01": {
+      "category": "plant:groundcover",
+      "source": "polyhaven",
+      "url": "/assets/models/shrub_sorrel_01.92347f14.glb",
+      "bytes": 407772,
+      "triangles": 3319
+    },
+    "calathea_orbifolia_01": {
+      "category": "plant:fern",
+      "source": "polyhaven",
+      "url": "/assets/models/calathea_orbifolia_01.e547bc0e.glb",
+      "bytes": 649120,
+      "triangles": 16688
+    },
+    "weed_plant_02": {
+      "category": "plant:groundcover",
+      "source": "polyhaven",
+      "url": "/assets/models/weed_plant_02.6f03d2ea.glb",
+      "bytes": 613580,
+      "triangles": 11116
+    },
+    "rock_07": {
+      "category": "rock",
+      "source": "polyhaven",
+      "url": "/assets/models/rock_07.8736735b.glb",
+      "bytes": 502904,
+      "triangles": 5524
+    },
+    "rock_09": {
+      "category": "rock",
+      "source": "polyhaven",
+      "url": "/assets/models/rock_09.867a1d6a.glb",
+      "bytes": 488656,
+      "triangles": 5148
+    },
+    "dry_branches_medium_01": {
+      "category": "prop:debris",
+      "source": "polyhaven",
+      "url": "/assets/models/dry_branches_medium_01.598cf63c.glb",
+      "bytes": 613816,
+      "triangles": 6721
+    }
+  },
+  "hdris": {
+    "lush_dirt_path": {
+      "category": "hdri:sunlit",
+      "tiers": {
+        "2k": {
+          "url": "/assets/hdri/lush_dirt_path_2k.bd58bc09.hdr",
+          "bytes": 7271402
+        },
+        "1k": {
+          "url": "/assets/hdri/lush_dirt_path_1k.d402c5a5.hdr",
+          "bytes": 1833408
+        }
+      }
+    },
+    "misty_pines": {
+      "category": "hdri:overcast",
+      "tiers": {
+        "2k": {
+          "url": "/assets/hdri/misty_pines_2k.3fcc1574.hdr",
+          "bytes": 7050893
+        },
+        "1k": {
+          "url": "/assets/hdri/misty_pines_1k.08498ace.hdr",
+          "bytes": 1798128
+        }
+      }
+    }
+  }
+}

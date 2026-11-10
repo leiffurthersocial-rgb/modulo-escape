@@ -36,7 +36,9 @@ if (KTX_DIR) {
   TOOL_ENV.LD_LIBRARY_PATH = `${join(KTX_DIR, '..', 'lib')}:${process.env.LD_LIBRARY_PATH ?? ''}`;
 }
 function run(cmd: string, args: string[]) {
-  execFileSync(cmd, args, { env: TOOL_ENV, stdio: ['ignore', 'ignore', 'pipe'] });
+  const out = execFileSync(cmd, args, { env: TOOL_ENV, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+  // gltf-transform reports per-texture failures but still exits 0: treat them as errors.
+  if (/\berror:/i.test(out)) throw new Error(`${cmd} ${args[0]} failed:\n${out.split('\n').filter((l) => /error|fatal/i.test(l)).join('\n')}`);
 }
 
 // ───────── manifest types (also read by the game at runtime) ─────────
@@ -44,6 +46,7 @@ export interface TexTier { albedo: string; normal: string; orm: string; bytes: n
 export interface Manifest {
   generated: string;
   textures: Record<string, { category: string; source: string; tiers: Record<string, TexTier> }>;
+  hdris: Record<string, { category: string; tiers: Record<string, { url: string; bytes: number }> }>;
   models: Record<string, { category: string; source: string; url: string; bytes: number; triangles: number }>;
 }
 
@@ -125,9 +128,12 @@ async function buildOrm(m: MapFiles, px: number, out: string) {
 }
 
 const ETC1S_SRGB = ['--t2', '--encode', 'etc1s', '--clevel', '4', '--qlevel', '200', '--genmipmap', '--assign_oetf', 'srgb'];
-const UASTC_LINEAR = ['--t2', '--encode', 'uastc', '--uastc_quality', '2', '--uastc_rdo_l', '1.0', '--zcmp', '19', '--genmipmap', '--assign_oetf', 'linear'];
+const ETC1S_LINEAR = ['--t2', '--encode', 'etc1s', '--clevel', '4', '--qlevel', '220', '--genmipmap', '--assign_oetf', 'linear'];
+// Normals keep UASTC (ETC1S blocks read as bumps); RDO + zstd keeps the download small.
+const UASTC_LINEAR = ['--t2', '--encode', 'uastc', '--uastc_quality', '2', '--uastc_rdo_l', '2.0', '--zcmp', '19', '--genmipmap', '--assign_oetf', 'linear'];
 
-async function processTexture(e: SourceEntry, tiers: string[], manifest: Manifest) {
+async function processTexture(e: SourceEntry, defaultTiers: string[], manifest: Manifest) {
+  const tiers = e.tiers ?? defaultTiers;
   const found = await findMaps(e);
   if (!found) {
     console.warn(`  ✗ ${e.id}: no cached source maps (run assets:fetch first)`);
@@ -151,7 +157,7 @@ async function processTexture(e: SourceEntry, tiers: string[], manifest: Manifes
     await buildOrm(found.maps, px, o);
     run('toktx', [...ETC1S_SRGB, `${a}.ktx2`, a]);
     run('toktx', [...UASTC_LINEAR, `${n}.ktx2`, n]);
-    run('toktx', [...UASTC_LINEAR, `${o}.ktx2`, o]);
+    run('toktx', [...ETC1S_LINEAR, `${o}.ktx2`, o]);
     const A = await emit(`${a}.ktx2`, `tex/${e.id}/albedo_${tier}`, 'ktx2');
     const N = await emit(`${n}.ktx2`, `tex/${e.id}/normal_${tier}`, 'ktx2');
     const O = await emit(`${o}.ktx2`, `tex/${e.id}/orm_${tier}`, 'ktx2');
@@ -176,13 +182,24 @@ async function processModel(e: SourceEntry, draco: boolean, manifest: Manifest) 
   const tmp = join(WORK, `${e.id}.glb`);
   await mkdir(WORK, { recursive: true });
   const gt = join(ROOT, 'node_modules', '.bin', 'gltf-transform');
-  run(gt, [
-    'optimize', src, tmp,
+  // 1) geometry: dedup/prune/weld (+simplify), meshopt or Draco; textures resized, left uncompressed.
+  const mid = join(WORK, `${e.id}.mid.glb`);
+  const mid2 = join(WORK, `${e.id}.mid2.glb`);
+  const args = [
+    'optimize', src, mid,
     '--compress', draco ? 'draco' : 'meshopt',
-    '--texture-compress', 'ktx2',
-    '--texture-size', '1024',
-    '--simplify', 'false',
-  ]);
+    '--texture-compress', 'false',
+    '--texture-size', String(e.textureSize ?? 1024),
+  ];
+  if (e.simplify) args.push('--simplify', 'true', '--simplify-ratio', String(e.simplify), '--simplify-error', '0.002');
+  else args.push('--simplify', 'false');
+  run(gt, args);
+  // 2) normals → UASTC + RDO + zstd; 3) everything else → ETC1S (small download).
+  // optimize only resizes when it also compresses, so resize explicitly.
+  const midR = join(WORK, `${e.id}.midr.glb`);
+  run(gt, ['resize', mid, midR, '--width', String(e.textureSize ?? 1024), '--height', String(e.textureSize ?? 1024)]);
+  run(gt, ['uastc', midR, mid2, '--slots', 'normalTexture', '--level', '2', '--rdo', '--rdo-lambda', '2', '--zstd', '18']);
+  run(gt, ['etc1s', mid2, tmp, '--slots', '!normalTexture', '--quality', '200']);
   const triangles = countTriangles(execFileSync(gt, ['inspect', tmp, '--format', 'csv'], { env: TOOL_ENV }).toString());
   const r = await emit(tmp, `models/${e.id}`, 'glb');
   manifest.models[e.id] = { category: e.category, source: e.source, url: r.url, bytes: r.bytes, triangles };
@@ -219,6 +236,7 @@ async function main() {
   const tiersArg = args.includes('--tiers') ? args[args.indexOf('--tiers') + 1]! : '512,1k,2k';
   const tiers = tiersArg.split(',').filter((t) => t in TIER_PX);
   const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
+  const onlyKind = args.includes('--kind') ? args[args.indexOf('--kind') + 1] : undefined;
   const draco = args.includes('--draco');
   if (!KTX_DIR) {
     try {
@@ -232,15 +250,29 @@ async function main() {
   const manifestPath = join(OUT, 'manifest.json');
   const manifest: Manifest = existsSync(manifestPath)
     ? (JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest)
-    : { generated: '', textures: {}, models: {} };
+    : { generated: '', textures: {}, models: {}, hdris: {} };
+  manifest.hdris ??= {};
 
   for (const e of sources) {
     if (only && e.id !== only) continue;
+    if (onlyKind && e.kind !== onlyKind) continue;
     console.log(`[${e.kind}] ${e.id}`);
     // Remove stale hashed outputs for this asset before re-emitting.
     if (e.kind === 'texture') {
       await rm(join(OUT, 'tex', e.id), { recursive: true, force: true });
       await processTexture(e, tiers, manifest);
+    } else if (e.kind === 'hdri') {
+      const src = join(CACHE_DIR, 'files', e.source, e.id, e.res ?? '1k', `${e.id}.hdr`);
+      if (!existsSync(src)) {
+        console.warn(`  ✗ ${e.id}: no cached hdr`);
+        continue;
+      }
+      const hdir = join(OUT, 'hdri');
+      if (existsSync(hdir)) for (const f of await readdir(hdir)) if (f.startsWith(`${e.id}_${e.res}.`)) await rm(join(hdir, f));
+      const r = await emit(src, `hdri/${e.id}_${e.res}`, 'hdr');
+      manifest.hdris[e.id] ??= { category: e.category, tiers: {} };
+      manifest.hdris[e.id]!.tiers[e.res ?? '1k'] = r;
+      console.log(`  ✓ ${e.res}: ${(r.bytes / 1e6).toFixed(1)} MB`);
     } else if (e.kind === 'model') {
       const mdir = join(OUT, 'models');
       if (existsSync(mdir)) {
@@ -271,6 +303,11 @@ async function main() {
       const vram = n * 3 * px * px * 1.33;
       console.log(`  ${tier.padEnd(4)} ${String(n).padStart(3)} materials  ${(bytes / 1e6).toFixed(2)} MB download  ~${(vram / 1e6).toFixed(0)} MB VRAM`);
     }
+  }
+  const hd = Object.values(manifest.hdris).flatMap((h) => Object.entries(h.tiers));
+  for (const t of ['1k', '2k']) {
+    const b = hd.filter(([k]) => k === t).reduce((s2, [, v]) => s2 + v.bytes, 0);
+    if (b) console.log(`  hdri ${t}: ${(b / 1e6).toFixed(2)} MB`);
   }
   const models = Object.values(manifest.models);
   if (models.length) {

@@ -1,5 +1,621 @@
 [
-  { "source": "polyhaven", "id": "concrete_wall_008", "kind": "texture", "category": "concrete" },
-  { "source": "ambientcg", "id": "Concrete049", "kind": "texture", "category": "concrete" },
-  { "source": "polyhaven", "id": "Barrel_01", "kind": "model", "category": "prop:barrel" }
+ {
+  "source": "polyhaven",
+  "id": "concrete_wall_008",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "concrete_wall_006",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "2k",
+  "tiers": [
+   "512",
+   "1k",
+   "2k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "concrete_wall_004",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "concrete_wall_003",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "rough_concrete",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "ribbed_concrete_wall",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "concrete_slab_wall",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "preconcrete_wall_001",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "cracked_concrete_wall",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "patterned_concrete_wall",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "ambientcg",
+  "id": "Concrete049",
+  "kind": "texture",
+  "category": "concrete_wall",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "concrete_floor_worn_001",
+  "kind": "texture",
+  "category": "concrete_floor",
+  "res": "2k",
+  "tiers": [
+   "512",
+   "1k",
+   "2k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "damaged_concrete_floor",
+  "kind": "texture",
+  "category": "concrete_floor",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "worn_concrete_floor",
+  "kind": "texture",
+  "category": "concrete_floor",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "concrete_floor_damaged_01",
+  "kind": "texture",
+  "category": "concrete_floor",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "hangar_concrete_floor",
+  "kind": "texture",
+  "category": "concrete_floor",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "smooth_concrete_floor",
+  "kind": "texture",
+  "category": "concrete_floor",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "worn_mossy_plasterwall",
+  "kind": "texture",
+  "category": "plaster",
+  "res": "2k",
+  "tiers": [
+   "512",
+   "1k",
+   "2k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "worn_plaster_wall",
+  "kind": "texture",
+  "category": "plaster",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "worn_cracked_plaster",
+  "kind": "texture",
+  "category": "plaster",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "damaged_plaster",
+  "kind": "texture",
+  "category": "plaster",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "rusty_metal_02",
+  "kind": "texture",
+  "category": "rusted_metal",
+  "res": "2k",
+  "tiers": [
+   "512",
+   "1k",
+   "2k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "rusty_metal_sheet",
+  "kind": "texture",
+  "category": "rusted_metal",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "green_metal_rust",
+  "kind": "texture",
+  "category": "rusted_metal",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "rusty_painted_metal",
+  "kind": "texture",
+  "category": "rusted_metal",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "dirty_concrete",
+  "kind": "texture",
+  "category": "wet_floor",
+  "res": "2k",
+  "tiers": [
+   "512",
+   "1k",
+   "2k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "garage_floor",
+  "kind": "texture",
+  "category": "wet_floor",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "ambientcg",
+  "id": "Ground094A",
+  "kind": "texture",
+  "category": "wet_floor",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "ambientcg",
+  "id": "Moss002",
+  "kind": "texture",
+  "category": "moss_ground",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "forest_ground_04",
+  "kind": "texture",
+  "category": "moss_ground",
+  "res": "2k",
+  "tiers": [
+   "512",
+   "1k",
+   "2k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "leaves_forest_ground",
+  "kind": "texture",
+  "category": "moss_ground",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "concrete_moss",
+  "kind": "texture",
+  "category": "moss_ground",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "mossy_brick",
+  "kind": "texture",
+  "category": "brick",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "worn_brick_wall",
+  "kind": "texture",
+  "category": "brick",
+  "res": "2k",
+  "tiers": [
+   "512",
+   "1k",
+   "2k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "broken_brick_wall",
+  "kind": "texture",
+  "category": "brick",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "rubble",
+  "kind": "texture",
+  "category": "rubble",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "concrete_debris",
+  "kind": "texture",
+  "category": "rubble",
+  "res": "2k",
+  "tiers": [
+   "512",
+   "1k",
+   "2k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "rocky_gravel",
+  "kind": "texture",
+  "category": "rubble",
+  "res": "1k",
+  "tiers": [
+   "512",
+   "1k"
+  ]
+ },
+ {
+  "source": "polyhaven",
+  "id": "lush_dirt_path",
+  "kind": "hdri",
+  "category": "hdri:sunlit",
+  "res": "2k"
+ },
+ {
+  "source": "polyhaven",
+  "id": "misty_pines",
+  "kind": "hdri",
+  "category": "hdri:overcast",
+  "res": "2k"
+ },
+ {
+  "source": "polyhaven",
+  "id": "lush_dirt_path",
+  "kind": "hdri",
+  "category": "hdri:sunlit",
+  "res": "1k"
+ },
+ {
+  "source": "polyhaven",
+  "id": "misty_pines",
+  "kind": "hdri",
+  "category": "hdri:overcast",
+  "res": "1k"
+ },
+ {
+  "source": "polyhaven",
+  "id": "SchoolChair_01",
+  "kind": "model",
+  "category": "prop:chair",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "SchoolDesk_01",
+  "kind": "model",
+  "category": "prop:desk",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "Barrel_01",
+  "kind": "model",
+  "category": "prop:barrel",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "barrel_03",
+  "kind": "model",
+  "category": "prop:barrel",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "can_rusted",
+  "kind": "model",
+  "category": "prop:debris",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "cement_bag",
+  "kind": "model",
+  "category": "prop:debris",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "trashbag",
+  "kind": "model",
+  "category": "prop:debris",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "old_tyre",
+  "kind": "model",
+  "category": "prop:debris",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "metal_trash_can",
+  "kind": "model",
+  "category": "prop:barrel",
+  "res": "1k",
+  "textureSize": 512,
+  "simplify": 0.4
+ },
+ {
+  "source": "polyhaven",
+  "id": "plastic_crate_02",
+  "kind": "model",
+  "category": "prop:debris",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "wooden_crate_02",
+  "kind": "model",
+  "category": "prop:debris",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "cardboard_box_01",
+  "kind": "model",
+  "category": "prop:debris",
+  "res": "1k",
+  "textureSize": 512,
+  "simplify": 0.3
+ },
+ {
+  "source": "polyhaven",
+  "id": "modular_industrial_pipes_01",
+  "kind": "model",
+  "category": "prop:pipe",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "fern_02",
+  "kind": "model",
+  "category": "plant:fern",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "shrub_sorrel_01",
+  "kind": "model",
+  "category": "plant:groundcover",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "calathea_orbifolia_01",
+  "kind": "model",
+  "category": "plant:fern",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "weed_plant_02",
+  "kind": "model",
+  "category": "plant:groundcover",
+  "res": "1k",
+  "textureSize": 512
+ },
+ {
+  "source": "polyhaven",
+  "id": "rock_07",
+  "kind": "model",
+  "category": "rock",
+  "res": "1k",
+  "textureSize": 512,
+  "simplify": 0.25
+ },
+ {
+  "source": "polyhaven",
+  "id": "rock_09",
+  "kind": "model",
+  "category": "rock",
+  "res": "1k",
+  "textureSize": 512,
+  "simplify": 0.25
+ },
+ {
+  "source": "polyhaven",
+  "id": "dry_branches_medium_01",
+  "kind": "model",
+  "category": "prop:debris",
+  "res": "1k",
+  "textureSize": 512,
+  "simplify": 0.4
+ }
 ]
