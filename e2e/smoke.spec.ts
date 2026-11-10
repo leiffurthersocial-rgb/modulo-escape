@@ -14,8 +14,9 @@ const ready = (page: Page) => page.waitForFunction(() => (window as unknown as {
 // CI renders on the CPU: use light presets so frames come back in reasonable time.
 
 test('loads a fixed seed, enters the building, no console errors', async ({ page }, info) => {
+  test.setTimeout(300_000);
   const errors = watchErrors(page);
-  await page.goto('/?seed=kzu&size=small&quality=low');
+  await page.goto('/?seed=kzu&size=small&quality=battery');
   await ready(page);
   await expect(page.locator('#btn-enter')).toBeVisible();
   await page.screenshot({ path: `docs/screenshots/${info.project.name}-title.png` });
@@ -50,15 +51,16 @@ test('same seed builds the same level in the browser', async ({ page }) => {
 
 test('autopilot escapes a small building and sees the win screen', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'one full run is enough');
-  test.setTimeout(300_000);
+  test.setTimeout(720_000);
   const errors = watchErrors(page);
   // Software rendering in CI is slow and sim time is capped per frame: keep the canvas small.
-  await page.setViewportSize({ width: 640, height: 400 });
+  await page.setViewportSize({ width: 480, height: 300 });
   await page.goto('/?seed=kzu&size=small&quality=battery');
   await ready(page);
   await page.click('#btn-enter');
   await page.evaluate(() => ((window as any).__game.game.autopilot.active = true));
-  await page.waitForFunction(() => (window as any).__game.game.state === 'won', null, { timeout: 280_000, polling: 1000 });
+  // Two floors: down the stairs and across the ground floor.
+  await page.waitForFunction(() => (window as any).__game.game.state === 'won', null, { timeout: 700_000, polling: 2000 });
   await expect(page.getByText('You got out')).toBeVisible();
   await page.screenshot({ path: `docs/screenshots/${info.project.name}-win.png` });
   expect(errors).toEqual([]);
