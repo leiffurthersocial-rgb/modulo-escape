@@ -4,7 +4,7 @@ First-person browser game. Escape a procedurally generated, derelict, overgrown,
 wet-tropical brutalist wing of the **KZU** school. Horror comes later; this plan
 prepares hooks for it but does not build it.
 
-Status: **approved 2026-11-10** (hint system dropped; all other defaults accepted). **Phase 1 complete (M0–M6), awaiting review.**
+Status: **approved 2026-11-10** (hint system dropped). Phase 1 (M0–M6) done. **Phase 2 (M7–M13) done, awaiting review.** Sketchfab declined → Poly Haven/ambientCG only.
 
 ---
 
@@ -207,27 +207,33 @@ taken and checked by me after every visual change.
 
 ---
 
-## 3. Quality presets (targets)
+## 3. Quality presets (as built — `src/render/quality.ts`)
 
 | Setting | Ultra | High | Medium | Low | Battery Saver |
 |---|---|---|---|---|---|
 | Pixel ratio cap | 2.0 | 1.5 | 1.25 | 1.0 | 0.75 |
 | FPS cap | none | 60 | 60 | 60 | 30 |
-| Shadows | 2 cascades 2048 | 1×2048 | 1×1024 | 1×512 | off |
-| Shadow distance | 40 m | 30 m | 20 m | 15 m | — |
-| AO | GTAO full | N8AO half | N8AO half (low) | baked only | baked only |
-| Bloom / shafts | yes / yes | yes / yes | yes / cheap | no / cards | no / no |
-| AA | SMAA high | SMAA | SMAA low | FXAA | none |
-| SSR (wet floors) | yes | no | no | no | no |
-| Texture tier | 2k (4k opt.) | 2k | 1k | 1k | 512 |
+| Sun shadow map / extent | 4096 / 34 m | 2048 / 20 m | 1024 / 20 m | 512 / 20 m | off |
+| Flashlight shadows | yes | yes | no | no | no |
+| Post-processing | yes | yes | yes | yes | **off** (renderer AgX only) |
+| AO | N8AO full | N8AO half | N8AO half | baked only | baked only |
+| Bloom / light shafts | yes / full | yes / full | yes / simple | no / simple | no / off |
+| AA | SMAA | SMAA | SMAA | FXAA | none |
+| SSR | not implemented (see DECISIONS #39) | | | | |
+| Texture tier | 2k | 2k | 1k | 1k | 512 |
+| HDRI | 2k | 2k | 2k | 1k | 1k |
 | Anisotropy | 16 | 8 | 4 | 2 | 1 |
-| Chunk radius | 3 | 3 | 2 | 2 | 1 |
+| Chunk radius (6×6-cell chunks) / view distance | 2 / 72 m | 2 / 56 m | 2 / 40 m | 1 / 30 m | 1 / 20 m |
 | Vegetation density | 100% | 100% | 70% | 50% | 30% |
-| Decals | all | all | most | few | few |
-| Particles (dust/drips) | 100% | 70% | 50% | 25% | 0 |
-| Dynamic lights | 8 | 6 | 4 | 3 | 2 |
+| Decals | all | all | 85% | 50% | 50% |
+| Dust particles | 100% | 70% | 50% | 25% | 0 |
+| Ceiling point lights | 8 | 6 | 4 | 3 | 2 |
 | Physics step | 60 Hz | 60 Hz | 60 Hz | 60 Hz | 30 Hz |
 
+Default: High on desktop, Medium on touch devices / iPad. Battery Saver is suggested
+after ~10 s of bad frame time (or a low Battery API reading where it exists; Safari has
+none). The opt-in watchdog steps down one preset at a time. The render loop stops while
+paused or hidden.
 All settings persist in localStorage. "Custom" exposes every row.
 
 ---
