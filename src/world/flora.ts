@@ -131,14 +131,14 @@ export function buildRoots(slots: RootSlot[]): THREE.BufferGeometry | null {
   for (const p of parts) p.dispose();
   // Neutral surface (some AO, lots of moss).
   const n = g.getAttribute('position').count;
-  const surf = new Float32Array(n * 3);
+  const surf = new Float32Array(n * 4);
   const uv = new Float32Array(n * 2);
   const pos = g.getAttribute('position');
   for (let i = 0; i < n; i++) {
-    surf.set([0.8, 0.7, 0.3], i * 3);
+    surf.set([0.8, 0.7, 0.3, 0], i * 4);
     uv.set([pos.getX(i) * 2, pos.getZ(i) * 2], i * 2);
   }
-  g.setAttribute('surface', new THREE.BufferAttribute(surf, 3));
+  g.setAttribute('surface', new THREE.BufferAttribute(surf, 4));
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   return g;
 }
@@ -161,9 +161,9 @@ function trunk(points: THREE.Vector3[], r0: number, r1: number): THREE.BufferGeo
   }
   g.computeVertexNormals();
   const n = pos.count;
-  const surf = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) surf.set([0.9, 0.55, 0.2], i * 3);
-  g.setAttribute('surface', new THREE.BufferAttribute(surf, 3));
+  const surf = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) surf.set([0.9, 0.55, 0.2, 0], i * 4);
+  g.setAttribute('surface', new THREE.BufferAttribute(surf, 4));
   return g;
 }
 

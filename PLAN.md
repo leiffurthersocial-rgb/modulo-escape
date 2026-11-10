@@ -309,3 +309,26 @@ Render scale is capped so the internal resolution stays ≤ ~3.2 MP on iPad.
 2. Timer counts from first movement: **yes**.
 3. Hint system: **dropped**.
 4. Vercel: not linked yet; steps given in M6.
+
+---
+
+## 8. Phase 2 review changes (2026-11-10)
+- **Indoor focus:** windows are rare (rooms 12%, halls 16%, corridors 4% of exterior walls);
+  outdoor vegetation only where a window looks out. The game happens inside.
+- **One floor:** all floors share one concrete material; wetness, moss, AO and sky light are
+  continuous fields (bilinear across connected cells, distance to the nearest wall), so nothing
+  changes at cell borders.
+- **Water:** puddles are part of the floor shader (organic mask over a smooth puddle field that
+  pools along wall bases and in damp areas, with drip ripples) instead of square quads, so they
+  are never cut off.
+
+## 9. Next phase (notes from review, not started)
+1. **Multiple floors:** stairwells/ramps between storeys (LevelData already has room for
+   `floors[]`; nav graph gains vertical edges; streaming per storey).
+2. **Horror layer:** light failures and flicker events through the ambience director, sound
+   director with positional cues, tension curve.
+3. **Monster:** a stalker using the nav graph and spawn points (hearing/sight, search,
+   patrol), chase and caught states.
+4. **More realistic school:** room types with layouts (classrooms with desk rows and a
+   blackboard, toilets, gym, staircase hall, offices, lockers in corridors), signage
+   (room plates, fire exit signs, notice boards), consistent corridor widths.

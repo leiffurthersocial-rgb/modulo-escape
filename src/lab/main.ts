@@ -77,7 +77,7 @@ async function main() {
 
   // ── Test room ──
   const H = 3.6;
-  const surf = () => [1, 0.6, 0.6] as [number, number, number];
+  const surf = () => [1, 0.6, 0.6, 0] as [number, number, number, number];
   const room: Record<Surface, AABB[]> = {
     floor: [{ min: [-4, -0.25, -4], max: [4, 0, 4] }],
     wall: [
@@ -100,10 +100,12 @@ async function main() {
     ],
     rubble: [],
   };
-  const fn = (_x: number, y: number) => {
+  const fn = (_x: number, y: number, _z: number, _nx: number, _ny: number) => {
     const s = surf();
     s[0] = 1 - 0.45 * Math.exp(-Math.max(0, y) / 0.4);
     s[1] = 0.45 * Math.exp(-y / 0.8) + 0.05;
+    // A puddle along the left wall base, to judge the wet look.
+    if (_ny > 0.5) s[3] = Math.max(0, 0.75 - (_x + 4) * 0.25) * (_z > -2 && _z < 2.5 ? 1 : 0.4);
     return s;
   };
   const meshes: Record<Surface, THREE.Mesh> = {} as Record<Surface, THREE.Mesh>;

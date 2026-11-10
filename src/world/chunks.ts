@@ -10,7 +10,7 @@ import type { KitPiece } from '../gen/kit.ts';
 import { cellIndex, getEdge, inBounds } from '../gen/grid.ts';
 import type { DecalSlot } from '../gen/dressing.ts';
 import { KIT, transformBox } from '../kit/greybox.ts';
-import { boxesToGeometry, boxesToSurfaceGeometry, type AABB, type SurfaceFn } from './boxMesh.ts';
+import { boxesToSurfaceGeometry, type AABB, type SurfaceFn } from './boxMesh.ts';
 import { propMatrix } from './props.ts';
 import { ROLE_OF, type KitRole, type WorldAssets } from './worldAssets.ts';
 import { buildRoots, buildVines } from './flora.ts';
@@ -131,10 +131,7 @@ export class ChunkManager {
     }
     // Pillars and skirtings reuse the wall material (one draw call fewer each per chunk).
     if (role === 'pillar' || role === 'trim') return 'wall';
-    if (role === 'floor') {
-      const c = cellIndex(l, p.cx, p.cz);
-      if ((l.dressing.damp[c] ?? 0) > 0.58) return 'wetfloor';
-    }
+    // One floor material everywhere: wetness and puddles come from the smooth surface field.
     return role;
   }
 
@@ -146,12 +143,11 @@ export class ChunkManager {
 
     // ── Kit surfaces, one mesh per role ──
     const byRole = new Map<KitRole, AABB[]>();
-    const puddles: AABB[] = [];
     for (const p of this.piecesByChunk.get(key) ?? []) {
       for (const b of KIT[p.id]) {
         const box = transformBox(b, p.x, p.z, p.yaw) as AABB;
-        if (b.mat === 'puddle') puddles.push(box);
-        else push(byRole, this.roleFor(p, b.mat), box);
+        if (b.mat === 'puddle') continue; // water is drawn by the floor shader now
+        push(byRole, this.roleFor(p, b.mat), box);
       }
     }
     for (const [role, boxes] of byRole) {
@@ -163,14 +159,6 @@ export class ChunkManager {
       mesh.userData.role = role;
       group.add(mesh);
     }
-    if (puddles.length) {
-      const mesh = new THREE.Mesh(boxesToGeometry(puddles), a.puddle);
-      mesh.receiveShadow = true;
-      mesh.matrixAutoUpdate = false;
-      mesh.renderOrder = 1;
-      group.add(mesh);
-    }
-
     // ── Decals ──
     const decals = (this.decalsByChunk.get(key) ?? []).filter((d, i) => d.atlas === 'plate' || hash01(d.x * 7.3 + d.z * 3.1 + i) < this.opts.decals);
     for (const atlas of ['main', 'plate'] as const) {
@@ -325,58 +313,107 @@ function edgeCells(l: LevelData, p: KitPiece): [number, number] {
 }
 
 /**
- * Per-vertex surface masks: baked AO (contact darkening at floor/wall/ceiling junctions),
- * moss (damp cells, low on walls, exteriors) and wetness. Cheap stand-in for lightmaps.
+ * Per-vertex surface masks: baked AO (contact darkening at floor/wall/ceiling junctions) × sky
+ * openness, moss, wetness and a puddle field. Every input is a continuous field over world space
+ * (bilinear across connected cells, distance to the nearest wall in a 3×3 neighbourhood), so two
+ * cells that meet without a wall get identical values on their shared edge: no visible tile seams.
  */
 function makeSurfaceFn(l: LevelData): SurfaceFn {
   const S = l.cellSize;
   const H = l.storeyHeight;
-  const wallish = (e: string) => e !== 'open' && e !== 'none';
   const openness = computeOpenness(l);
+  const damp = l.dressing.damp;
+  const walk = (x: number, z: number) => inBounds(l, x, z) && l.cells[cellIndex(l, x, z)]!.kind !== 'void';
+  const wallish = (e: string) => e !== 'open' && e !== 'none';
+
+  /** Bilinear sample of a per-cell field around (x,z), only blending cells connected to `own`. */
+  const smooth = (field: number[], x: number, z: number, own: number): number => {
+    const fx = x / S - 0.5;
+    const fz = z / S - 0.5;
+    const x0 = Math.floor(fx);
+    const z0 = Math.floor(fz);
+    const tx = fx - x0;
+    const tz = fz - z0;
+    const ownV = field[own] ?? 0;
+    const adj = l.nav.adj[own] ?? [];
+    const near = (cx: number, cz: number): number => {
+      if (!walk(cx, cz)) return ownV;
+      const i = cellIndex(l, cx, cz);
+      if (i === own || adj.includes(i)) return field[i]!;
+      // Diagonal: connected through one of the two shared orthogonal neighbours.
+      for (const j of adj) if ((l.nav.adj[j] ?? []).includes(i)) return field[i]!;
+      return ownV;
+    };
+    const a = near(x0, z0);
+    const b = near(x0 + 1, z0);
+    const c = near(x0, z0 + 1);
+    const d = near(x0 + 1, z0 + 1);
+    return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
+  };
+
+  /** Distance (m) to the nearest wall face around (x,z), looking at the 3×3 cells around it. */
+  const wallDist = (x: number, z: number): number => {
+    const cx = Math.floor(x / S);
+    const cz = Math.floor(z / S);
+    let best = 9;
+    for (let j = cz - 1; j <= cz + 1; j++) {
+      for (let i = cx - 1; i <= cx + 1; i++) {
+        if (!walk(i, j)) continue;
+        // Distance from (x,z) to each wall segment on this cell's four sides.
+        for (const side of ['N', 'S', 'W', 'E'] as const) {
+          if (!wallish(getEdge(l, i, j, side))) continue;
+          if (side === 'N' || side === 'S') {
+            const lz = (side === 'N' ? j : j + 1) * S;
+            const dx = Math.max(i * S - x, 0, x - (i + 1) * S);
+            best = Math.min(best, Math.hypot(dx, z - lz));
+          } else {
+            const lx = (side === 'W' ? i : i + 1) * S;
+            const dz = Math.max(j * S - z, 0, z - (j + 1) * S);
+            best = Math.min(best, Math.hypot(x - lx, dz));
+          }
+        }
+      }
+    }
+    return Math.max(0, best - 0.15);
+  };
+
   return (x, y, z, nx, ny, nz) => {
     // Sample the cell this face looks into.
     const px = x + nx * 0.2;
     const pz = z + nz * 0.2;
     const cx = Math.floor(px / S);
     const cz = Math.floor(pz / S);
-    const inside = inBounds(l, cx, cz) && l.cells[cellIndex(l, cx, cz)]!.kind !== 'void';
-    if (!inside) {
+    if (!walk(cx, cz)) {
       // Exterior faces and roof: weathered and mossy, no interior AO.
       const roof = ny > 0.5 && y > H;
-      return [1, roof ? 0.9 : 0.55 + 0.3 * Math.exp(-y / 1.2), roof ? 0.6 : 0.35];
+      return [1, roof ? 0.9 : 0.55 + 0.3 * Math.exp(-y / 1.2), roof ? 0.6 : 0.35, 0];
     }
-    const ci = cellIndex(l, cx, cz);
-    const damp = l.dressing.damp[ci] ?? 0;
-    const u = px - cx * S;
-    const v = pz - cz * S;
-    let d = 9;
-    if (wallish(getEdge(l, cx, cz, 'N'))) d = Math.min(d, v);
-    if (wallish(getEdge(l, cx, cz, 'S'))) d = Math.min(d, S - v);
-    if (wallish(getEdge(l, cx, cz, 'W'))) d = Math.min(d, u);
-    if (wallish(getEdge(l, cx, cz, 'E'))) d = Math.min(d, S - u);
-    d = Math.max(0, d - 0.15);
+    const own = cellIndex(l, cx, cz);
+    const dm = smooth(damp, px, pz, own);
+    const open = smooth(openness, px, pz, own);
+    const d = wallDist(px, pz);
     let ao = 1;
     let moss: number;
-    let wet = damp;
+    let wet = dm;
+    let puddle = 0;
     if (ny > 0.5) {
       ao *= 1 - 0.5 * Math.exp(-d / 0.45);
-      moss = damp * (0.45 + 0.7 * Math.exp(-d / 0.7));
+      moss = dm * (0.45 + 0.7 * Math.exp(-d / 0.7));
+      // Water collects along wall bases and wherever it is damp.
+      puddle = Math.min(1, Math.max(0.001, dm * 0.75 + Math.exp(-d / 0.8) * (0.15 + dm * 0.45) - 0.05));
     } else if (ny < -0.5) {
       ao *= 1 - 0.45 * Math.exp(-d / 0.55);
-      moss = damp * 0.15;
-      wet = damp * 0.3;
+      moss = dm * 0.15;
+      wet = dm * 0.3;
     } else {
       ao *= 1 - 0.45 * Math.exp(-Math.max(0, y) / 0.38);
       ao *= 1 - 0.35 * Math.exp(-Math.max(0, H - y) / 0.4);
-      // Inside corners darken too (distance along the wall to a perpendicular wall).
-      ao *= 1 - 0.3 * Math.exp(-d / 0.3);
-      moss = damp * (0.35 + 0.65 * Math.exp(-y / 0.9));
-      wet = damp * (0.25 + 0.5 * Math.exp(-y / 0.6));
+      moss = dm * (0.35 + 0.65 * Math.exp(-y / 0.9));
+      wet = dm * (0.25 + 0.5 * Math.exp(-y / 0.6));
     }
     // Floors face the (unoccluded) sky light the most; walls and ceilings less so.
-    const open = openness[ci]!;
     const sky = ny > 0.5 ? open : ny < -0.5 ? 0.6 + 0.4 * open : Math.min(1, 0.25 + open);
-    return [Math.max(0.08, ao * sky), Math.min(1, moss), Math.min(1, wet)];
+    return [Math.max(0.08, ao * sky), Math.min(1, moss), Math.min(1, wet), puddle];
   };
 }
 

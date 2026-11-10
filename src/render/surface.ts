@@ -52,8 +52,8 @@ export function patchSurfaceShader(m: THREE.Material, mossFactor: number, uvScal
       .replace(
         '#include <common>',
         `#include <common>
-attribute vec3 surface;
-varying vec3 vSurface;
+attribute vec4 surface;
+varying vec4 vSurface;
 varying vec3 vWPos;
 varying vec3 vWNormal;`,
       )
@@ -75,10 +75,11 @@ vWNormal = normalize(mat3(modelMatrix) * objectNormal);`,
 uniform float uTime; uniform float uWetness; uniform float uMoss; uniform float uMossScale;
 uniform float uMossFactor; uniform float uUvScale;
 uniform sampler2D uMossMap;
-varying vec3 vSurface; varying vec3 vWPos; varying vec3 vWNormal;
+varying vec4 vSurface; varying vec3 vWPos; varying vec3 vWNormal;
 ${NOISE}
 float sMossMask;
-float sWet;`,
+float sWet;
+float sPuddle;`,
       )
       .replace(
         '#include <map_fragment>',
@@ -92,7 +93,7 @@ float sWet;`,
   float low = 1.0 - smoothstep(0.0, 0.9, vWPos.y);           // creeping up from the floor
   float m = vSurface.g * (0.55 + 0.9 * low) + up * 0.25 * vSurface.g;
   float n2 = sFbm(wuv * 1.7 + 3.1);
-  sMossMask = smoothstep(0.5, 0.8, m * uMoss * uMossFactor * 1.4 + (n - 0.5) * 1.1 + (n2 - 0.5) * 0.4) * min(uMossFactor, 1.0) * 0.92;
+  sMossMask = smoothstep(0.5, 0.8, m * uMoss * uMossFactor * 1.4 + (n - 0.5) * 1.6 + (n2 - 0.5) * 0.6) * min(uMossFactor, 1.0) * 0.92;
   vec3 mossCol = texture2D(uMossMap, wuv * uMossScale).rgb;
   float ml = dot(mossCol, vec3(0.3, 0.59, 0.11));
   mossCol = mix(vec3(ml), mossCol, 0.75) * vec3(0.8, 0.92, 0.65);  // a little desaturated: damp, not neon
@@ -100,13 +101,43 @@ float sWet;`,
   // Wetness: damp map + global wetness, broken up by noise; puddles handled separately.
   sWet = clamp(vSurface.b * (0.4 + uWetness * 1.2) + (sNoise(wuv * 0.9) - 0.6) * 0.5, 0.0, 1.0) * clamp(uWetness * 1.6, 0.0, 1.0);
   diffuseColor.rgb *= mix(1.0, 0.55, sWet);
+  // Standing water: an organic mask over the smooth puddle field (pools along wall bases and in
+  // damp areas). Continuous across cells, so it is never cut off at a tile edge.
+  float thr = 0.6 - uWetness * 0.22;
+  float pf = vSurface.a + (sFbm(vWPos.xz * 0.55 + 11.0) - 0.5) * 0.55 + (sNoise(vWPos.xz * 2.2) - 0.5) * 0.08;
+  sPuddle = smoothstep(thr, thr + 0.05, pf) * step(0.0001, vSurface.a);
+  sMossMask *= 1.0 - sPuddle;
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.28 + vec3(0.004, 0.006, 0.007), sPuddle);
 }`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, 0.14, sWet * 0.9);
-roughnessFactor = mix(roughnessFactor, 0.85, sMossMask);`,
+roughnessFactor = mix(roughnessFactor, 0.38, sWet * 0.8);
+roughnessFactor = mix(roughnessFactor, 0.85, sMossMask);
+roughnessFactor = mix(roughnessFactor, 0.035, sPuddle);`,
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+if (sPuddle > 0.001) {
+  // Water is flat; drips make expanding rings.
+  vec2 p = vWPos.xz * 1.6;
+  vec2 gr = vec2(0.0);
+  for (int k = 0; k < 3; k++) {
+    vec2 q = p + float(k) * 0.37;
+    vec2 cell = floor(q);
+    float h = sHash(cell + float(k) * 7.0);
+    vec2 c = cell + vec2(sHash(cell + 1.3), sHash(cell + 2.7));
+    float t = fract(uTime * (0.35 + h * 0.3) + h);
+    vec2 d = q - c;
+    float r = length(d);
+    float w = sin((r - t * 0.9) * 42.0) * exp(-abs(r - t * 0.9) * 14.0) * (1.0 - t);
+    gr += (r > 1e-4 ? d / r : vec2(0.0)) * w;
+  }
+  vec3 rn = normalize((viewMatrix * vec4(normalize(vec3(-gr.x * 0.22, 1.0, -gr.y * 0.22)), 0.0)).xyz);
+  normal = normalize(mix(normal, rn, sPuddle));
+}`,
       )
       .replace(
         '#include <aomap_fragment>',
@@ -153,7 +184,7 @@ export function createSurfaceMaterial(o: SurfaceOptions): THREE.MeshStandardMate
 export function ensureSurfaceAttribute(g: THREE.BufferGeometry, ao = 1, moss = 0, wet = 0) {
   if (g.getAttribute('surface')) return;
   const n = g.getAttribute('position').count;
-  const a = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) a.set([ao, moss, wet], i * 3);
-  g.setAttribute('surface', new THREE.BufferAttribute(a, 3));
+  const a = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) a.set([ao, moss, wet, 0], i * 4);
+  g.setAttribute('surface', new THREE.BufferAttribute(a, 4));
 }

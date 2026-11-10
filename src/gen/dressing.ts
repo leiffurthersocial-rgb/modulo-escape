@@ -273,18 +273,19 @@ function placeOutdoor(l: LevelData, rng: Rng): { trees: FloraSlot[]; shrubs: Flo
     const nz = z + DIR[s].dz;
     return inBounds(l, nx, nz) && l.cells[cellIndex(l, nx, nz)]!.kind !== 'void' && getEdge(l, x, z, s) === 'window';
   });
-  for (let z = -3; z < l.height + 3; z++) {
-    for (let x = -3; x < l.width + 3; x++) {
+  // Indoor-focused game: the outside only matters where a window looks at it.
+  for (let z = -2; z < l.height + 2; z++) {
+    for (let x = -2; x < l.width + 2; x++) {
       const inside = inBounds(l, x, z);
       if (inside && l.cells[cellIndex(l, x, z)]!.kind !== 'void') continue;
+      const win = inside && nearWindow(x, z);
       const nb = inside && nearBuilding(x, z);
-      const pTree = inside ? (nearWindow(x, z) ? 0.55 : nb ? 0.12 : 0.3) : 0.35;
+      const pTree = win ? 0.75 : nb ? 0.04 : 0.07;
       if (rng.chance(pTree)) {
-        // Keep trunks off the facade so they don't poke through walls.
         const margin = nb ? 1.2 : 0.6;
         trees.push({ x: (x + rng.range(margin / S, 1 - margin / S)) * S, z: (z + rng.range(margin / S, 1 - margin / S)) * S, scale: rng.range(0.75, 1.3), rot: rng.range(0, 6.28), variant: rng.int(0, 2) });
       }
-      const ns = rng.int(nb ? 2 : 0, nb ? 5 : 3);
+      const ns = win ? rng.int(3, 6) : rng.chance(0.25) ? 1 : 0;
       for (let k = 0; k < ns; k++) shrubs.push({ x: (x + rng.next()) * S, z: (z + rng.next()) * S, scale: rng.range(0.6, 1.4), rot: rng.range(0, 6.28), variant: rng.int(0, 7) });
     }
   }

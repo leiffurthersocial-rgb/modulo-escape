@@ -452,7 +452,8 @@ function assignEdges(w: Work, rng: Rng) {
         if (!aWalk && !bWalk) kind = 'none';
         else if (aWalk !== bWalk) {
           const inner = aWalk ? c : n!;
-          const p = inner.kind === 'corridor' ? 0.18 : 0.35;
+          // Mostly enclosed: the game happens inside; windows are rare glimpses out.
+          const p = inner.kind === 'corridor' ? 0.04 : inner.kind === 'hall' ? 0.16 : 0.12;
           kind = rng.chance(p) ? 'window' : 'solid';
         } else {
           const nn = n!;

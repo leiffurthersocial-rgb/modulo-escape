@@ -178,9 +178,9 @@ describe('golden seeds', () => {
   // Locks layouts so later phases (props, materials, decals) can't silently change existing seeds.
   // Update deliberately with: GEN_UPDATE_GOLDEN=1 (prints new values).
   const golden: Record<string, string> = {
-    'kzu:small': 'd08287b8',
-    'kzu:medium': '3cd0fc4b',
-    'abc123:large': '66d70ed0',
+    'kzu:small': 'f09e2f25',
+    'kzu:medium': 'f4a614ef',
+    'abc123:large': 'f37de638',
   };
   it('layout fingerprints are stable', () => {
     for (const key of Object.keys(golden)) {

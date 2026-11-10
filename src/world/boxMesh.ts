@@ -57,7 +57,8 @@ export function boxesToGeometry(boxes: AABB[], uvScale = 0.5): THREE.BufferGeome
   return g;
 }
 
-export type SurfaceFn = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => [number, number, number];
+/** Returns [ao × sky, moss, wet, puddle] for a vertex. */
+export type SurfaceFn = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => [number, number, number, number];
 
 /**
  * Like boxesToGeometry, but large faces are subdivided (≤ maxSeg metres) and every vertex gets a
@@ -113,7 +114,7 @@ export function boxesToSurfaceGeometry(boxes: AABB[], fn: SurfaceFn, maxSeg = 1,
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setAttribute('surface', new THREE.Float32BufferAttribute(surf, 3));
+  g.setAttribute('surface', new THREE.Float32BufferAttribute(surf, 4));
   g.setIndex(pos.length / 3 < 65536 ? new THREE.Uint16BufferAttribute(idx, 1) : new THREE.Uint32BufferAttribute(idx, 1));
   g.computeBoundingBox();
   g.computeBoundingSphere();
