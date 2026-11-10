@@ -96,8 +96,9 @@ export function dressLevel(l: LevelData, attempt = 0): Dressing {
   return {
     damp,
     decals: placeDecals(l, rng, damp),
-    vines: placeVines(l, flora, damp),
-    roots: placeRoots(l, flora, damp),
+    // Clean concrete look: no creepers, roots or moss patches (kept as code for later moods).
+    vines: [] as VineSlot[],
+    roots: [] as RootSlot[],
     ...placeOutdoor(l, flora),
     roomLabels,
   };
@@ -176,7 +177,7 @@ function placeDecals(l: LevelData, rng: Rng, damp: number[]): DecalSlot[] {
         tryAdd(0.22, (u) => push('main', rng.pick(DECAL_TILES.crack), wallPoint(l, cx, cz, side, u, rng.range(0.8, 2.6)), 1.1, 1.1, rng.range(-0.6, 0.6), cx, cz));
         if (c.kind === 'corridor') tryAdd(0.1, (u) => push('main', rng.pick(DECAL_TILES.stencil), wallPoint(l, cx, cz, side, u, 1.75), 1.0, 0.5, 0, cx, cz));
         tryAdd(0.05, (u) => push('main', rng.pick(DECAL_TILES.graffiti), wallPoint(l, cx, cz, side, u, rng.range(1.2, 1.7)), 1.3, 0.8, rng.range(-0.08, 0.08), cx, cz));
-        tryAdd(dm * 0.2, (u) => push('main', rng.pick(DECAL_TILES.moss), wallPoint(l, cx, cz, side, u, 0.35), 1.2, 0.7, 0, cx, cz));
+        rng.next(); // (was: moss patch) keep the stream stable
         tryAdd(0.12, (u) => push('main', rng.pick(DECAL_TILES.stain), wallPoint(l, cx, cz, side, u, rng.range(0.6, 1.4)), 0.9, 0.9, rng.range(0, Math.PI * 2), cx, cz));
       }
       // Room plates beside doors, on the corridor side.
@@ -196,14 +197,14 @@ function placeDecals(l: LevelData, rng: Rng, damp: number[]): DecalSlot[] {
       const floorP = (u: number, v: number) => ({ x: (cx + 0.5) * S + u, y: fy, z: (cz + 0.5) * S + v, nx: 0, nz: 0 });
       if (rng.chance(0.3)) push('main', DECAL_TILES.floorStain[0], floorP(rng.range(-1, 1), rng.range(-1, 1)), rng.range(1.2, 2), rng.range(1.2, 2), rng.range(0, 6.28), cx, cz, 1);
       if (c.floor === 'cracked' && rng.chance(0.8)) push('main', rng.pick(DECAL_TILES.crack), floorP(rng.range(-0.8, 0.8), rng.range(-0.8, 0.8)), 1.6, 1.6, rng.range(0, 6.28), cx, cz, 1);
-      if (dm > 0.6 && rng.chance(dm * 0.5)) push('main', rng.pick(DECAL_TILES.moss), floorP(rng.range(-1.2, 1.2), rng.range(-1.2, 1.2)), 1.4, 1.4, rng.range(0, 6.28), cx, cz, 1);
+
     }
   }
   return out;
 }
 
 /** A few creepers hanging from ceiling cracks along walls, only in the dampest spots. */
-function placeVines(l: LevelData, rng: Rng, damp: number[]): VineSlot[] {
+export function placeVines(l: LevelData, rng: Rng, damp: number[]): VineSlot[] {
   const out: VineSlot[] = [];
   for (let cz = 0; cz < l.height; cz++) {
     for (let cx = 0; cx < l.width; cx++) {
@@ -220,7 +221,7 @@ function placeVines(l: LevelData, rng: Rng, damp: number[]): VineSlot[] {
   return out;
 }
 
-function placeRoots(l: LevelData, rng: Rng, damp: number[]): RootSlot[] {
+export function placeRoots(l: LevelData, rng: Rng, damp: number[]): RootSlot[] {
   const out: RootSlot[] = [];
   const S = l.cellSize;
   l.cells.forEach((c, i) => {

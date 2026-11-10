@@ -465,15 +465,16 @@ export class Game {
     const sky = outdoor * groundFloor;
     this.env.sun.intensity = this.env.params.sunIntensity * sky;
     this.env.sun.shadow.autoUpdate = sky > 0.01;
-    this.env.hemi.intensity = this.env.params.hemiIntensity * (0.25 + 0.75 * sky);
-    this.scene.environmentIntensity = this.env.params.envIntensity * (0.18 + 0.82 * sky);
+    this.env.hemi.intensity = this.env.params.hemiIntensity * (0.55 + 0.45 * sky);
+    this.scene.environmentIntensity = this.env.params.envIntensity * (0.5 + 0.5 * sky);
     // Eye adaptation: dark interiors open the "iris", daylight at the gate closes it.
-    const target = THREE.MathUtils.lerp(1.15, 0.6, sky);
+    const target = THREE.MathUtils.lerp(1.35, 0.6, sky);
     this.adapt += (target - this.adapt) * Math.min(1, dt * 1.5);
     if (dt === 0) this.adapt = target;
     this.renderer.toneMappingExposure = this.env.params.exposure * this.adapt;
-    this.env.fog.color.copy(this.env.params.fogColor).multiplyScalar(0.06 + 0.94 * sky);
-    this.env.fog.density = THREE.MathUtils.lerp(0.045, this.env.params.fogDensity, sky);
+    // Pale damp haze at the end of long corridors (the look you liked), full daylight fog outside.
+    this.env.fog.color.copy(this.env.params.fogColor).multiplyScalar(0.3 + 0.7 * sky);
+    this.env.fog.density = THREE.MathUtils.lerp(0.03, this.env.params.fogDensity, sky);
 
     for (const e of this.entities.entities.values()) e.object.visible = Math.abs(e.floor - this.player.floor) <= 1;
     this.renderer.info.reset();

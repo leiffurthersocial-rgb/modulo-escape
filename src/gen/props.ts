@@ -89,22 +89,17 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
         }
         if (doorway(ea) && ea !== 'open') continue;
         if (doorway(eb) && eb !== 'open') continue;
+        // Clean, empty spaces: corridors and halls stay bare.
         const roll = rng.next();
-        const pDebris = walls === 2 ? 0.28 : walls === 1 ? 0.1 : 0.02;
-        if (roll < pDebris) {
-          add(rng.chance(0.6) ? 'rubble' : 'debris', cx, cz, c.u, c.v);
-          continue;
-        }
-        if (keepClear || walls === 0) continue;
         const r2 = rng.next();
+        if (keepClear || walls === 0) continue;
+        void roll; // (was: rubble) — no loose clutter, only school furniture
         if (cell.kind === 'room' && r2 < 0.12) add(rng.chance(0.6) ? 'chair' : 'desk', cx, cz, c.u, c.v);
-        else if (cell.kind === 'hall' && r2 < 0.12) add('collapsed_slab', cx, cz, c.u, c.v);
-        else if (r2 < 0.025) add('barrel', cx, cz, c.u, c.v);
       }
 
       // Mid-wall slots: old pipes along corridor walls.
       for (const m of MIDS) {
-        if (edge(m.side) === 'solid' && cell.kind === 'corridor' && rng.chance(0.1)) add('pipe', cx, cz, m.u, m.v);
+        if (edge(m.side) === 'solid' && cell.kind === 'corridor' && rng.chance(0.06)) add('pipe', cx, cz, m.u, m.v);
       }
     }
   }

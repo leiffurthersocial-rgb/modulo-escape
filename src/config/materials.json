@@ -1,7 +1,7 @@
 {
   "picks": {
     "concrete_wall": "concrete_wall_006",
-    "concrete_floor": "concrete_floor_worn_001",
+    "concrete_floor": "hangar_concrete_floor",
     "plaster": "worn_mossy_plasterwall",
     "rusted_metal": "rusty_metal_02",
     "wet_floor": "dirty_concrete",

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-10T16:48:41.248Z",
+  "generated": "2026-11-10T18:25:32.894Z",
   "textures": {
     "concrete_wall_008": {
       "category": "concrete_wall",
@@ -233,25 +233,18 @@
       "source": "polyhaven",
       "tiers": {
         "512": {
-          "albedo": "/assets/tex/concrete_floor_worn_001/albedo_512.c51b892d.ktx2",
-          "normal": "/assets/tex/concrete_floor_worn_001/normal_512.c6fce959.ktx2",
-          "orm": "/assets/tex/concrete_floor_worn_001/orm_512.f978e134.ktx2",
-          "bytes": 229866,
+          "albedo": "/assets/tex/concrete_floor_worn_001/albedo_512.d2a69e5b.ktx2",
+          "normal": "/assets/tex/concrete_floor_worn_001/normal_512.cc77e5d3.ktx2",
+          "orm": "/assets/tex/concrete_floor_worn_001/orm_512.6c75ad6a.ktx2",
+          "bytes": 229846,
           "px": 512
         },
         "1k": {
-          "albedo": "/assets/tex/concrete_floor_worn_001/albedo_1k.b1faadda.ktx2",
-          "normal": "/assets/tex/concrete_floor_worn_001/normal_1k.8adfa5b0.ktx2",
-          "orm": "/assets/tex/concrete_floor_worn_001/orm_1k.72c88771.ktx2",
-          "bytes": 1011142,
+          "albedo": "/assets/tex/concrete_floor_worn_001/albedo_1k.daa1b546.ktx2",
+          "normal": "/assets/tex/concrete_floor_worn_001/normal_1k.5b3e4e7c.ktx2",
+          "orm": "/assets/tex/concrete_floor_worn_001/orm_1k.e21e26e9.ktx2",
+          "bytes": 1011122,
           "px": 1024
-        },
-        "2k": {
-          "albedo": "/assets/tex/concrete_floor_worn_001/albedo_2k.8dc3cf4f.ktx2",
-          "normal": "/assets/tex/concrete_floor_worn_001/normal_2k.8474d3c3.ktx2",
-          "orm": "/assets/tex/concrete_floor_worn_001/orm_2k.17b57cee.ktx2",
-          "bytes": 5394890,
-          "px": 2048
         }
       }
     },
@@ -320,18 +313,25 @@
       "source": "polyhaven",
       "tiers": {
         "512": {
-          "albedo": "/assets/tex/hangar_concrete_floor/albedo_512.90a315cf.ktx2",
-          "normal": "/assets/tex/hangar_concrete_floor/normal_512.6af6b7da.ktx2",
-          "orm": "/assets/tex/hangar_concrete_floor/orm_512.89860f3d.ktx2",
-          "bytes": 359389,
+          "albedo": "/assets/tex/hangar_concrete_floor/albedo_512.c2859504.ktx2",
+          "normal": "/assets/tex/hangar_concrete_floor/normal_512.f90d550f.ktx2",
+          "orm": "/assets/tex/hangar_concrete_floor/orm_512.8c46c402.ktx2",
+          "bytes": 360385,
           "px": 512
         },
         "1k": {
-          "albedo": "/assets/tex/hangar_concrete_floor/albedo_1k.6ab08b41.ktx2",
-          "normal": "/assets/tex/hangar_concrete_floor/normal_1k.4b71273d.ktx2",
-          "orm": "/assets/tex/hangar_concrete_floor/orm_1k.97253b04.ktx2",
-          "bytes": 1283060,
+          "albedo": "/assets/tex/hangar_concrete_floor/albedo_1k.3e61cc65.ktx2",
+          "normal": "/assets/tex/hangar_concrete_floor/normal_1k.1026f037.ktx2",
+          "orm": "/assets/tex/hangar_concrete_floor/orm_1k.0be32221.ktx2",
+          "bytes": 1292775,
           "px": 1024
+        },
+        "2k": {
+          "albedo": "/assets/tex/hangar_concrete_floor/albedo_2k.0d75bd7f.ktx2",
+          "normal": "/assets/tex/hangar_concrete_floor/normal_2k.43e0fb2c.ktx2",
+          "orm": "/assets/tex/hangar_concrete_floor/orm_2k.e8953dad.ktx2",
+          "bytes": 4801969,
+          "px": 2048
         }
       }
     },

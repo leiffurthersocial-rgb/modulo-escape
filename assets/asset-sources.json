@@ -126,11 +126,10 @@
   "id": "concrete_floor_worn_001",
   "kind": "texture",
   "category": "concrete_floor",
-  "res": "2k",
+  "res": "1k",
   "tiers": [
    "512",
-   "1k",
-   "2k"
+   "1k"
   ]
  },
  {
@@ -171,10 +170,11 @@
   "id": "hangar_concrete_floor",
   "kind": "texture",
   "category": "concrete_floor",
-  "res": "1k",
+  "res": "2k",
   "tiers": [
    "512",
-   "1k"
+   "1k",
+   "2k"
   ]
  },
  {

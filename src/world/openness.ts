@@ -17,6 +17,6 @@ export function computeOpenness(l: LevelData): number[] {
     if (c.kind === 'void') return 1;
     let bleed = 0;
     for (const n of l.nav.adj[i] ?? []) bleed = Math.max(bleed, own[n]! * 0.45);
-    return Math.min(1, 0.08 + own[i]! + bleed);
+    return Math.min(1, 0.16 + own[i]! + bleed);
   });
 }
