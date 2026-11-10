@@ -1,6 +1,7 @@
 import './style.css';
 import { createGame, readUrlParams } from './game/game.ts';
 import { UI } from './ui/ui.ts';
+import { bus } from './core/events.ts';
 
 async function main() {
   const root = document.getElementById('app') ?? document.body;
@@ -11,7 +12,7 @@ async function main() {
   ui.attach(game);
   game.renderFrame(0);
   const w = window as unknown as { __game: unknown };
-  w.__game = { game, level: game.level, ready: true };
+  w.__game = { game, level: game.level, bus, ready: true };
 }
 
 main().catch((err: unknown) => {

@@ -1,30 +1,56 @@
 /**
- * The monster: Quaternius' CC0 zombie made tall, gaunt and dark with glowing eyes (placeholder capsule
- * if the model is missing). On by default (Settings → Monster, or ?monster=off). Swap the model in
- * MONSTER_MODEL_ID; the senses, nav and catch hooks stay.
+ * The monster. Body: the procedural "Tall One" (src/ai/creature.ts) by default, or a skinned GLB
+ * (MONSTER_MODEL_ID) when `kind: 'model'`. Brain: a small state machine on top of the building's
+ * nav graph, line of sight and hearing:
  *
- * States: dormant → patrol (random reachable nodes) → investigate (last heard noise) →
- * chase (sees the player) → search (lost them; sweeps around the last known position) → patrol.
+ *   dormant → patrol      wanders the floor; every ~50 s drifts towards the player's area
+ *   patrol/search → investigate   heard a noise (footsteps: crouch 1.5 m, walk 5 m, sprint 18 m)
+ *   any → chase           sees the player (same floor, view cone, nothing in between; the flashlight
+ *                          makes you visible from further away, crouching from less far)
+ *   chase                 keeps tracking for 3 s after losing sight, runs straight at you when close,
+ *                          speeds up the longer it runs; then goes to the last known spot → search
+ *   search                sweeps around for a while → patrol
+ *   attack                the jump scare (game takes over)
+ *
+ * Emits 'monster:step' (audible footsteps) and 'monster:vocal' (breathing, clicks, screech).
  */
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { bus } from '../core/events.ts';
 import { streamRng, type Rng } from '../core/rng.ts';
 import type { Entity, EntityContext } from './entities.ts';
 import type { MonsterModel } from './monsterModel.ts';
+import { Creature, type CreatureMode } from './creature.ts';
 
 export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search' | 'attack';
 
 export interface MonsterTuning {
   walkSpeed: number;
   chaseSpeed: number;
+  /** Extra chase speed per second of chasing (capped at +30%). */
+  chaseRamp: number;
   sightRange: number;
   /** Half-angle of the view cone (radians). */
   fov: number;
   catchDistance: number;
+  /** Seconds it keeps tracking you after losing sight. */
+  memory: number;
   searchTime: number;
+  /** Seconds between drifts towards the player's area while patrolling. */
+  driftEvery: number;
 }
 
-export const DEFAULT_TUNING: MonsterTuning = { walkSpeed: 1.3, chaseSpeed: 3.9, sightRange: 16, fov: 1.0, catchDistance: 1.0, searchTime: 10 };
+export const DEFAULT_TUNING: MonsterTuning = {
+  walkSpeed: 1.25,
+  chaseSpeed: 4.1,
+  chaseRamp: 0.06,
+  sightRange: 17,
+  fov: 1.05,
+  catchDistance: 1.1,
+  memory: 3,
+  searchTime: 12,
+  driftEvery: 50,
+};
 
 export class Monster implements Entity {
   readonly id = 'monster';
@@ -35,58 +61,58 @@ export class Monster implements Entity {
   private path: number[] = [];
   private target = new THREE.Vector3();
   private lastKnown = new THREE.Vector3();
+  private lastSeen = -1e9;
   private stateTime = 0;
   private heading = new THREE.Vector3(0, 0, 1);
   private rng: Rng;
   private tmp = new THREE.Vector3();
+  private time = 0;
+  private nextDrift: number;
+  private nextVocal = 3;
+  private creature: Creature | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private actions = new Map<string, THREE.AnimationAction>();
   private current: THREE.AnimationAction | null = null;
-  private time = 0;
 
   constructor(
     seed: string,
     spawn: THREE.Vector3,
     model: MonsterModel | null = null,
     readonly tuning: MonsterTuning = DEFAULT_TUNING,
+    kind: 'creature' | 'model' = 'creature',
   ) {
     this.rng = streamRng(seed, 'monster');
+    this.nextDrift = tuning.driftEvery;
     this.position.copy(spawn);
-    if (model) this.buildFromModel(model);
-    else this.buildPlaceholder();
+    if (kind === 'model' && model) this.buildFromModel(model);
+    else this.buildCreature();
     this.object.position.copy(spawn);
-    this.play('Idle');
+    this.setPose('idle');
   }
 
-  /** Tall, gaunt and dark: the stylised zombie pushed towards horror. */
+  private buildCreature() {
+    const c = new Creature();
+    c.onStep = (foot, loud) => bus.emit('monster:step', { x: foot.x, y: foot.y, z: foot.z, floor: this.floor, loud });
+    this.object.add(c.object);
+    this.creature = c;
+  }
+
+  /** Alternative body: a skinned GLB, measured posed, scaled to 2.3 m and darkened. */
   private buildFromModel(model: MonsterModel) {
     const body = cloneSkinned(model.scene) as THREE.Group;
     body.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
       m.castShadow = true;
-      m.frustumCulled = false; // skinned bounds don't follow the animation
-      // Near-black, wet skin: the cartoon colours are mostly desaturated away and only a
-      // greenish sheen survives in the flashlight.
+      m.frustumCulled = false;
       const mat = (m.material as THREE.MeshStandardMaterial).clone();
       mat.color.set(0x262a24);
       mat.roughness = 0.42;
-      mat.metalness = 0;
-      mat.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace(
-          '#include <map_fragment>',
-          `#include <map_fragment>
-  float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-  diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 0.25) * vec3(0.85, 0.95, 0.85);`,
-        );
-      };
-      mat.customProgramCacheKey = () => 'monster-skin';
       m.material = mat;
     });
     this.object.add(body);
     this.mixer = new THREE.AnimationMixer(body);
     for (const clip of model.animations) this.actions.set(clip.name, this.mixer.clipAction(clip));
-    // Measure the *posed* skinned mesh (bones applied), then scale to 2.15 m, gaunt, feet on y = 0.
     const measure = () => {
       this.mixer!.update(0);
       this.object.updateMatrixWorld(true);
@@ -95,51 +121,25 @@ export class Monster implements Entity {
     };
     this.actions.get('Idle')?.play();
     const box = measure();
-    const h = Math.max(0.01, box.max.y - box.min.y);
-    const s = 2.15 / h;
-    body.scale.set(s * 0.8, s * 1.2, s * 0.8);
-    const posed = measure();
-    body.position.y -= posed.min.y;
-    body.updateMatrixWorld(true);
+    const s = 2.3 / Math.max(0.01, box.max.y - box.min.y);
+    body.scale.set(s * 0.8, s, s * 0.8);
+    body.position.y -= measure().min.y;
     this.actions.get('Idle')?.stop();
-    // Glowing eyes on the head bone.
-    let head: THREE.Object3D | null = null;
-    body.traverse((o) => {
-      if (!head && /^head$/i.test(o.name)) head = o;
-    });
-    if (head) {
-      const hb = head as THREE.Object3D;
-      const hp = hb.getWorldPosition(new THREE.Vector3());
-      const ws = hb.getWorldScale(new THREE.Vector3()).x || 1;
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
-      for (const side of [-1, 1]) {
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), eyeMat);
-        const wp = hp.clone().add(new THREE.Vector3(side * 0.07, 0.1, 0.26));
-        eye.position.copy(hb.worldToLocal(wp));
-        eye.scale.setScalar(1 / ws);
-        hb.add(eye);
-      }
-      const glow = new THREE.PointLight(0xff9a60, 0.6, 2.2, 2);
-      glow.position.copy(hb.worldToLocal(hp.clone().add(new THREE.Vector3(0, 0.05, 0.3))));
-      hb.add(glow);
+  }
+
+  /** Body pose for both bodies (creature modes / GLB clips). */
+  private setPose(mode: CreatureMode, timeScale = 1) {
+    if (this.creature) {
+      this.creature.mode = mode;
+      return;
     }
-  }
-
-  private buildPlaceholder() {
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.5, 4, 10), new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.9 }));
-    body.position.y = 1.1;
-    const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xff3020 }));
-    eyes.position.set(0, 1.7, 0.33);
-    this.object.add(body, eyes);
-  }
-
-  private play(name: string, timeScale = 1, fade = 0.35) {
-    const a = this.actions.get(name);
+    const clip = { idle: 'Idle', walk: 'Walk', run: 'Run_Arms', attack: 'Punch' }[mode];
+    const a = this.actions.get(clip);
     if (!a) return;
     a.timeScale = timeScale;
     if (a === this.current) return;
-    a.reset().setEffectiveWeight(1).fadeIn(fade).play();
-    this.current?.fadeOut(fade);
+    a.reset().setEffectiveWeight(1).fadeIn(0.3).play();
+    this.current?.fadeOut(0.3);
     this.current = a;
   }
 
@@ -150,19 +150,18 @@ export class Monster implements Entity {
     this.position.copy(at);
     this.object.position.copy(at);
     this.object.rotation.y = Math.atan2(look.x - at.x, look.z - at.z);
-    this.play('Punch', 1.4, 0.05);
-    setTimeout(() => this.state === 'attack' && this.play('Idle_Attack', 1.2, 0.15), 450);
+    this.setPose('attack', 1.4);
   }
 
-  /** World position of the head (for the scare camera); falls back to a fixed height. */
+  /** World position of the head (for the scare camera). */
   headPosition(out: THREE.Vector3): THREE.Vector3 {
+    this.object.updateMatrixWorld(true);
     let head: THREE.Object3D | null = null;
     this.object.traverse((o) => {
       if (!head && /^head$/i.test(o.name)) head = o;
     });
-    this.object.updateMatrixWorld(true);
-    if (head) return (head as THREE.Object3D).getWorldPosition(out);
-    return out.copy(this.position).setY(this.position.y + 1.9);
+    if (head) return (head as THREE.Object3D).getWorldPosition(out).add(new THREE.Vector3(0, 0.1, 0));
+    return out.copy(this.position).setY(this.position.y + 2.1);
   }
 
   wake() {
@@ -170,64 +169,102 @@ export class Monster implements Entity {
   }
 
   private setState(s: MonsterState) {
+    if (s === 'chase' && this.state !== 'chase') bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind: 'screech' });
     this.state = s;
     this.stateTime = 0;
     this.path = [];
   }
 
   update(dt: number, ctx: EntityContext) {
-    this.stateTime += dt;
     this.time += dt;
+    this.stateTime += dt;
     this.mixer?.update(dt);
+    this.creature?.update(dt);
     if (this.state === 'dormant' || this.state === 'attack') return;
     this.floor = ctx.nav.floorAt(this.position.y);
     const me = ctx.nav.nodeAt(this.position.x, this.position.y, this.position.z);
-    const eye = this.tmp.copy(this.position).setY(this.position.y + 1.7);
+    const eye = this.tmp.copy(this.position).setY(this.position.y + 2.1);
+    const player = ctx.player;
 
     // ── perception ──
-    const toPlayer = ctx.player.eye.clone().sub(eye);
+    const toPlayer = player.eye.clone().sub(eye);
     const dist = toPlayer.length();
-    const inCone = toPlayer.clone().normalize().dot(this.heading) > Math.cos(this.tuning.fov) || dist < 2.5;
-    const range = this.tuning.sightRange * (ctx.player.flashlightOn ? 1.4 : 1) * (ctx.player.crouching ? 0.6 : 1);
-    const sees = Math.abs(ctx.player.floor - this.floor) <= 0 && dist < range && inCone && ctx.senses.lineOfSight(eye, ctx.player.eye);
+    const flat = Math.hypot(player.position.x - this.position.x, player.position.z - this.position.z);
+    const sameFloor = player.floor === this.floor;
+    const inCone = toPlayer.clone().setY(0).normalize().dot(this.heading) > Math.cos(this.tuning.fov) || dist < 3;
+    const range = this.tuning.sightRange * (player.flashlightOn ? 1.4 : 1) * (player.crouching ? 0.65 : 1);
+    const sees = sameFloor && dist < range && inCone && ctx.senses.lineOfSight(eye, player.eye);
     if (sees) {
-      this.lastKnown.copy(ctx.player.position);
+      this.lastSeen = this.time;
+      this.lastKnown.copy(player.position);
       if (this.state !== 'chase') this.setState('chase');
-    } else if (this.state === 'patrol' || this.state === 'search') {
+    } else if (this.state !== 'chase') {
       const heard = ctx.senses.hear(this.position, this.floor);
-      if (heard) {
+      if (heard && (this.state !== 'investigate' || heard.pos.distanceTo(this.lastKnown) > 2)) {
         this.lastKnown.copy(heard.pos);
-        this.setState('investigate');
+        if (this.state !== 'investigate') this.setState('investigate');
+        else this.path = [];
       }
     }
 
     // ── behaviour ──
     let speed = this.tuning.walkSpeed;
+    let direct = false;
     if (this.state === 'chase') {
-      speed = this.tuning.chaseSpeed;
-      if (!sees && this.stateTime > 1.5) this.setState('search');
-      this.goTo(ctx, me, this.lastKnown);
-      if (dist < this.tuning.catchDistance + 0.6) ctx.catchPlayer(this.id);
+      const tracking = this.time - this.lastSeen < this.tuning.memory;
+      // It knows where you went for a few seconds after losing sight (it heard / smelled you).
+      if (tracking) this.lastKnown.copy(player.position);
+      speed = this.tuning.chaseSpeed * (1 + Math.min(0.3, this.stateTime * this.tuning.chaseRamp));
+      direct = sees && sameFloor && flat < 7;
+      if (!tracking && (!this.path.length || this.position.distanceTo(this.lastKnown) < 1.2)) this.setState('search');
+      else if (!direct) this.goTo(ctx, me, this.lastKnown);
+      if (sameFloor && flat < this.tuning.catchDistance) ctx.catchPlayer(this.id);
     } else if (this.state === 'investigate') {
+      speed *= 1.5;
       this.goTo(ctx, me, this.lastKnown);
       if (!this.path.length || this.position.distanceTo(this.lastKnown) < 1.2) this.setState('search');
     } else if (this.state === 'search') {
       if (!this.path.length) {
-        const n = ctx.nav.neighbors(me);
-        const pick = n.length ? this.rng.pick(n) : me;
-        this.path = [pick];
+        // Sweep: random nodes a couple of cells around the last known spot.
+        const near = ctx.nav.nodesNear(ctx.nav.nodeAt(this.lastKnown.x, this.lastKnown.y, this.lastKnown.z), 3);
+        const pick = near.length ? this.rng.pick(near) : me;
+        this.path = ctx.nav.path(me, pick).slice(1);
       }
       if (this.stateTime > this.tuning.searchTime) this.setState('patrol');
-    } else if (this.state === 'patrol' && !this.path.length) {
-      this.path = ctx.nav.path(me, ctx.nav.randomNode(this.rng)).slice(1);
+    } else if (this.state === 'patrol') {
+      if (this.time > this.nextDrift) {
+        // Pacing: drift towards the player's area (not their exact cell) so encounters happen.
+        this.nextDrift = this.time + this.tuning.driftEvery * (0.7 + this.rng.next() * 0.6);
+        const pn = ctx.nav.nodeAt(player.position.x, player.position.y, player.position.z);
+        const near = ctx.nav.nodesNear(pn, 6).filter((n) => n !== pn);
+        if (near.length) this.path = ctx.nav.path(me, this.rng.pick(near)).slice(1);
+      }
+      if (!this.path.length) this.path = ctx.nav.path(me, ctx.nav.randomNode(this.rng, this.floor)).slice(1);
     }
-    // Lurch: speed swells and drops with each step; the chase is a relentless arms-out run.
-    if (this.state === 'chase') this.play('Run_Arms', 1.05);
-    else if (this.path.length) {
-      speed *= 0.75 + 0.35 * Math.max(0, Math.sin(this.time * 2.6));
-      this.play('Walk', 0.8);
-    } else this.play('Idle', 0.7);
-    this.follow(ctx, dt, speed);
+
+    // ── body + sound ──
+    const moving = direct || this.path.length > 0;
+    if (this.state === 'chase') this.setPose('run');
+    else if (moving) {
+      speed *= 0.75 + 0.35 * Math.max(0, Math.sin(this.time * 2.6)); // lurch
+      this.setPose('walk', 0.8);
+    } else this.setPose('idle');
+    if (this.creature) this.creature.speed = speed;
+    this.vocalize(dt, flat, sameFloor);
+
+    if (direct) this.moveTowards(player.position, speed, dt);
+    else this.follow(ctx, dt, speed);
+  }
+
+  /** Breathing and clicking, more often when close or hunting. */
+  private vocalize(dt: number, flat: number, sameFloor: boolean) {
+    this.nextVocal -= dt;
+    if (this.nextVocal > 0) return;
+    const hunting = this.state === 'chase' || this.state === 'investigate';
+    this.nextVocal = (hunting ? 1.6 : 3.2) + this.rng.next() * 3;
+    if (!sameFloor && flat > 12) return;
+    const kind = this.rng.next() < 0.35 ? 'click' : 'breath';
+    bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind });
   }
 
   private goTo(ctx: EntityContext, me: number, where: THREE.Vector3) {
@@ -236,10 +273,23 @@ export class Monster implements Entity {
     if (!this.path.length || this.path[this.path.length - 1] !== goal) this.path = ctx.nav.path(me, goal).slice(1);
   }
 
-  /** Move along the path at `speed` (kinematic; walls are respected because the path follows the nav graph). */
+  private moveTowards(p: THREE.Vector3, speed: number, dt: number) {
+    const d = this.tmp.set(p.x - this.position.x, 0, p.z - this.position.z);
+    const len = d.length();
+    if (len < 0.05) return;
+    d.divideScalar(len);
+    this.position.addScaledVector(d, Math.min(len, speed * dt));
+    this.position.y += (p.y - this.position.y) * Math.min(1, dt * 6);
+    this.face(d, dt);
+  }
+
+  /** Move along the path (walls are respected because the path follows the nav graph). */
   private follow(ctx: EntityContext, dt: number, speed: number) {
     const next = this.path[0];
-    if (next === undefined) return;
+    if (next === undefined) {
+      this.object.position.copy(this.position);
+      return;
+    }
     ctx.nav.nodePos(next, this.target);
     const d = this.target.clone().sub(this.position);
     const len = d.length();
@@ -247,19 +297,19 @@ export class Monster implements Entity {
       this.path.shift();
       return;
     }
-    const step = Math.min(len, speed * dt);
     d.divideScalar(len);
-    this.position.addScaledVector(d, step);
-    if (Math.abs(d.x) + Math.abs(d.z) > 0.1) this.heading.set(d.x, 0, d.z).normalize();
+    this.position.addScaledVector(d, Math.min(len, speed * dt));
+    this.face(d, dt);
+  }
+
+  private face(d: THREE.Vector3, dt: number) {
+    if (Math.abs(d.x) + Math.abs(d.z) > 0.1) this.heading.lerp(new THREE.Vector3(d.x, 0, d.z).normalize(), Math.min(1, dt * 8)).normalize();
     this.object.position.copy(this.position);
     this.object.rotation.y = Math.atan2(this.heading.x, this.heading.z);
   }
 
   dispose() {
     this.mixer?.stopAllAction();
-    this.object.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) (m.material as THREE.Material).dispose();
-    });
+    this.creature?.dispose();
   }
 }

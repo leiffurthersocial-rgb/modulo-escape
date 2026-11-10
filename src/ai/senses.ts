@@ -54,8 +54,10 @@ export class Senses {
     if (len < 1e-3) return true;
     dir.divideScalar(len);
     const ray = new RAPIER.Ray({ x: from.x, y: from.y, z: from.z }, { x: dir.x, y: dir.y, z: dir.z });
-    const hit = this.physics.world.castRay(ray, len, true, undefined, undefined, excludeCollider);
-    return !hit || hit.timeOfImpact >= len - 0.05;
+    // Stop short of the target: the player's own capsule must not count as an obstacle.
+    const reach = Math.max(0, len - 0.6);
+    const hit = this.physics.world.castRay(ray, reach, true, undefined, undefined, excludeCollider);
+    return !hit || hit.timeOfImpact >= reach - 0.01;
   }
 
   dispose() {

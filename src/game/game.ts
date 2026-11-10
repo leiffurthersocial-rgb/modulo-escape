@@ -221,7 +221,7 @@ export class Game {
    */
   private maybeSpawnMonster() {
     const q = new URLSearchParams(location.search).get('monster');
-    if (q === 'off' || (q !== 'on' && q !== 'stub' && !settings.monster)) return;
+    if (q === 'off' || (q !== 'on' && q !== 'model' && !settings.monster)) return;
     const b = this.building;
     const startNode = b.start.floor * this.nav.N + cellIndex(b, b.start.x, b.start.z);
     const dist = bfsFrom(b.nav.adj, startNode);
@@ -230,7 +230,7 @@ export class Game {
       .filter((n) => Math.floor(n / this.nav.N) === b.start.floor && (dist[n] ?? -1) > 0);
     const node = cands.sort((x, y) => dist[y]! - dist[x]!)[0] ?? dist.indexOf(Math.max(...dist));
     if (node < 0) return;
-    const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel);
+    const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, this.monsterModel ? 'model' : 'creature');
     this.entities.add(m);
     this.monsterWakeAt = 20;
     this.monster = m;
@@ -513,6 +513,8 @@ export class Game {
     this.env.fog.density = THREE.MathUtils.lerp(0.03, this.env.params.fogDensity, sky);
 
     for (const e of this.entities.entities.values()) e.object.visible = Math.abs(e.floor - this.player.floor) <= 1;
+    const cfw = this.player.camera.getWorldDirection(this.tmpV);
+    this.audio.updateListener(cam, cfw, this.player.floor);
     this.renderer.info.reset();
     this.post.render(dt);
     this.overlay.frame(this.renderer);
@@ -631,7 +633,8 @@ export async function createGame(
   await env.loadHdris(lib.manifest, quality.hdriRes);
   env.setMood(settings.graphics.mood);
   onProgress('Waking something up…');
-  const monsterModel = await loadMonsterModel(renderer, lib.manifest);
+  // Default body is procedural; ?monster=model uses the skinned GLB instead.
+  const monsterModel = new URLSearchParams(location.search).get('monster') === 'model' ? await loadMonsterModel(renderer, lib.manifest) : null;
   const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel);
   onProgress('Compiling shaders…');
   await renderer.compileAsync(game.scene, game.player.camera).catch(() => {});

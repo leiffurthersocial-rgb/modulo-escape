@@ -6,6 +6,7 @@
 import { bus } from '../core/events.ts';
 import { settings } from '../game/settings.ts';
 import { HvacAmbience, playSting } from './hvac.ts';
+import { creatureBreath, creatureClicks, creatureScreech, creatureStep, setListener } from './creatureSounds.ts';
 
 export type AudioBus = 'ambience' | 'sfx' | 'music' | 'stingers';
 
@@ -35,6 +36,12 @@ export class AudioManager {
         }
       }),
       bus.on('scare:start', () => this.sting()),
+      bus.on('monster:step', (e) => this.atMonster(e, (ctx, out, o) => creatureStep(ctx, out, o, e.loud))),
+      bus.on('monster:vocal', (e) =>
+        this.atMonster(e, (ctx, out, o) =>
+          e.kind === 'breath' ? creatureBreath(ctx, out, o) : e.kind === 'click' ? creatureClicks(ctx, out, o) : creatureScreech(ctx, out, { ...o, gain: o.gain * 1.4 }),
+        ),
+      ),
       bus.on('level:won', () => this.fadeAmbience(4)),
       bus.on('audio:cue', () => {
         /* Phase 2+: look up a buffer by name and play it positionally. */
@@ -63,6 +70,24 @@ export class AudioManager {
     this.ensure();
     if (!this.ctx || this.hvac) return;
     this.hvac = new HvacAmbience(this.ctx, this.buses.get('ambience')!);
+  }
+
+  private listenerFloor = 0;
+
+  /** Call every frame with the camera so positional sounds come from the right place. */
+  updateListener(pos: { x: number; y: number; z: number }, fwd: { x: number; y: number; z: number }, floor: number) {
+    this.listenerFloor = floor;
+    if (this.ctx && this.ctx.state === 'running') setListener(this.ctx, pos, fwd);
+  }
+
+  private atMonster(
+    e: { x: number; y: number; z: number; floor: number },
+    play: (ctx: AudioContext, out: AudioNode, o: { x: number; y: number; z: number; floorsApart: number; gain: number }) => void,
+  ) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const apart = Math.abs(e.floor - this.listenerFloor);
+    if (apart > 1) return;
+    play(this.ctx, this.buses.get('sfx')!, { x: e.x, y: e.y, z: e.z, floorsApart: apart, gain: 1 });
   }
 
   setTension(v: number) {

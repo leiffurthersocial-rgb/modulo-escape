@@ -16,7 +16,6 @@ import { ROLE_OF, type KitRole, type WorldAssets } from './worldAssets.ts';
 import { buildRoots, buildVines } from './flora.ts';
 import { tileUv } from '../render/decalAtlas.ts';
 import { bus } from '../core/events.ts';
-import { streamRng } from '../core/rng.ts';
 import { computeOpenness } from './openness.ts';
 
 export const CHUNK_CELLS = 6;
@@ -72,9 +71,8 @@ export class ChunkManager {
     for (const d of level.dressing.decals) push(this.decalsByChunk, chunkKey(d.cx, d.cz), d);
     for (const v of level.dressing.vines) push(this.vinesByChunk, chunkKey(v.cx, v.cz), v);
     for (const r of level.dressing.roots) push(this.rootsByChunk, chunkKey(r.cx, r.cz), r);
-    // About half the classrooms are plastered (seeded); corridors and halls stay raw concrete.
-    const mr = streamRng(level.seed, 'materials');
-    this.plasterRooms = new Set(level.rooms.filter((r) => r.kind === 'room' && mr.chance(0.5)).map((r) => r.id));
+    // Same raw concrete everywhere (classrooms included). The plaster role stays available.
+    this.plasterRooms = new Set();
     this.surfaceFn = makeSurfaceFn(level);
   }
 

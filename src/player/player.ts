@@ -191,7 +191,8 @@ export class Player {
     const stride = Math.floor(this.bobPhase / Math.PI);
     if (stride !== this.lastStep && this.grounded && hs > 0.4) {
       this.lastStep = stride;
-      const radius = this.crouching ? 2 : this.sprinting ? 16 : 7;
+      // How far the monster can hear each footstep: crouch 1.5 m, walk 5 m, sprint 18 m.
+      const radius = this.crouching ? 1.5 : this.sprinting ? 18 : 5;
       bus.emit('noise', { x: this.feet.x, y: this.feet.y, z: this.feet.z, floor: this.floor, radius, source: 'player' });
     }
     this.bobAmount += ((this.grounded && hs > 0.3 ? 1 : 0) - this.bobAmount) * Math.min(1, dt * 6);

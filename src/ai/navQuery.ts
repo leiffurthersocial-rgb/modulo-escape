@@ -85,6 +85,25 @@ export class NavQuery {
     return out;
   }
 
+  /** Nodes within `radius` graph steps of `node` (including it). */
+  nodesNear(node: number, radius: number): number[] {
+    if (node < 0) return [];
+    const seen = new Map<number, number>([[node, 0]]);
+    const q = [node];
+    for (let h = 0; h < q.length; h++) {
+      const c = q[h]!;
+      const d = seen.get(c)!;
+      if (d >= radius) continue;
+      for (const n of this.neighbors(c)) {
+        if (!seen.has(n)) {
+          seen.set(n, d + 1);
+          q.push(n);
+        }
+      }
+    }
+    return [...seen.keys()];
+  }
+
   /** Random walkable node (optionally on a floor). */
   randomNode(rng: Rng, floor?: number): number {
     const nodes: number[] = [];
