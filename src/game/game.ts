@@ -23,6 +23,7 @@ import { ChunkManager } from '../world/chunks.ts';
 import { ExitGate } from '../world/exitGate.ts';
 import { saveSettings, settings } from './settings.ts';
 import { Autopilot } from './autopilot.ts';
+import { DEFAULT_QUALITY, type Quality } from '../render/quality.ts';
 import { AmbienceDirector } from '../director/director.ts';
 import { AudioManager } from '../audio/audio.ts';
 import { Minimap } from '../ui/minimap.ts';
@@ -60,6 +61,8 @@ export class Game {
   private tmpS = new THREE.Vector3(1, 1, 1);
   private unbindResize: () => void;
   stepHz = 60;
+  quality: Quality = DEFAULT_QUALITY;
+  private lastRender = 0;
   readonly autopilot: Autopilot;
   readonly director: AmbienceDirector;
   readonly audio = new AudioManager();
@@ -72,12 +75,13 @@ export class Game {
     readonly level: LevelData,
     private hooks: GameHooks,
   ) {
-    this.renderer = createRenderer(root, DEFAULT_RENDER);
+    this.renderer = createRenderer(root, { ...DEFAULT_RENDER, pixelRatioCap: this.quality.pixelRatioCap, shadowMapSize: this.quality.shadowMapSize });
     const pieces = kitPieces(level);
     this.physics = new PhysicsWorld(level, pieces, this.stepHz);
-    this.env = new Environment(this.scene, level, DEFAULT_RENDER.shadowMapSize);
+    this.env = new Environment(this.scene, level, this.quality.shadowMapSize);
 
     this.chunks = new ChunkManager(level, pieces, this.mats);
+    this.chunks.radius = this.quality.chunkRadius;
     this.chunks.dynamicMatrix = (i) => {
       const b = this.physics.dynamicProps.get(i);
       if (!b) return null;
@@ -192,7 +196,31 @@ export class Game {
     }
   };
 
+  /** Apply a quality preset at runtime. */
+  applyQuality(q: Quality) {
+    this.quality = q;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
+    this.renderer.shadowMap.enabled = q.shadowMapSize > 0;
+    this.env.setShadowMapSize(q.shadowMapSize);
+    this.chunks.radius = q.chunkRadius;
+    this.chunks.update(this.player.feet.x, this.player.feet.z, true);
+    this.director.lights.setPoolSize(this.scene, q.lightPool);
+    this.director.lights.assignNear(this.player.feet.x, this.player.feet.z);
+    this.stepHz = q.physicsHz;
+    this.physics.world.timestep = 1 / q.physicsHz;
+    // Light count changes recompile shaders; materials must be told.
+    this.scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(m)) m.forEach((x) => (x.needsUpdate = true));
+      else if (m) m.needsUpdate = true;
+    });
+    bus.emit('quality:changed', { preset: q.name });
+  }
+
   private tick = (now: number) => {
+    // FPS cap: skip this vsync if we're early (2 ms slack for timer jitter).
+    if (this.quality.fpsCap > 0 && now - this.lastRender < 1000 / this.quality.fpsCap - 2) return;
+    this.lastRender = now;
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     this.update(dt);

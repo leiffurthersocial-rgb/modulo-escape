@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: 'e2e',
   timeout: 120_000,
   reporter: [['list']],
+  workers: 2,
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'off',

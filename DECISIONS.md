@@ -31,3 +31,5 @@ Running log of technical decisions. Newest at the bottom.
 | 25 | 2026-11-10 | Touch controls auto-enable only for touch-only devices (`pointer: coarse` and no `any-pointer: fine`) | An iPad with a trackpad/mouse keeps Pointer Lock; anyone can force touch on/off in Settings. |
 | 26 | 2026-11-10 | Minimap is fog-of-war (visited cells + one step of visibility) | A full map would trivialise the escape. |
 | 27 | 2026-11-10 | Ceiling lights: instanced fixtures for every slot, plus a pool of 4 real PointLights reassigned to the nearest working fixtures on cell change | Real lights everywhere would blow the forward-rendering budget; pool size becomes a quality setting. |
+| 28 | 2026-11-10 | Phase 1 quality presets (high/medium/low/battery) as a small `Quality` object applied at runtime; FPS cap by skipping vsyncs | Enough for the bench now; grows into the full preset system in Phase 2 without changing call sites. |
+| 29 | 2026-11-10 | E2E full-run test uses a 640×400 viewport and 2 workers | CI renders on the CPU and sim time is capped per frame; a small canvas keeps the run under 2 minutes. |

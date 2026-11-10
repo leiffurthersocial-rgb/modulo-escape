@@ -11,6 +11,10 @@ export default tseslint.config(
     },
   },
   {
+    files: ['e2e/**/*.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
     // The generator must stay pure: no rendering, physics or DOM dependencies.
     files: ['src/gen/**/*.ts', 'src/core/**/*.ts'],
     rules: {

@@ -4,7 +4,7 @@ First-person browser game. Escape a procedurally generated, derelict, overgrown,
 wet-tropical brutalist wing of the **KZU** school. Horror comes later; this plan
 prepares hooks for it but does not build it.
 
-Status: **approved 2026-11-10** (hint system dropped; all other defaults accepted).
+Status: **approved 2026-11-10** (hint system dropped; all other defaults accepted). **Phase 1 complete (M0–M6), awaiting review.**
 
 ---
 
