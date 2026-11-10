@@ -21,8 +21,12 @@ import { bindResize, createRenderer, DEFAULT_RENDER } from '../render/renderer.t
 import { DebugOverlay } from '../ui/debugOverlay.ts';
 import { ChunkManager } from '../world/chunks.ts';
 import { ExitGate } from '../world/exitGate.ts';
-import { settings } from './settings.ts';
+import { saveSettings, settings } from './settings.ts';
 import { Autopilot } from './autopilot.ts';
+import { AmbienceDirector } from '../director/director.ts';
+import { AudioManager } from '../audio/audio.ts';
+import { Minimap } from '../ui/minimap.ts';
+import { isTouchOnlyDevice, TouchControls } from '../input/touch.ts';
 
 export type GameState = 'ready' | 'playing' | 'paused' | 'won';
 
@@ -57,6 +61,11 @@ export class Game {
   private unbindResize: () => void;
   stepHz = 60;
   readonly autopilot: Autopilot;
+  readonly director: AmbienceDirector;
+  readonly audio = new AudioManager();
+  readonly minimap: Minimap;
+  readonly touch: TouchControls;
+  private offs: (() => void)[] = [];
 
   constructor(
     readonly root: HTMLElement,
@@ -120,8 +129,28 @@ export class Game {
     this.chunks.update(this.player.feet.x, this.player.feet.z, true);
 
     this.autopilot = new Autopilot(this);
+    this.director = new AmbienceDirector(this.scene, level, 4);
+    this.minimap = new Minimap(root, level);
+    this.minimap.setVisible(settings.minimap);
+    this.touch = new TouchControls(root, this.input, () => this.setState('paused'));
+    this.applyTouchSetting();
+    this.offs.push(
+      bus.on('player:enteredCell', (e) => this.minimap.reveal(e.x, e.z)),
+      bus.on('settings:changed', ({ key }) => {
+        if (key === 'minimap' || key === '*') this.minimap.setVisible(settings.minimap);
+        if (key === 'touchControls' || key === '*') this.applyTouchSetting();
+      }),
+    );
     document.addEventListener('visibilitychange', this.onVisibility);
     bus.emit('level:loaded', { level });
+  }
+
+  /** Touch controls on when forced on, or on 'auto' for touch-only devices. */
+  applyTouchSetting(): boolean {
+    const on = settings.touchControls === 'on' || (settings.touchControls === 'auto' && isTouchOnlyDevice());
+    this.touch.setEnabled(on);
+    this.touch.setVisible(this.state === 'playing');
+    return on;
   }
 
   setState(s: GameState) {
@@ -138,6 +167,7 @@ export class Game {
       this.renderFrame(0);
       this.stop();
     }
+    this.touch.setVisible(s === 'playing');
     if (s === 'paused' || s === 'playing') bus.emit('game:paused', { paused: s === 'paused' });
     this.hooks.onState(s, this);
   }
@@ -175,6 +205,10 @@ export class Game {
     // Edge-triggered actions.
     if (input.pressed('debug')) this.overlay.toggle();
     if (input.pressed('flashlight')) this.player.setFlashlight(!this.player.flashlightOn);
+    if (input.pressed('minimap')) {
+      settings.minimap = !settings.minimap;
+      saveSettings('minimap');
+    }
     if (input.pressed('pause')) {
       // Esc normally releases pointer lock itself (→ pause via lock change); P or a
       // non-locked Esc gets here. setState('paused') releases the lock if still held.
@@ -203,6 +237,7 @@ export class Game {
     this.checkCell();
     this.checkExit();
     this.gate.update(dt);
+    this.director.update(dt);
   }
 
   renderFrame(dt: number) {
@@ -213,6 +248,7 @@ export class Game {
     this.renderer.info.reset();
     this.renderer.render(this.scene, this.player.camera);
     this.overlay.frame(this.renderer);
+    this.minimap.draw(this.player.feet.x, this.player.feet.z, this.player.yaw, performance.now());
   }
 
   private syncDynamicProps() {
@@ -259,6 +295,9 @@ export class Game {
   dispose() {
     this.stop();
     document.removeEventListener('visibilitychange', this.onVisibility);
+    for (const off of this.offs) off();
+    this.director.dispose();
+    this.audio.dispose();
     this.unbindResize();
     this.input.dispose();
     this.chunks.dispose();

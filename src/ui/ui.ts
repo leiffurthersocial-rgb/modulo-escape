@@ -88,6 +88,8 @@ export class UI {
     this.el.append(this.toastEl);
     this.show(this.titleScreen);
     bus.on('exit:opened', () => this.toast('The gate grinds open…'));
+    if (game.touch.enabled && game.input.pointerLockSupported === false) this.toast('Touch controls enabled (change in Settings)', 3500);
+    else if (game.touch.enabled) this.toast('Touch device detected: touch controls on (change in Settings)', 3500);
   }
 
   private screens(): HTMLElement[] {
@@ -130,6 +132,11 @@ export class UI {
   }
 
   private async play(game: Game) {
+    if (game.touch.enabled) {
+      game.input.lookMode = 'touch';
+      game.setState('playing');
+      return;
+    }
     const mode = await game.input.requestLock();
     if (mode === 'drag' && !game.input.pointerLockSupported) this.toast('Mouse capture unavailable: drag to look', 3500);
     else if (mode === 'drag') this.toast('Mouse capture was refused: click-drag to look', 3500);

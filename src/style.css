@@ -141,3 +141,28 @@ button.primary:hover { background: #e7c260; }
   background: rgba(0,0,0,0.55); image-rendering: pixelated;
 }
 @media (max-width: 700px) { .minimap { width: 140px; height: 140px; } }
+
+/* Touch controls */
+.touch { position: absolute; inset: 0; z-index: 15; touch-action: none; }
+.touch-move { position: absolute; left: 0; top: 0; bottom: 0; width: 42%; }
+.touch-look { position: absolute; right: 0; top: 0; bottom: 0; width: 58%; }
+.stick-base {
+  position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.06);
+  left: calc(110px + var(--sal)); top: calc(100% - 130px - var(--sab)); pointer-events: none; opacity: 0.5;
+}
+.stick-base.active { opacity: 1; }
+.stick-knob {
+  position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px;
+  border-radius: 50%; background: rgba(255,255,255,0.35);
+}
+.touch-buttons {
+  position: absolute; right: calc(16px + var(--sar)); bottom: calc(20px + var(--sab));
+  display: grid; grid-template-columns: repeat(2, 72px); gap: 12px;
+}
+.tbtn {
+  width: 72px; height: 72px; border-radius: 50%; padding: 0; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.06em; background: rgba(20,22,20,0.55); border: 2px solid rgba(255,255,255,0.22);
+  touch-action: none;
+}
+.tbtn.on { background: rgba(216,176,74,0.55); color: #111; }

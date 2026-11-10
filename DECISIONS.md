@@ -28,3 +28,6 @@ Running log of technical decisions. Newest at the bottom.
 | 22 | 2026-11-10 | Pointer Lock first; on missing API or `pointerlockerror` fall back to click-drag look, with a toast | Never hard-fails on iPadOS Safari or locked-down browsers. |
 | 23 | 2026-11-10 | Crouch defaults to C / Z, not Ctrl | Ctrl+W closes the browser tab. |
 | 24 | 2026-11-10 | Autopilot that follows the generator's nav graph | Lets Playwright play every seed end to end and drives the /bench camera path. |
+| 25 | 2026-11-10 | Touch controls auto-enable only for touch-only devices (`pointer: coarse` and no `any-pointer: fine`) | An iPad with a trackpad/mouse keeps Pointer Lock; anyone can force touch on/off in Settings. |
+| 26 | 2026-11-10 | Minimap is fog-of-war (visited cells + one step of visibility) | A full map would trivialise the escape. |
+| 27 | 2026-11-10 | Ceiling lights: instanced fixtures for every slot, plus a pool of 4 real PointLights reassigned to the nearest working fixtures on cell change | Real lights everywhere would blow the forward-rendering budget; pool size becomes a quality setting. |
