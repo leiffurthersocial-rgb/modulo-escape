@@ -19,3 +19,6 @@ Running log of technical decisions. Newest at the bottom.
 | 13 | 2026-11-10 | Poly Haven sources: JPG for albedo/ARM, PNG for normals, prefer packed ARM over separate maps | PNG everywhere was ~6× the download; JPG blocks only hurt normals. ARM is already our ORM layout. |
 | 14 | 2026-11-10 | Hashed output names (`albedo_1k.<hash>.ktx2`) + manifest.json | Makes `/assets/*` safe to cache immutably. |
 | 15 | 2026-11-10 | Models: `gltf-transform optimize` (meshopt default, `--draco` optional, KTX2 textures ≤ 1k) | One battle-tested pipeline; meshopt decodes faster and its decoder is smaller than Draco's. |
+| 16 | 2026-11-10 | Kit pieces are lists of axis-aligned boxes; the same boxes build render geometry and physics colliders | Render and collision can never disagree; trivial to rotate by 90° steps. |
+| 17 | 2026-11-10 | Greybox: one vertex-coloured material per chunk (+ puddles), props as InstancedMesh per type per chunk | Cut draw calls from 169 to 64 at a typical view. Phase 2 swaps to a handful of PBR materials per chunk. |
+| 18 | 2026-11-10 | Level origin at the NW grid corner, +X east, +Z south, cell (x,z) centre at ((x+.5)·4, (z+.5)·4) | One convention for generator, builder, physics and minimap. |

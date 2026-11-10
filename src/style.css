@@ -1,0 +1,58 @@
+:root {
+  --fg: #e8e6df;
+  --muted: #a7a59c;
+  --accent: #d8b04a;
+  --danger: #c4473c;
+  --panel: rgba(18, 20, 18, 0.86);
+  --panel-border: rgba(232, 230, 223, 0.14);
+  --font: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #0d0f0d;
+  color: var(--fg);
+  font-family: var(--font);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+#app { position: fixed; inset: 0; height: 100dvh; }
+#game-canvas { display: block; width: 100%; height: 100%; }
+button {
+  font: inherit;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  min-height: 44px;
+}
+button:hover, button:focus-visible { background: rgba(255, 255, 255, 0.14); outline: none; }
+button.primary { background: var(--accent); color: #1a1a14; border-color: transparent; font-weight: 700; }
+button.primary:hover { background: #e7c260; }
+
+.debug-overlay {
+  position: absolute;
+  top: calc(8px + var(--sat));
+  left: calc(8px + var(--sal));
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.62);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre;
+  pointer-events: none;
+  border-radius: 4px;
+  z-index: 50;
+}
