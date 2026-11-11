@@ -220,7 +220,7 @@ export class Game {
 
   /**
    * The monster spawns on the start floor, as far from the player as the nav graph allows, and
-   * wakes after 12 s. Settings → Monster turns it off (exploring); ?monster=off/on overrides.
+   * wakes after 6 s. Settings → Monster turns it off (exploring); ?monster=off/on overrides.
    */
   private maybeSpawnMonster() {
     const q = new URLSearchParams(location.search).get('monster');
@@ -236,7 +236,7 @@ export class Game {
     const kind = this.monsterModel ? 'model' : this.monsterImage ? 'image' : 'creature';
     const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, kind, this.monsterImage);
     this.entities.add(m);
-    this.monsterWakeAt = 12;
+    this.monsterWakeAt = 6;
     this.monster = m;
   }
   private monster: Monster | null = null;

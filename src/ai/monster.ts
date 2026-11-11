@@ -4,7 +4,8 @@
  * (MONSTER_MODEL_ID) when `kind: 'model'`. Brain: a small state machine on top of the building's
  * nav graph, line of sight and hearing:
  *
- *   dormant → patrol      wanders the floor; every ~50 s drifts towards the player's area
+ *   dormant → patrol      wanders; every ~9 s drifts towards the player's area; after 14 s without
+ *                         an encounter it reappears, unseen, 3–5 cells from the player (any floor)
  *   patrol/search → investigate   heard a noise (footsteps: crouch 1.5 m, walk 5 m, sprint 18 m)
  *   any → chase           sees the player (same floor, view cone, nothing in between; the flashlight
  *                          makes you visible from further away, crouching from less far)
@@ -40,6 +41,8 @@ export interface MonsterTuning {
   searchTime: number;
   /** Seconds between drifts towards the player's area while patrolling. */
   driftEvery: number;
+  /** Seconds without an encounter before it slips round, out of sight, to a few rooms from you. */
+  stalkAfter: number;
 }
 
 export const DEFAULT_TUNING: MonsterTuning = {
@@ -50,8 +53,9 @@ export const DEFAULT_TUNING: MonsterTuning = {
   fov: 1.05,
   catchDistance: 1.1,
   memory: 1.5,
-  searchTime: 12,
-  driftEvery: 25,
+  searchTime: 7,
+  driftEvery: 9,
+  stalkAfter: 14,
 };
 
 export class Monster implements Entity {
@@ -71,6 +75,8 @@ export class Monster implements Entity {
   private time = 0;
   private nextDrift: number;
   private nextVocal = 3;
+  /** Last time it saw you or reappeared near you (drives stalking). */
+  private lastEncounter = 0;
   private creature: Creature | null = null;
   private image: ImageBody | null = null;
   private eyeTarget = new THREE.Vector3();
@@ -209,6 +215,7 @@ export class Monster implements Entity {
     const sees = sameFloor && dist < range && inCone && ctx.senses.lineOfSight(eye, player.eye);
     if (sees) {
       this.lastSeen = this.time;
+      this.lastEncounter = this.time;
       this.lastKnown.copy(player.position);
       if (this.state !== 'chase') this.setState('chase');
     } else if (this.state !== 'chase') {
@@ -219,6 +226,9 @@ export class Monster implements Entity {
         else this.path = [];
       }
     }
+
+    // ── stalking: it never stays away for long ──
+    if ((this.state === 'patrol' || this.state === 'search') && this.time - this.lastEncounter > this.tuning.stalkAfter && this.stalk(ctx, me)) return;
 
     // ── behaviour ──
     let speed = this.tuning.walkSpeed;
@@ -271,6 +281,45 @@ export class Monster implements Entity {
 
     if (direct) this.moveTowards(player.position, speed, dt);
     else this.follow(ctx, dt, speed);
+  }
+
+  /**
+   * If it is far from you (other floor or more than ~6 cells away), reappear 3–5 cells from you on
+   * your floor, somewhere you can't see, and come looking. Never pops into view.
+   */
+  private stalk(ctx: EntityContext, me: number): boolean {
+    const player = ctx.player;
+    const pn = ctx.nav.nodeAt(player.position.x, player.position.y, player.position.z);
+    if (pn < 0) return false;
+    const close = new Set(ctx.nav.nodesNear(pn, 6));
+    if (me >= 0 && close.has(me) && this.floor === player.floor) {
+      this.lastEncounter = this.time; // already close by: just keep hunting normally
+      return false;
+    }
+    const inner = new Set(ctx.nav.nodesNear(pn, 2));
+    const N = ctx.nav.N;
+    const cands = ctx.nav.nodesNear(pn, 5).filter((n) => {
+      if (inner.has(n) || Math.floor(n / N) !== player.floor) return false;
+      const l = ctx.building.floors[player.floor]!;
+      return l.cells[n % N]!.kind !== 'stair';
+    });
+    const pos = new THREE.Vector3();
+    for (const n of this.rng.shuffle(cands)) {
+      ctx.nav.nodePos(n, pos);
+      const eye = pos.clone().setY(pos.y + 1.6);
+      if (ctx.senses.lineOfSight(eye, player.eye)) continue; // you'd see it appear
+      this.position.copy(pos);
+      this.object.position.copy(pos);
+      this.floor = player.floor;
+      this.lastEncounter = this.time;
+      // Come towards your area (it "smelled" you) and search there — not your exact spot.
+      const around = ctx.nav.nodesNear(pn, 2).filter((n) => Math.floor(n / N) === player.floor);
+      ctx.nav.nodePos(around.length ? this.rng.pick(around) : pn, this.lastKnown);
+      this.setState('investigate');
+      bus.emit('monster:vocal', { x: pos.x, y: pos.y + 2, z: pos.z, floor: this.floor, kind: 'screech' });
+      return true;
+    }
+    return false;
   }
 
   /** Breathing and clicking, more often when close or hunting. */
