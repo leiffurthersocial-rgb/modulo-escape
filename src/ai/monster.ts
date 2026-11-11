@@ -1,5 +1,6 @@
 /**
- * The monster. Body: the procedural "Tall One" (src/ai/creature.ts) by default, or a skinned GLB
+ * The monster. Body: Robin (a floating robin.png billboard, src/ai/monsterImage.ts) when the image
+ * is in the repo, else the procedural "Tall One" (src/ai/creature.ts), or a skinned GLB
  * (MONSTER_MODEL_ID) when `kind: 'model'`. Brain: a small state machine on top of the building's
  * nav graph, line of sight and hearing:
  *
@@ -21,6 +22,7 @@ import { streamRng, type Rng } from '../core/rng.ts';
 import type { Entity, EntityContext } from './entities.ts';
 import type { MonsterModel } from './monsterModel.ts';
 import { Creature, type CreatureMode } from './creature.ts';
+import { ImageBody, type MonsterImage } from './monsterImage.ts';
 
 export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search' | 'attack';
 
@@ -41,15 +43,15 @@ export interface MonsterTuning {
 }
 
 export const DEFAULT_TUNING: MonsterTuning = {
-  walkSpeed: 1.25,
-  chaseSpeed: 4.1,
-  chaseRamp: 0.06,
+  walkSpeed: 1.1,
+  chaseSpeed: 3.3,
+  chaseRamp: 0.03,
   sightRange: 17,
   fov: 1.05,
   catchDistance: 1.1,
-  memory: 3,
+  memory: 1.5,
   searchTime: 12,
-  driftEvery: 50,
+  driftEvery: 25,
 };
 
 export class Monster implements Entity {
@@ -70,6 +72,8 @@ export class Monster implements Entity {
   private nextDrift: number;
   private nextVocal = 3;
   private creature: Creature | null = null;
+  private image: ImageBody | null = null;
+  private eyeTarget = new THREE.Vector3();
   private mixer: THREE.AnimationMixer | null = null;
   private actions = new Map<string, THREE.AnimationAction>();
   private current: THREE.AnimationAction | null = null;
@@ -79,12 +83,16 @@ export class Monster implements Entity {
     spawn: THREE.Vector3,
     model: MonsterModel | null = null,
     readonly tuning: MonsterTuning = DEFAULT_TUNING,
-    kind: 'creature' | 'model' = 'creature',
+    kind: 'creature' | 'model' | 'image' = 'creature',
+    img: MonsterImage | null = null,
   ) {
     this.rng = streamRng(seed, 'monster');
     this.nextDrift = tuning.driftEvery;
     this.position.copy(spawn);
-    if (kind === 'model' && model) this.buildFromModel(model);
+    if (kind === 'image' && img) {
+      this.image = new ImageBody(img);
+      this.object.add(this.image.object);
+    } else if (kind === 'model' && model) this.buildFromModel(model);
     else this.buildCreature();
     this.object.position.copy(spawn);
     this.setPose('idle');
@@ -131,6 +139,10 @@ export class Monster implements Entity {
   private setPose(mode: CreatureMode, timeScale = 1) {
     if (this.creature) {
       this.creature.mode = mode;
+      return;
+    }
+    if (this.image) {
+      this.image.mode = mode;
       return;
     }
     const clip = { idle: 'Idle', walk: 'Walk', run: 'Run_Arms', attack: 'Punch' }[mode];
@@ -180,6 +192,7 @@ export class Monster implements Entity {
     this.stateTime += dt;
     this.mixer?.update(dt);
     this.creature?.update(dt);
+    this.image?.update(dt, this.eyeTarget.copy(ctx.player.eye));
     if (this.state === 'dormant' || this.state === 'attack') return;
     this.floor = ctx.nav.floorAt(this.position.y);
     const me = ctx.nav.nodeAt(this.position.x, this.position.y, this.position.z);
@@ -211,13 +224,17 @@ export class Monster implements Entity {
     let speed = this.tuning.walkSpeed;
     let direct = false;
     if (this.state === 'chase') {
-      const tracking = this.time - this.lastSeen < this.tuning.memory;
+      // Losing it: after a short memory, or at once if you got far away out of sight (sprinting works).
+      const tracking = this.time - this.lastSeen < this.tuning.memory && (sees || flat < 12);
       // It knows where you went for a few seconds after losing sight (it heard / smelled you).
       if (tracking) this.lastKnown.copy(player.position);
-      speed = this.tuning.chaseSpeed * (1 + Math.min(0.3, this.stateTime * this.tuning.chaseRamp));
+      speed = this.tuning.chaseSpeed * (1 + Math.min(0.15, this.stateTime * this.tuning.chaseRamp));
       direct = sees && sameFloor && flat < 7;
-      if (!tracking && (!this.path.length || this.position.distanceTo(this.lastKnown) < 1.2)) this.setState('search');
-      else if (!direct) this.goTo(ctx, me, this.lastKnown);
+      if (!tracking) {
+        // Lost you: walk (not run) to where it last saw you and look around there.
+        this.setState('search');
+        this.goTo(ctx, me, this.lastKnown);
+      } else if (!direct) this.goTo(ctx, me, this.lastKnown);
       if (sameFloor && flat < this.tuning.catchDistance) ctx.catchPlayer(this.id);
     } else if (this.state === 'investigate') {
       speed *= 1.5;
@@ -236,7 +253,7 @@ export class Monster implements Entity {
         // Pacing: drift towards the player's area (not their exact cell) so encounters happen.
         this.nextDrift = this.time + this.tuning.driftEvery * (0.7 + this.rng.next() * 0.6);
         const pn = ctx.nav.nodeAt(player.position.x, player.position.y, player.position.z);
-        const near = ctx.nav.nodesNear(pn, 6).filter((n) => n !== pn);
+        const near = ctx.nav.nodesNear(pn, 4).filter((n) => n !== pn);
         if (near.length) this.path = ctx.nav.path(me, this.rng.pick(near)).slice(1);
       }
       if (!this.path.length) this.path = ctx.nav.path(me, ctx.nav.randomNode(this.rng, this.floor)).slice(1);
@@ -257,9 +274,24 @@ export class Monster implements Entity {
   }
 
   /** Breathing and clicking, more often when close or hunting. */
+  /**
+   * Sounds: near you on the same floor it screams (more often the closer it is); otherwise it
+   * breathes and clicks now and then.
+   */
+  private wasNear = false;
+
   private vocalize(dt: number, flat: number, sameFloor: boolean) {
+    const near = sameFloor && flat < 12;
+    // Coming close: scream soon, don't wait for the idle timer.
+    if (near && !this.wasNear) this.nextVocal = Math.min(this.nextVocal, 0.4);
+    this.wasNear = near;
     this.nextVocal -= dt;
     if (this.nextVocal > 0) return;
+    if (near) {
+      this.nextVocal = 1.4 + (flat / 12) * 3.5 + this.rng.next() * 1.5;
+      bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind: 'scream' });
+      return;
+    }
     const hunting = this.state === 'chase' || this.state === 'investigate';
     this.nextVocal = (hunting ? 1.6 : 3.2) + this.rng.next() * 3;
     if (!sameFloor && flat > 12) return;
@@ -311,5 +343,6 @@ export class Monster implements Entity {
   dispose() {
     this.mixer?.stopAllAction();
     this.creature?.dispose();
+    this.image?.dispose();
   }
 }

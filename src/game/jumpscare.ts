@@ -24,7 +24,7 @@ export interface JumpScareConfig {
   turnTime: number;
 }
 
-export const JUMPSCARE: JumpScareConfig = { duration: 1.8, blackAt: 1.25, faceDistance: 0.85, shake: 0.07, turnTime: 0.15 };
+export const JUMPSCARE: JumpScareConfig = { duration: 2.2, blackAt: 1.7, faceDistance: 0.85, shake: 0.08, turnTime: 0.12 };
 
 export class JumpScare {
   active = false;

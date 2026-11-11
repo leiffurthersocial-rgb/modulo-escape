@@ -14,7 +14,7 @@ export interface GameEvents {
   'player:caught': { by: string };
   /** Monster foot plant (audible, positional). loud 0..1. */
   'monster:step': { x: number; y: number; z: number; floor: number; loud: number };
-  'monster:vocal': { x: number; y: number; z: number; floor: number; kind: 'breath' | 'click' | 'screech' };
+  'monster:vocal': { x: number; y: number; z: number; floor: number; kind: 'breath' | 'click' | 'screech' | 'scream' };
   /** Jump scare begins (input frozen, camera on the monster) / ends (→ caught screen). */
   'scare:start': { by: string };
   'scare:end': { by: string };

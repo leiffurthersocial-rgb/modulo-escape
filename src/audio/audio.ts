@@ -5,8 +5,8 @@
  */
 import { bus } from '../core/events.ts';
 import { settings } from '../game/settings.ts';
-import { HvacAmbience, playSting } from './hvac.ts';
-import { creatureBreath, creatureClicks, creatureScreech, creatureStep, setListener } from './creatureSounds.ts';
+import { HvacAmbience } from './hvac.ts';
+import { creatureBreath, creatureClicks, creatureScream, creatureScreech, creatureStep, playerStep, screamSting, setListener } from './creatureSounds.ts';
 
 export type AudioBus = 'ambience' | 'sfx' | 'music' | 'stingers';
 
@@ -36,10 +36,22 @@ export class AudioManager {
         }
       }),
       bus.on('scare:start', () => this.sting()),
+      // Your own footsteps (the same events the monster listens to): crouch soft, sprint loud.
+      bus.on('noise', (n) => {
+        if (n.source !== 'player' || !this.ctx || this.ctx.state !== 'running') return;
+        this.stepSide = -this.stepSide;
+        playerStep(this.ctx, this.buses.get('sfx')!, n.radius >= 15 ? 1 : n.radius >= 4 ? 0.45 : 0.08, this.stepSide);
+      }),
       bus.on('monster:step', (e) => this.atMonster(e, (ctx, out, o) => creatureStep(ctx, out, o, e.loud))),
       bus.on('monster:vocal', (e) =>
         this.atMonster(e, (ctx, out, o) =>
-          e.kind === 'breath' ? creatureBreath(ctx, out, o) : e.kind === 'click' ? creatureClicks(ctx, out, o) : creatureScreech(ctx, out, { ...o, gain: o.gain * 1.4 }),
+          e.kind === 'breath'
+            ? creatureBreath(ctx, out, o)
+            : e.kind === 'click'
+              ? creatureClicks(ctx, out, o)
+              : e.kind === 'scream'
+                ? creatureScream(ctx, out, { ...o, gain: o.gain * 1.6 })
+                : creatureScreech(ctx, out, { ...o, gain: o.gain * 1.4 }),
         ),
       ),
       bus.on('level:won', () => this.fadeAmbience(4)),
@@ -73,6 +85,7 @@ export class AudioManager {
   }
 
   private listenerFloor = 0;
+  private stepSide = 1;
 
   /** Call every frame with the camera so positional sounds come from the right place. */
   updateListener(pos: { x: number; y: number; z: number }, fwd: { x: number; y: number; z: number }, floor: number) {
@@ -98,7 +111,7 @@ export class AudioManager {
     this.ensure();
     if (!this.ctx) return;
     void this.ctx.resume();
-    playSting(this.ctx, this.buses.get('stingers')!);
+    screamSting(this.ctx, this.buses.get('stingers')!);
     // The building goes quiet after the scare.
     this.fadeAmbience(1.5);
   }

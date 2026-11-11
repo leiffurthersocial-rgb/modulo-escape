@@ -543,7 +543,18 @@ export class UI {
   private playScareOverlay(game: Game) {
     this.scareEl?.remove();
     const c = game.scare.config;
-    const el = h('div', { class: 'scare' }, h('div', { class: 'scare-flash' }), h('div', { class: 'scare-vignette' }), h('div', { class: 'scare-black' }));
+    const img = game.monsterImage?.url;
+    // Robin's face rushes the screen: main image + red/cyan offset copies for a glitchy split.
+    const face = img
+      ? h(
+          'div',
+          { class: 'scare-face' },
+          h('img', { src: img, className: 'f-red', alt: '' }),
+          h('img', { src: img, className: 'f-cyan', alt: '' }),
+          h('img', { src: img, className: 'f-main', alt: '' }),
+        )
+      : null;
+    const el = h('div', { class: 'scare' }, face, h('div', { class: 'scare-flash' }), h('div', { class: 'scare-vignette' }), h('div', { class: 'scare-black' }));
     el.style.setProperty('--black-at', `${c.blackAt}s`);
     el.style.setProperty('--black-len', `${Math.max(0.1, c.duration - c.blackAt)}s`);
     this.el.append(el);

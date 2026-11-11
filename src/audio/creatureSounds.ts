@@ -161,3 +161,125 @@ export function setListener(ctx: AudioContext, pos: { x: number; y: number; z: n
     legacy.setOrientation(fwd.x, fwd.y, fwd.z, 0, 1, 0);
   }
 }
+
+/**
+ * A scream: a few detuned sawtooth "voices" with fast vibrato, shaped by vowel formants (an open
+ * "aah" sliding towards "eee"), plus breath noise. `intensity` 0..1 scales length and harshness.
+ */
+function screamVoice(ctx: AudioContext, dest: AudioNode, t: number, dur: number, f0: number, f1: number, gain: number) {
+  const voices = [0, 7, -11, 15];
+  const mix = ctx.createGain();
+  mix.gain.value = gain;
+  // Formants: F1 ~850→350, F2 ~1250→2300, F3 ~2800 (aah → eee).
+  const formants: [number, number, number, number][] = [
+    [850, 350, 7, 1],
+    [1250, 2300, 9, 0.7],
+    [2800, 3100, 10, 0.45],
+  ];
+  const sum = ctx.createGain();
+  for (const [a, b, q, g] of formants) {
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = q;
+    bp.frequency.setValueAtTime(a, t);
+    bp.frequency.linearRampToValueAtTime(b, t + dur * 0.8);
+    const fg = ctx.createGain();
+    fg.gain.value = g;
+    sum.connect(bp).connect(fg).connect(mix);
+  }
+  for (const cents of voices) {
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.detune.value = cents;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.35);
+    o.frequency.exponentialRampToValueAtTime(f1 * 0.85, t + dur);
+    const vib = ctx.createOscillator();
+    vib.frequency.value = 7 + Math.random() * 3;
+    const vg = ctx.createGain();
+    vg.gain.value = f1 * 0.03;
+    vib.connect(vg).connect(o.frequency);
+    o.connect(sum);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+    vib.start(t);
+    vib.stop(t + dur + 0.05);
+  }
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.exponentialRampToValueAtTime(1, t + 0.04);
+  env.gain.setValueAtTime(1, t + dur * 0.7);
+  env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  mix.connect(env).connect(dest);
+  noiseBurst(ctx, dest, t, dur * 0.9, 'bandpass', 3000, 1.2, gain * 0.5, 0.03);
+}
+
+/** Positional proximity scream (Robin is near). */
+export function creatureScream(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
+  const d = sink(ctx, out, o);
+  const t = ctx.currentTime;
+  const dur = 0.7 + Math.random() * 0.8;
+  const base = 420 + Math.random() * 200;
+  screamVoice(ctx, d, t, dur, base, base * (1.6 + Math.random() * 0.5), 0.5);
+}
+
+function distortionCurve(amount: number): Float32Array {
+  const n = 2048;
+  const c = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    c[i] = ((1 + amount) * x) / (1 + amount * Math.abs(x));
+  }
+  return c;
+}
+
+/**
+ * Jump-scare scream: several overlapping screams (one very high), overdriven, a sub hit and a
+ * noise blast. ~2 s. Deliberately the loudest thing in the game.
+ */
+export function screamSting(ctx: AudioContext, out: AudioNode) {
+  const t = ctx.currentTime;
+  const drive = ctx.createWaveShaper();
+  drive.curve = distortionCurve(18) as Float32Array<ArrayBuffer>;
+  drive.oversample = '2x';
+  const master = ctx.createGain();
+  master.gain.value = 0.55;
+  drive.connect(master).connect(out);
+  screamVoice(ctx, drive, t, 1.9, 520, 1150, 0.8);
+  screamVoice(ctx, drive, t + 0.04, 1.6, 700, 1600, 0.6);
+  screamVoice(ctx, drive, t + 0.1, 1.2, 1100, 2400, 0.35);
+  // Sub hit + blast (clean, so it thumps).
+  const sub = ctx.createOscillator();
+  sub.frequency.setValueAtTime(65, t);
+  sub.frequency.exponentialRampToValueAtTime(28, t + 0.5);
+  const sg = ctx.createGain();
+  sg.gain.setValueAtTime(1, t);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+  sub.connect(sg).connect(out);
+  sub.start(t);
+  sub.stop(t + 0.75);
+  noiseBurst(ctx, out, t, 0.9, 'highpass', 400, 0.7, 0.6, 0.005);
+}
+
+/** Your own footstep on concrete: soft scuff (crouch), step (walk), hard slap (sprint). */
+export function playerStep(ctx: AudioContext, out: AudioNode, strength: number, side: number) {
+  const t = ctx.currentTime;
+  const pan = ctx.createStereoPanner();
+  pan.pan.value = side * 0.15;
+  const g = ctx.createGain();
+  g.gain.value = 0.18 + strength * 0.5;
+  g.connect(pan).connect(out);
+  const thud = ctx.createOscillator();
+  thud.frequency.setValueAtTime(110 + Math.random() * 20, t);
+  thud.frequency.exponentialRampToValueAtTime(55, t + 0.07);
+  const tg = ctx.createGain();
+  tg.gain.setValueAtTime(0.0001, t);
+  tg.gain.exponentialRampToValueAtTime(0.5, t + 0.004);
+  tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+  thud.connect(tg).connect(g);
+  thud.start(t);
+  thud.stop(t + 0.12);
+  // Grit under the sole: sharper for a sprint.
+  noiseBurst(ctx, g, t, 0.05 + strength * 0.05, 'bandpass', 1800 + strength * 1800 + Math.random() * 400, 1.5, 0.35 + strength * 0.4);
+  if (strength < 0.2) noiseBurst(ctx, g, t + 0.02, 0.12, 'lowpass', 1200, 0.7, 0.15, 0.03); // scuff
+}

@@ -198,3 +198,26 @@ button.primary:hover { background: #e7c260; }
 @keyframes scare-flash { 0% { opacity: 0.95; background: #fff; } 25% { opacity: 0.8; background: #b00; } 100% { opacity: 0; background: #b00; } }
 @keyframes scare-pulse { from { opacity: 0.55; } to { opacity: 1; } }
 @keyframes scare-black { to { opacity: 1; } }
+
+/* Robin jump scare: face rush, shake, RGB split, flicker. Flashes stay ≤ 3/s (photosensitivity). */
+.scare-face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; animation: face-bg 2.2s steps(1) forwards; }
+.scare-face img { position: absolute; height: 115vh; max-width: none; object-fit: contain; transform-origin: 50% 45%; }
+.scare-face .f-main { animation: face-rush 0.22s cubic-bezier(0.2, 0, 0, 1) forwards, face-shake 0.09s steps(2) 0.22s infinite, face-flicker 0.33s steps(1) 0.22s infinite; filter: contrast(1.5) saturate(1.3); }
+.scare-face .f-red, .scare-face .f-cyan { mix-blend-mode: screen; opacity: 0.75; animation: face-rush 0.22s cubic-bezier(0.2, 0, 0, 1) forwards, face-split 0.11s steps(2) 0.22s infinite; }
+.scare-face .f-red { filter: brightness(0.8) sepia(1) saturate(9) hue-rotate(-50deg); --dx: -2.2vw; }
+.scare-face .f-cyan { filter: brightness(0.8) sepia(1) saturate(9) hue-rotate(150deg); --dx: 2.2vw; }
+@keyframes face-bg { 0% { background: rgba(0,0,0,0.2); } 10% { background: #000; } }
+@keyframes face-rush { from { transform: scale(0.18) rotate(-4deg); } to { transform: scale(1.3) rotate(1deg); } }
+@keyframes face-shake {
+  0% { transform: scale(1.3) translate(-1.5vw, 1vh) rotate(1.5deg); }
+  50% { transform: scale(1.36) translate(1.8vw, -1.4vh) rotate(-2deg); }
+  100% { transform: scale(1.3) translate(-0.6vw, 1.6vh) rotate(0.8deg); }
+}
+@keyframes face-split {
+  0% { transform: scale(1.32) translate(var(--dx), 0.6vh); }
+  50% { transform: scale(1.3) translate(calc(var(--dx) * -0.6), -0.8vh); }
+  100% { transform: scale(1.34) translate(var(--dx), 0); }
+}
+@keyframes face-flicker { 0% { filter: contrast(1.6) saturate(1.4) brightness(1.15); } 50% { filter: contrast(2.2) saturate(0.4) brightness(0.65) invert(0.08); } }
+.scare-flash { animation: scare-flash 0.35s ease-out forwards, scare-reflash 0.34s steps(1) 0.35s 3; }
+@keyframes scare-reflash { 0% { opacity: 0.45; background: #a00; } 50% { opacity: 0; } }

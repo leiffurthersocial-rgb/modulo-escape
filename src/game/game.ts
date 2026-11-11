@@ -40,6 +40,7 @@ import { Senses } from '../ai/senses.ts';
 import { EntityManager, type EntityContext } from '../ai/entities.ts';
 import { Monster } from '../ai/monster.ts';
 import { loadMonsterModel, type MonsterModel } from '../ai/monsterModel.ts';
+import { loadMonsterImage, type MonsterImage } from '../ai/monsterImage.ts';
 
 export type GameState = 'ready' | 'playing' | 'paused' | 'won' | 'scare' | 'caught';
 
@@ -108,6 +109,8 @@ export class Game {
     quality: Quality,
     scene: THREE.Scene,
     private monsterModel: MonsterModel | null = null,
+    /** Robin (robin.png) if present: the monster's body and the face of the jump scare. */
+    readonly monsterImage: MonsterImage | null = null,
   ) {
     this.scene = scene;
     this.renderer = renderer;
@@ -217,7 +220,7 @@ export class Game {
 
   /**
    * The monster spawns on the start floor, as far from the player as the nav graph allows, and
-   * wakes after 20 s. Settings → Monster turns it off (exploring); ?monster=off/on overrides.
+   * wakes after 12 s. Settings → Monster turns it off (exploring); ?monster=off/on overrides.
    */
   private maybeSpawnMonster() {
     const q = new URLSearchParams(location.search).get('monster');
@@ -230,9 +233,10 @@ export class Game {
       .filter((n) => Math.floor(n / this.nav.N) === b.start.floor && (dist[n] ?? -1) > 0);
     const node = cands.sort((x, y) => dist[y]! - dist[x]!)[0] ?? dist.indexOf(Math.max(...dist));
     if (node < 0) return;
-    const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, this.monsterModel ? 'model' : 'creature');
+    const kind = this.monsterModel ? 'model' : this.monsterImage ? 'image' : 'creature';
+    const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, kind, this.monsterImage);
     this.entities.add(m);
-    this.monsterWakeAt = 20;
+    this.monsterWakeAt = 12;
     this.monster = m;
   }
   private monster: Monster | null = null;
@@ -635,7 +639,8 @@ export async function createGame(
   onProgress('Waking something up…');
   // Default body is procedural; ?monster=model uses the skinned GLB instead.
   const monsterModel = new URLSearchParams(location.search).get('monster') === 'model' ? await loadMonsterModel(renderer, lib.manifest) : null;
-  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel);
+  const monsterImage = await loadMonsterImage();
+  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel, monsterImage);
   onProgress('Compiling shaders…');
   await renderer.compileAsync(game.scene, game.player.camera).catch(() => {});
   renderer.domElement.style.visibility = '';
