@@ -329,12 +329,78 @@ function generateFloor(seed: string, cfg: SizeConfig, f: number, res: Reservatio
   }
   const deadEnds = addDeadEnds(w, cfg, rng);
   assignEdges(w, rng);
+  // Gameplay: prune corridor stubs that lead nowhere (keeping the few deliberate spurs), then give
+  // bigger rooms a second door so they become shortcuts rather than traps.
+  pruneStubs(w, deadEnds > 0 ? deadEnds : 0, rng);
+  assignEdges(w, rng);
+  secondDoors(w, rng);
   applyStairEdges(w);
   const nav = buildNav(w);
   const first = firstWalkable(w);
   const d0 = bfs(nav.adj, first);
   if (w.cells.some((c, i) => isWalkable(c.kind) && d0[i]! < 0)) throw new GenerationError(`floor ${f} not connected`);
   return { w, loops, deadEnds };
+}
+
+/** Remove corridor cells that lead nowhere (degree ≤ 1), repeatedly, except `keep` random spurs. */
+function pruneStubs(w: Work, keep: number, rng: Rng) {
+  const protectedCells = new Set<number>();
+  for (;;) {
+    const nav = buildNav(w);
+    const stubs = w.cells
+      .map((c, i) => ({ c, i }))
+      .filter(({ c, i }) => c.kind === 'corridor' && (c.room < 0 || w.rooms[c.room]?.kind !== 'landing') && nav.adj[i]!.length <= 1 && !protectedCells.has(i));
+    if (!stubs.length) return;
+    if (keep > 0 && protectedCells.size === 0) {
+      // Keep a couple of tips as deliberate dead ends (hiding spots), protect the whole spur.
+      for (const s of rng.shuffle(stubs.slice()).slice(0, keep)) {
+        let cur = s.i;
+        for (let k = 0; k < 6; k++) {
+          protectedCells.add(cur);
+          const next = nav.adj[cur]!.find((n) => !protectedCells.has(n) && w.cells[n]!.kind === 'corridor' && nav.adj[n]!.length <= 2);
+          if (next === undefined) break;
+          cur = next;
+        }
+      }
+      continue;
+    }
+    for (const { c } of stubs) {
+      c.kind = 'void';
+      c.room = -1;
+    }
+    // Re-derive the edges of the shrunken corridor network.
+    for (let i = 0; i < w.edgesX.length; i++) w.edgesX[i] = 'none';
+    for (let i = 0; i < w.edgesZ.length; i++) w.edgesZ[i] = 'none';
+    assignEdges(w, rng);
+  }
+}
+
+/** Rooms of 2+ cells with a single door get a second one on another wall cell facing a corridor. */
+function secondDoors(w: Work, rng: Rng) {
+  for (const r of w.rooms) {
+    if ((r.kind !== 'room' && r.kind !== 'hall') || r.w * r.h < 2) continue;
+    const doors: { x: number; z: number; s: Side }[] = [];
+    const cands: { x: number; z: number; s: Side }[] = [];
+    for (let z = r.z; z < r.z + r.h; z++) {
+      for (let x = r.x; x < r.x + r.w; x++) {
+        for (const s of SIDES) {
+          const nx = x + DIR[s].dx;
+          const nz = z + DIR[s].dz;
+          if (!inBounds(w, nx, nz)) continue;
+          const n = w.cells[cellIndex(w, nx, nz)]!;
+          if (n.room === r.id || n.kind !== 'corridor' || (n.room >= 0 && w.rooms[n.room]?.kind === 'landing')) continue;
+          const e = getEdge(w, x, z, s);
+          if (e === 'door' || e === 'broken') doors.push({ x, z, s });
+          else if (e === 'solid') cands.push({ x, z, s });
+        }
+      }
+    }
+    if (doors.length !== 1) continue;
+    // Prefer the candidate farthest from the existing door (front + back door).
+    const d0 = doors[0]!;
+    const best = cands.sort((a, b) => Math.hypot(b.x - d0.x, b.z - d0.z) - Math.hypot(a.x - d0.x, a.z - d0.z))[0];
+    if (best && Math.hypot(best.x - d0.x, best.z - d0.z) >= 1 && rng.chance(0.9)) setEdge(w, best.x, best.z, best.s, 'door');
+  }
 }
 
 /** Stairs are walled in except their entrance; shafts open only towards the upper landing. */
@@ -374,9 +440,10 @@ function placeRooms(w: Work, cfg: SizeConfig, rng: Rng) {
         rw = rng.int(3, Math.min(6, Math.floor(w.width / 3)));
         rh = rng.int(3, Math.min(5, Math.floor(w.height / 3)));
       } else {
-        // Mostly small classrooms/offices, occasionally long rooms.
-        rw = rng.pick([1, 2, 2, 2, 3, 3, 4]);
-        rh = rng.pick([1, 2, 2, 3, 3]);
+        // Classrooms are 8×8 m to 12×12 m (2–3 cells); some small store rooms / offices.
+        const small = rng.chance(0.25);
+        rw = small ? rng.pick([1, 1, 2]) : rng.pick([2, 2, 3]);
+        rh = small ? rng.pick([1, 2]) : rng.pick([2, 3, 3]);
       }
       if (rng.chance(0.5)) [rw, rh] = [rh, rw];
       const x = rng.int(0, w.width - rw);
@@ -441,7 +508,7 @@ function linkRooms(rooms: Room[], cfg: SizeConfig, rng: Rng): Link[] {
   }
   // Loops: for each room, consider its 3 nearest neighbours.
   for (let i = 0; i < n; i++) {
-    const near = [...Array(n).keys()].filter((j) => j !== i).sort((p, q) => dist(i, p) - dist(i, q) || p - q).slice(0, 3);
+    const near = [...Array(n).keys()].filter((j) => j !== i).sort((p, q) => dist(i, p) - dist(i, q) || p - q).slice(0, 4);
     for (const j of near) {
       const key = `${Math.min(i, j)}-${Math.max(i, j)}`;
       if (has.has(key)) continue;

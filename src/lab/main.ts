@@ -243,7 +243,7 @@ async function main() {
   });
   const wet = slider('Wetness', 0, 1, 0.01, () => surfaceUniforms.uWetness.value, (v) => (surfaceUniforms.uWetness.value = v));
   const moss = slider('Moss / dirt', 0, 1.5, 0.01, () => surfaceUniforms.uMoss.value, (v) => (surfaceUniforms.uMoss.value = v));
-  const mood = slider('Mood: sunlit ↔ overcast', 0, 1, 0.01, () => env.mood, (v) => {
+  const mood = slider('Mood: moonlit ↔ dark night', 0, 1, 0.01, () => env.mood, (v) => {
     env.setMood(v);
     wet.input.value = String(surfaceUniforms.uWetness.value);
     wet.refresh();

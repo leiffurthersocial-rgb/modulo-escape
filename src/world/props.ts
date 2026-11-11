@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { PropSlot, PropType } from '../gen/types.ts';
 import { STOREY_HEIGHT } from '../gen/config.ts';
 
@@ -23,6 +24,15 @@ export function makePropGeometries(): Map<PropType, THREE.BufferGeometry> {
   m.set('chair', new THREE.BoxGeometry(0.45, 0.85, 0.45).translate(0, 0.425, 0));
   m.set('desk', new THREE.BoxGeometry(1.0, 0.75, 0.6).translate(0, 0.375, 0));
   m.set('classroom_desk', new THREE.BoxGeometry(0.7, 0.75, 0.5).translate(0, 0.375, 0));
+  // Blackboard: 3 m slate with a frame and chalk ledge, its back on local -z (against the front wall).
+  m.set(
+    'blackboard',
+    mergeGeometries([
+      new THREE.BoxGeometry(3.1, 1.3, 0.04).translate(0, 1.55, 0.02),
+      new THREE.BoxGeometry(3.2, 0.06, 0.06).translate(0, 0.88, 0.05),
+      new THREE.BoxGeometry(3.2, 0.06, 0.03).translate(0, 2.23, 0.03),
+    ])!,
+  );
   // Pipe: horizontal along X near the ceiling.
   m.set('pipe', new THREE.CylinderGeometry(0.08, 0.08, 4, 8).rotateZ(Math.PI / 2).translate(0, STOREY_HEIGHT - 0.45, 0));
   return m;

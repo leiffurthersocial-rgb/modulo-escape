@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fnv1a, Rng, streamRng } from '../src/core/rng.ts';
 import {
   bfs,
+  buildNav,
   cellIndex,
   DIR,
   generateBuilding,
@@ -83,7 +84,7 @@ function checkFloor(l: LevelData): string[] {
   l.props.forEach((p, i) => {
     const u = p.x - p.cx * S;
     const v = p.z - p.cz * S;
-    if (u - p.r < 0.15 || v - p.r < 0.15 || u + p.r > S - 0.15 || v + p.r > S - 0.15) errs.push(`prop ${i} intersects wall`);
+    if (p.type !== 'blackboard' && (u - p.r < 0.15 || v - p.r < 0.15 || u + p.r > S - 0.15 || v + p.r > S - 0.15)) errs.push(`prop ${i} intersects wall`);
     if (!isWalkable(l.cells[cellIndex(l, p.cx, p.cz)]!.kind)) errs.push(`prop ${i} in void`);
     if (p.solid) {
       const band = 0.6 * (S / 4);
@@ -195,14 +196,25 @@ for (const size of SIZES) {
       let loops = 0;
       let deadEnds = 0;
       let halls = 0;
+      let stubs = 0;
+      let floors = 0;
       for (const seed of seedList(100, `mix-${size}`)) {
-        const s = generateBuilding(seed, size).stats;
+        const b = generateBuilding(seed, size);
+        const s = b.stats;
         loops += s.loops;
         deadEnds += s.deadEnds;
         halls += s.halls;
+        for (const l of b.floors) {
+          floors++;
+          const nav = buildNav(l);
+          // Actual corridor tips that lead nowhere (landings are excluded: stairs continue there).
+          stubs += l.cells.filter((c, i) => c.kind === 'corridor' && (c.room < 0 || l.rooms[c.room]?.kind !== 'landing') && nav.adj[i]!.length <= 1).length;
+        }
       }
-      expect(loops).toBeGreaterThan(50);
-      expect(deadEnds).toBeGreaterThan(50);
+      // Gameplay: many loops to circle the monster, only a handful of deliberate spurs.
+      expect(loops / floors).toBeGreaterThan(1);
+      expect(stubs / floors).toBeLessThanOrEqual(2.5);
+      expect(deadEnds).toBeLessThanOrEqual(stubs + floors);
       if (size !== 'small') expect(halls).toBeGreaterThan(80);
       expect(generateBuilding(`stairs-${size}`, size).stairs.length).toBeGreaterThanOrEqual(SIZE_CONFIG[size].floors - 1);
     });
@@ -213,9 +225,9 @@ describe('golden seeds', () => {
   // Locks layouts so later phases (props, materials, decals) can't silently change existing seeds.
   // Update deliberately with: GEN_UPDATE_GOLDEN=1 (prints new values).
   const golden: Record<string, string> = {
-    'kzu:small': 'b96c8e67',
-    'kzu:medium': '79e68ebe',
-    'abc123:large': '380d7d6e',
+    'kzu:small': 'b34829e8',
+    'kzu:medium': '49360045',
+    'abc123:large': '6d7015e9',
   };
   it('layout fingerprints are stable', () => {
     for (const key of Object.keys(golden)) {

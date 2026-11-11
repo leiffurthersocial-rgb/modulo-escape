@@ -188,6 +188,7 @@ const GREY_PROP: Record<PropType, number> = {
   chair: 0x3c6e9e,
   desk: 0x8a6a45,
   classroom_desk: 0x8a6a45,
+  blackboard: 0x1d2b24,
   pipe: 0x5e6266,
 };
 

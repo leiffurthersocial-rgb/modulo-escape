@@ -228,6 +228,18 @@
     "attributionRequired": false
   },
   {
+    "id": "dikhololo_night",
+    "source": "polyhaven",
+    "kind": "hdri",
+    "category": "hdri:night-dark",
+    "name": "Dikhololo Night",
+    "sourceUrl": "https://polyhaven.com/a/dikhololo_night",
+    "author": "Greg Zaal",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attributionRequired": false
+  },
+  {
     "id": "dirty_concrete",
     "source": "polyhaven",
     "kind": "texture",
@@ -312,24 +324,12 @@
     "attributionRequired": false
   },
   {
-    "id": "lush_dirt_path",
+    "id": "moonlit_golf",
     "source": "polyhaven",
     "kind": "hdri",
-    "category": "hdri:sunlit",
-    "name": "Lush Dirt Path",
-    "sourceUrl": "https://polyhaven.com/a/lush_dirt_path",
-    "author": "Alexander Scholten",
-    "license": "CC0 1.0",
-    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attributionRequired": false
-  },
-  {
-    "id": "misty_pines",
-    "source": "polyhaven",
-    "kind": "hdri",
-    "category": "hdri:overcast",
-    "name": "Misty Pines",
-    "sourceUrl": "https://polyhaven.com/a/misty_pines",
+    "category": "hdri:night-moon",
+    "name": "Moonlit Golf",
+    "sourceUrl": "https://polyhaven.com/a/moonlit_golf",
     "author": "Greg Zaal",
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",

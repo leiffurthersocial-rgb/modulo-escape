@@ -427,30 +427,30 @@
  },
  {
   "source": "polyhaven",
-  "id": "lush_dirt_path",
+  "id": "moonlit_golf",
   "kind": "hdri",
-  "category": "hdri:sunlit",
+  "category": "hdri:night-moon",
   "res": "2k"
  },
  {
   "source": "polyhaven",
-  "id": "misty_pines",
+  "id": "dikhololo_night",
   "kind": "hdri",
-  "category": "hdri:overcast",
+  "category": "hdri:night-dark",
   "res": "2k"
  },
  {
   "source": "polyhaven",
-  "id": "lush_dirt_path",
+  "id": "moonlit_golf",
   "kind": "hdri",
-  "category": "hdri:sunlit",
+  "category": "hdri:night-moon",
   "res": "1k"
  },
  {
   "source": "polyhaven",
-  "id": "misty_pines",
+  "id": "dikhololo_night",
   "kind": "hdri",
-  "category": "hdri:overcast",
+  "category": "hdri:night-dark",
   "res": "1k"
  },
  {

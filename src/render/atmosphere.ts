@@ -26,6 +26,11 @@ export interface MoodParams {
   shafts: number;
 }
 
+/**
+ * Indoor look (tuned earlier against daylight skies; the user liked it): hemi fill, haze, exposure,
+ * wetness. Outdoors it is night now, so the sky/moon parameters live in NIGHT_* below and the game
+ * blends indoor → night by how far the player is out of the gate.
+ */
 const SUNLIT: MoodParams = {
   sunColor: new THREE.Color(0xffe2b8),
   sunIntensity: 3.6,
@@ -53,6 +58,56 @@ const OVERCAST: MoodParams = {
   shafts: 0.12,
 };
 
+/** Clear moonlit night. `sun` is the moon. */
+const NIGHT_MOON: MoodParams = {
+  sunColor: new THREE.Color(0x8fa6d6),
+  sunIntensity: 0.55,
+  hemiSky: new THREE.Color(0x34405e),
+  hemiGround: new THREE.Color(0x0c0f12),
+  hemiIntensity: 0.3,
+  fogColor: new THREE.Color(0x151b28),
+  fogDensity: 0.02,
+  exposure: 0.95,
+  envIntensity: 0.4,
+  wetness: 0.3,
+  shafts: 0,
+};
+/** Moonless, hazy night. */
+const NIGHT_DARK: MoodParams = {
+  sunColor: new THREE.Color(0x6a7a99),
+  sunIntensity: 0.15,
+  hemiSky: new THREE.Color(0x1c2232),
+  hemiGround: new THREE.Color(0x08090b),
+  hemiIntensity: 0.22,
+  fogColor: new THREE.Color(0x0b0e14),
+  fogDensity: 0.035,
+  exposure: 1.15,
+  envIntensity: 0.7,
+  wetness: 0.85,
+  shafts: 0,
+};
+/** Night HDRIs average ~2.3× darker than the day skies the indoor IBL was tuned with. */
+export const INDOOR_ENV_COMP = 2.3;
+/** How bright the night sky backdrop is drawn (stars and moonlit clouds, not a grey dome). */
+const NIGHT_BACKGROUND = 0.35;
+
+const cloneParams = (p: MoodParams): MoodParams => ({ ...p, sunColor: p.sunColor.clone(), hemiSky: p.hemiSky.clone(), hemiGround: p.hemiGround.clone(), fogColor: p.fogColor.clone() });
+
+function lerpParams(out: MoodParams, a: MoodParams, b: MoodParams, t: number) {
+  const L = THREE.MathUtils.lerp;
+  out.sunColor.copy(a.sunColor).lerp(b.sunColor, t);
+  out.hemiSky.copy(a.hemiSky).lerp(b.hemiSky, t);
+  out.hemiGround.copy(a.hemiGround).lerp(b.hemiGround, t);
+  out.fogColor.copy(a.fogColor).lerp(b.fogColor, t);
+  out.sunIntensity = L(a.sunIntensity, b.sunIntensity, t);
+  out.hemiIntensity = L(a.hemiIntensity, b.hemiIntensity, t);
+  out.fogDensity = L(a.fogDensity, b.fogDensity, t);
+  out.exposure = L(a.exposure, b.exposure, t);
+  out.envIntensity = L(a.envIntensity, b.envIntensity, t);
+  out.wetness = L(a.wetness, b.wetness, t);
+  out.shafts = L(a.shafts, b.shafts, t);
+}
+
 export class Atmosphere {
   readonly group = new THREE.Group();
   readonly sun: THREE.DirectionalLight;
@@ -71,7 +126,10 @@ export class Atmosphere {
   private blendMat: THREE.ShaderMaterial | null = null;
   private envRT: THREE.WebGLRenderTarget | null = null;
   private ground: THREE.Mesh;
-  readonly params: MoodParams = { ...SUNLIT, sunColor: SUNLIT.sunColor.clone(), hemiSky: SUNLIT.hemiSky.clone(), hemiGround: SUNLIT.hemiGround.clone(), fogColor: SUNLIT.fogColor.clone() };
+  /** Outdoor (night) parameters. */
+  readonly params: MoodParams = cloneParams(NIGHT_MOON);
+  /** Indoor parameters (hemi fill, haze, exposure, wetness). */
+  readonly indoor: MoodParams = cloneParams(SUNLIT);
   private pendingEnv = false;
 
   constructor(
@@ -133,8 +191,8 @@ export class Atmosphere {
       const e = Object.values(manifest.hdris).find((h) => h.category === cat);
       return e?.tiers[res]?.url ?? Object.values(e?.tiers ?? {})[0]?.url;
     };
-    const a = pick('hdri:sunlit');
-    const b = pick('hdri:overcast');
+    const a = pick('hdri:night-moon');
+    const b = pick('hdri:night-dark');
     if (!a || !b) return;
     const loader = new HDRLoader().setDataType(THREE.HalfFloatType);
     const [ta, tb] = await Promise.all([loader.loadAsync(a), loader.loadAsync(b)]);
@@ -177,7 +235,7 @@ export class Atmosphere {
     this.envRT = this.pmrem.fromEquirectangular(this.blendRT.texture);
     this.scene.environment = this.envRT.texture;
     this.scene.background = this.blendRT.texture;
-    this.scene.backgroundIntensity = 1;
+    this.scene.backgroundIntensity = NIGHT_BACKGROUND;
     old?.dispose();
     this.pendingEnv = false;
   }
@@ -196,18 +254,10 @@ export class Atmosphere {
   private applyMood() {
     const t = this.mood;
     const p = this.params;
-    p.sunColor.copy(SUNLIT.sunColor).lerp(OVERCAST.sunColor, t);
-    p.hemiSky.copy(SUNLIT.hemiSky).lerp(OVERCAST.hemiSky, t);
-    p.hemiGround.copy(SUNLIT.hemiGround).lerp(OVERCAST.hemiGround, t);
-    p.fogColor.copy(SUNLIT.fogColor).lerp(OVERCAST.fogColor, t);
-    const L = THREE.MathUtils.lerp;
-    p.sunIntensity = L(SUNLIT.sunIntensity, OVERCAST.sunIntensity, t);
-    p.hemiIntensity = L(SUNLIT.hemiIntensity, OVERCAST.hemiIntensity, t);
-    p.fogDensity = L(SUNLIT.fogDensity, OVERCAST.fogDensity, t);
-    p.exposure = L(SUNLIT.exposure, OVERCAST.exposure, t);
-    p.envIntensity = L(SUNLIT.envIntensity, OVERCAST.envIntensity, t);
-    p.wetness = L(SUNLIT.wetness, OVERCAST.wetness, t);
-    p.shafts = L(SUNLIT.shafts, OVERCAST.shafts, t);
+    lerpParams(this.indoor, SUNLIT, OVERCAST, t);
+    lerpParams(p, NIGHT_MOON, NIGHT_DARK, t);
+    p.exposure = this.indoor.exposure;
+    p.wetness = this.indoor.wetness;
     this.sun.color.copy(p.sunColor);
     this.sun.intensity = p.sunIntensity;
     this.hemi.color.copy(p.hemiSky);
@@ -218,7 +268,7 @@ export class Atmosphere {
     this.scene.environmentIntensity = p.envIntensity;
     this.renderer.toneMappingExposure = p.exposure;
     surfaceUniforms.uWetness.value = p.wetness;
-    if (!this.blendRT) this.scene.background = p.fogColor.clone().lerp(new THREE.Color(0xc8d8e0), 0.4);
+    if (!this.blendRT) this.scene.background = p.fogColor.clone();
   }
 
   /** Keep the shadow frustum centred on the player, snapped to texels to avoid shimmering. */

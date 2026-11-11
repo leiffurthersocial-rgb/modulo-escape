@@ -33,6 +33,7 @@ export const PROP_RADIUS: Record<PropType, number> = {
   chair: 0.35,
   desk: 0.5,
   classroom_desk: 0.5,
+  blackboard: 0,
   pipe: 0.2,
 };
 export const SOLID_PROPS: ReadonlySet<PropType> = new Set(['barrel', 'collapsed_slab', 'chair', 'desk', 'classroom_desk']);
@@ -58,12 +59,42 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
       solid: SOLID_PROPS.has(type),
     });
   };
-  // Classrooms: desks in rows, all facing the same wall (seeded per room).
-  const roomFacing = new Map<number, number>();
-  const classroom = new Map<number, boolean>();
+  // Classrooms: a front wall without doors carries the blackboard; the teacher's desk stands in
+  // front of it and the student desks (with chairs) face it in rows, with aisles between the cells.
+  const classroom = new Map<number, { front: Side; facing: number; teacher: string | null }>();
+  const doorish = (e: EdgeKind) => e === 'door' || e === 'broken' || e === 'exit' || e === 'open';
+  const FACING: Record<Side, number> = { N: 0, E: -Math.PI / 2, S: Math.PI, W: Math.PI / 2 };
   for (const r of l.rooms) {
-    roomFacing.set(r.id, rng.pick([0, Math.PI / 2, Math.PI, -Math.PI / 2]));
-    classroom.set(r.id, r.kind === 'room' && r.w * r.h >= 2 && rng.chance(0.75));
+    if (r.kind !== 'room' || r.w * r.h < 4 || !rng.chance(0.85)) continue;
+    // Score each side: no doors first, then the longer wall (so rows run across the room).
+    let best: { side: Side; score: number } | null = null;
+    for (const side of ['N', 'E', 'S', 'W'] as Side[]) {
+      const cells: [number, number][] = [];
+      if (side === 'N' || side === 'S') for (let x = r.x; x < r.x + r.w; x++) cells.push([x, side === 'N' ? r.z : r.z + r.h - 1]);
+      else for (let z = r.z; z < r.z + r.h; z++) cells.push([side === 'W' ? r.x : r.x + r.w - 1, z]);
+      if (cells.some(([x, z]) => doorish(getEdge(l, x, z, side)))) continue;
+      const score = cells.length * 10 + rng.next();
+      if (!best || score > best.score) best = { side, score };
+    }
+    if (!best) continue;
+    const front = best.side;
+    classroom.set(r.id, { front, facing: FACING[front], teacher: null });
+    // Blackboard centred on the front wall, just proud of its face.
+    const cx = r.x + r.w / 2;
+    const cz = r.z + r.h / 2;
+    const S = l.cellSize;
+    let bx: number;
+    let bz: number;
+    if (front === 'N' || front === 'S') {
+      bx = cx * S;
+      bz = (front === 'N' ? r.z : r.z + r.h) * S + (front === 'N' ? 0.17 : -0.17);
+    } else {
+      bz = cz * S;
+      bx = (front === 'W' ? r.x : r.x + r.w) * S + (front === 'W' ? 0.17 : -0.17);
+    }
+    const bcx = Math.min(r.x + r.w - 1, Math.floor(bx / S - (front === 'E' ? 0.01 : 0)));
+    const bcz = Math.min(r.z + r.h - 1, Math.floor(bz / S - (front === 'S' ? 0.01 : 0)));
+    out.push({ type: 'blackboard', cx: bcx, cz: bcz, x: bx, z: bz, r: 0, rot: FACING[front], scale: 1, variant: 0, solid: false });
   }
 
   for (let cz = 0; cz < l.height; cz++) {
@@ -74,7 +105,12 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
       const roomKind = cell.room >= 0 ? l.rooms[cell.room]!.kind : null;
       const keepClear = i === startI || i === exitI || roomKind === 'landing';
       const edge = (side: Side) => getEdge(l, cx, cz, side);
-      const isClass = cell.kind === 'room' && classroom.get(cell.room);
+      const cls = cell.kind === 'room' ? classroom.get(cell.room) : undefined;
+      const room = cell.room >= 0 ? l.rooms[cell.room]! : null;
+      const frontRow =
+        cls && room
+          ? (cls.front === 'N' && cz === room.z) || (cls.front === 'S' && cz === room.z + room.h - 1) || (cls.front === 'W' && cx === room.x) || (cls.front === 'E' && cx === room.x + room.w - 1)
+          : false;
 
       for (const c of CORNERS) {
         const [a, b] = c.sides;
@@ -82,9 +118,20 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
         const eb = edge(b);
         const doorway = (e: EdgeKind) => e === 'door' || e === 'broken' || e === 'exit' || e === 'open';
         const walls = Number(isWallLike(ea)) + Number(isWallLike(eb));
-        if (isClass && !keepClear && !(ea === 'door' || eb === 'door' || ea === 'broken' || eb === 'broken')) {
-          // Desk + chair at every free corner of a classroom cell: reads as rows with aisles.
-          if (rng.chance(0.85)) add('classroom_desk', cx, cz, c.u, c.v, roomFacing.get(cell.room)! + rng.range(-0.12, 0.12));
+        if (cls && !keepClear) {
+          if (doorish(ea) && ea !== 'open') continue; // keep door swings clear
+          if (doorish(eb) && eb !== 'open') continue;
+          if (frontRow && (a === cls.front || b === cls.front)) {
+            // Space in front of the board; one corner gets the teacher's desk, facing the class.
+            const sideWall = a === cls.front ? isWallLike(eb) : isWallLike(ea);
+            if (!cls.teacher && sideWall) {
+              cls.teacher = `${cx},${cz}`;
+              add('desk', cx, cz, c.u, c.v, cls.facing + Math.PI + rng.range(-0.05, 0.05));
+            }
+            continue;
+          }
+          // Student desk + chair, facing the board, slightly askew after years of neglect.
+          if (rng.chance(0.9)) add('classroom_desk', cx, cz, c.u, c.v, cls.facing + rng.range(-0.1, 0.1));
           continue;
         }
         if (doorway(ea) && ea !== 'open') continue;
@@ -94,7 +141,9 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
         const r2 = rng.next();
         if (keepClear || walls === 0) continue;
         void roll; // (was: rubble) — no loose clutter, only school furniture
-        if (cell.kind === 'room' && r2 < 0.12) add(rng.chance(0.6) ? 'chair' : 'desk', cx, cz, c.u, c.v);
+        // Small rooms are offices / store rooms: a desk or stacked chairs against the walls.
+        if (cell.kind === 'room' && room && room.w * room.h < 4 && r2 < 0.3) add(rng.chance(0.5) ? 'chair' : rng.chance(0.5) ? 'desk' : 'barrel', cx, cz, c.u, c.v);
+        else if (cell.kind === 'room' && r2 < 0.08) add('chair', cx, cz, c.u, c.v);
       }
 
       // Mid-wall slots: old pipes along corridor walls.

@@ -15,7 +15,7 @@ import type { Building, LevelData, LevelSize } from '../gen/types.ts';
 import { Input } from '../input/input.ts';
 import { initPhysics, PhysicsWorld, propKey } from '../physics/physicsWorld.ts';
 import { Player } from '../player/player.ts';
-import { Atmosphere } from '../render/atmosphere.ts';
+import { Atmosphere, INDOOR_ENV_COMP } from '../render/atmosphere.ts';
 import { bindResize, createRenderer, DEFAULT_RENDER } from '../render/renderer.ts';
 import { PostFX } from '../render/post.ts';
 import { Dust } from '../render/shafts.ts';
@@ -505,16 +505,21 @@ export class Game {
     const sky = outdoor * groundFloor;
     this.env.sun.intensity = this.env.params.sunIntensity * sky;
     this.env.sun.shadow.autoUpdate = sky > 0.01;
-    this.env.hemi.intensity = this.env.params.hemiIntensity * (0.55 + 0.45 * sky);
-    this.scene.environmentIntensity = this.env.params.envIntensity * (0.5 + 0.5 * sky);
-    // Eye adaptation: dark interiors open the "iris", daylight at the gate closes it.
-    const target = THREE.MathUtils.lerp(1.35, 0.6, sky);
+    // Inside keeps the tuned indoor fill; stepping out of the gate fades to the night outside.
+    const ind = this.env.indoor;
+    const out = this.env.params;
+    this.env.hemi.intensity = THREE.MathUtils.lerp(ind.hemiIntensity * 0.55, out.hemiIntensity, sky);
+    this.env.hemi.color.copy(ind.hemiSky).lerp(out.hemiSky, sky);
+    this.env.hemi.groundColor.copy(ind.hemiGround).lerp(out.hemiGround, sky);
+    this.scene.environmentIntensity = THREE.MathUtils.lerp(ind.envIntensity * 0.5 * INDOOR_ENV_COMP, out.envIntensity, sky);
+    // Eye adaptation: dark interiors open the "iris"; the night outside keeps it open.
+    const target = THREE.MathUtils.lerp(1.35, 1.5, sky);
     this.adapt += (target - this.adapt) * Math.min(1, dt * 1.5);
     if (dt === 0) this.adapt = target;
-    this.renderer.toneMappingExposure = this.env.params.exposure * this.adapt;
-    // Pale damp haze at the end of long corridors (the look you liked), full daylight fog outside.
-    this.env.fog.color.copy(this.env.params.fogColor).multiplyScalar(0.3 + 0.7 * sky);
-    this.env.fog.density = THREE.MathUtils.lerp(0.03, this.env.params.fogDensity, sky);
+    this.renderer.toneMappingExposure = ind.exposure * this.adapt;
+    // Pale damp haze at the end of long corridors (the look you liked), blue night haze outside.
+    this.env.fog.color.copy(ind.fogColor).multiplyScalar(0.3).lerp(out.fogColor, sky);
+    this.env.fog.density = THREE.MathUtils.lerp(0.03, out.fogDensity, sky);
 
     for (const e of this.entities.entities.values()) e.object.visible = Math.abs(e.floor - this.player.floor) <= 1;
     const cfw = this.player.camera.getWorldDirection(this.tmpV);

@@ -498,7 +498,7 @@ export class UI {
     return wrap;
   }
 
-  /** F4 debug menu: mood (sunlit ↔ overcast), wetness and moss overrides. */
+  /** F4 debug menu: mood (moonlit ↔ dark night), wetness and moss overrides. */
   toggleDebugMenu() {
     if (this.debugMenu) {
       this.debugMenu.remove();
@@ -521,7 +521,7 @@ export class UI {
       h(
         'div',
         { class: 'field' },
-        ...slider('Mood: sunlit ↔ overcast', settings.graphics.mood, (v) => {
+        ...slider('Mood: moonlit ↔ dark night', settings.graphics.mood, (v) => {
           settings.graphics.mood = v;
           saveSettings('mood');
         }),

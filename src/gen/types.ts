@@ -37,6 +37,7 @@ export type PropType =
   | 'chair'
   | 'desk'
   | 'classroom_desk'
+  | 'blackboard'
   | 'pipe';
 
 export interface PropSlot {

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-10T18:36:01.649Z",
+  "generated": "2026-11-11T07:46:37.428Z",
   "textures": {
     "concrete_wall_008": {
       "category": "concrete_wall",
@@ -877,29 +877,29 @@
     }
   },
   "hdris": {
-    "lush_dirt_path": {
-      "category": "hdri:sunlit",
+    "moonlit_golf": {
+      "category": "hdri:night-moon",
       "tiers": {
         "2k": {
-          "url": "/assets/hdri/lush_dirt_path_2k.bd58bc09.hdr",
-          "bytes": 7271402
+          "url": "/assets/hdri/moonlit_golf_2k.b4e3a366.hdr",
+          "bytes": 6981963
         },
         "1k": {
-          "url": "/assets/hdri/lush_dirt_path_1k.d402c5a5.hdr",
-          "bytes": 1833408
+          "url": "/assets/hdri/moonlit_golf_1k.cff71a58.hdr",
+          "bytes": 1725527
         }
       }
     },
-    "misty_pines": {
-      "category": "hdri:overcast",
+    "dikhololo_night": {
+      "category": "hdri:night-dark",
       "tiers": {
         "2k": {
-          "url": "/assets/hdri/misty_pines_2k.3fcc1574.hdr",
-          "bytes": 7050893
+          "url": "/assets/hdri/dikhololo_night_2k.35b5ef6d.hdr",
+          "bytes": 7050455
         },
         "1k": {
-          "url": "/assets/hdri/misty_pines_1k.08498ace.hdr",
-          "bytes": 1798128
+          "url": "/assets/hdri/dikhololo_night_1k.6861489f.hdr",
+          "bytes": 1745132
         }
       }
     }
