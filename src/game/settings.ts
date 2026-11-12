@@ -81,7 +81,7 @@ export const DEFAULT_SETTINGS: Settings = {
   invertY: false,
   fov: 75,
   headBob: true,
-  touchControls: 'auto',
+  touchControls: 'on',
   materialPicks: {},
   monster: true,
   masterVolume: 0.8,
@@ -105,7 +105,12 @@ function load(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return structuredClone(DEFAULT_SETTINGS);
-    const parsed = JSON.parse(raw) as Partial<Settings>;
+    const parsed = JSON.parse(raw) as Partial<Settings> & { touchMigrated?: boolean };
+    // Touch controls are on by default now; switch saved 'auto' over once (you can still turn them off).
+    if (!parsed.touchMigrated) {
+      if (parsed.touchControls === 'auto' || parsed.touchControls === undefined) parsed.touchControls = 'on';
+      parsed.touchMigrated = true;
+    }
     return {
       ...structuredClone(DEFAULT_SETTINGS),
       ...parsed,
