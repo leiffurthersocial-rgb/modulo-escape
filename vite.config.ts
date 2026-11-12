@@ -49,6 +49,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, 'index.html'),
         bench: resolve(import.meta.dirname, 'bench/index.html'),
         lab: resolve(import.meta.dirname, 'lab/index.html'),
+        robin: resolve(import.meta.dirname, 'robin/index.html'),
       },
     },
   },

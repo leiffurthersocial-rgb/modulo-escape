@@ -1,6 +1,7 @@
 /**
- * The monster. Body: Robin (a floating robin.png billboard, src/ai/monsterImage.ts) when the image
- * is in the repo, else the procedural "Tall One" (src/ai/creature.ts), or a skinned GLB
+ * The monster. Body: Robin — the sculpted 3.1 m skinned body with robin.png as its face
+ * (src/ai/robinBody.ts) — when robin.png and the GLB are present; else the floating billboard
+ * (src/ai/monsterImage.ts), the procedural "Tall One" (src/ai/creature.ts), or a skinned GLB
  * (MONSTER_MODEL_ID) when `kind: 'model'`. Brain: a small state machine on top of the building's
  * nav graph, line of sight and hearing:
  *
@@ -24,6 +25,8 @@ import type { Entity, EntityContext } from './entities.ts';
 import type { MonsterModel } from './monsterModel.ts';
 import { Creature, type CreatureMode } from './creature.ts';
 import { ImageBody, type MonsterImage } from './monsterImage.ts';
+import { RobinBody, type RobinTemplate } from './robinBody.ts';
+import { getEdge } from '../gen/grid.ts';
 
 export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search' | 'attack';
 
@@ -79,6 +82,7 @@ export class Monster implements Entity {
   private lastEncounter = 0;
   private creature: Creature | null = null;
   private image: ImageBody | null = null;
+  private robin: RobinBody | null = null;
   private eyeTarget = new THREE.Vector3();
   private mixer: THREE.AnimationMixer | null = null;
   private actions = new Map<string, THREE.AnimationAction>();
@@ -89,13 +93,19 @@ export class Monster implements Entity {
     spawn: THREE.Vector3,
     model: MonsterModel | null = null,
     readonly tuning: MonsterTuning = DEFAULT_TUNING,
-    kind: 'creature' | 'model' | 'image' = 'creature',
+    kind: 'creature' | 'model' | 'image' | 'robin' = 'creature',
     img: MonsterImage | null = null,
+    robinTpl: RobinTemplate | null = null,
   ) {
     this.rng = streamRng(seed, 'monster');
     this.nextDrift = tuning.driftEvery;
     this.position.copy(spawn);
-    if (kind === 'image' && img) {
+    if (kind === 'robin' && robinTpl) {
+      const r = new RobinBody(robinTpl);
+      r.onStep = (foot, loud) => bus.emit('monster:step', { x: foot.x, y: foot.y, z: foot.z, floor: this.floor, loud });
+      this.object.add(r.object);
+      this.robin = r;
+    } else if (kind === 'image' && img) {
       this.image = new ImageBody(img);
       this.object.add(this.image.object);
     } else if (kind === 'model' && model) this.buildFromModel(model);
@@ -151,6 +161,10 @@ export class Monster implements Entity {
       this.image.mode = mode;
       return;
     }
+    if (this.robin) {
+      this.robin.mode = mode;
+      return;
+    }
     const clip = { idle: 'Idle', walk: 'Walk', run: 'Run_Arms', attack: 'Punch' }[mode];
     const a = this.actions.get(clip);
     if (!a) return;
@@ -199,6 +213,10 @@ export class Monster implements Entity {
     this.mixer?.update(dt);
     this.creature?.update(dt);
     this.image?.update(dt, this.eyeTarget.copy(ctx.player.eye));
+    if (this.robin) {
+      this.robin.duck = this.needsDuck(ctx) ? 1 : 0;
+      this.robin.update(dt, this.eyeTarget.copy(ctx.player.eye));
+    }
     if (this.state === 'dormant' || this.state === 'attack') return;
     this.floor = ctx.nav.floorAt(this.position.y);
     const me = ctx.nav.nodeAt(this.position.x, this.position.y, this.position.z);
@@ -277,6 +295,7 @@ export class Monster implements Entity {
       this.setPose('walk', 0.8);
     } else this.setPose('idle');
     if (this.creature) this.creature.speed = speed;
+    if (this.robin) this.robin.speed = moving ? speed : 0;
     this.vocalize(dt, flat, sameFloor);
 
     if (direct) this.moveTowards(player.position, speed, dt);
@@ -339,6 +358,7 @@ export class Monster implements Entity {
     if (near) {
       this.nextVocal = 1.4 + (flat / 12) * 3.5 + this.rng.next() * 1.5;
       bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind: 'scream' });
+      this.robin?.scream();
       return;
     }
     const hunting = this.state === 'chase' || this.state === 'investigate';
@@ -389,7 +409,27 @@ export class Monster implements Entity {
     this.object.rotation.y = Math.atan2(this.heading.x, this.heading.z);
   }
 
+  /** Robin is 3.1 m tall: crouch under door lintels (2.6 m) and on stairs. */
+  private needsDuck(ctx: EntityContext): boolean {
+    const l = ctx.building.floors[this.floor];
+    if (!l) return false;
+    const S = l.cellSize;
+    const cx = Math.floor(this.position.x / S);
+    const cz = Math.floor(this.position.z / S);
+    if (cx < 0 || cz < 0 || cx >= l.width || cz >= l.height) return false;
+    if (l.cells[cz * l.width + cx]!.kind === 'stair') return true;
+    const u = this.position.x - cx * S;
+    const v = this.position.z - cz * S;
+    const near = 1.5;
+    const door = (side: 'N' | 'E' | 'S' | 'W') => {
+      const e = getEdge(l, cx, cz, side);
+      return e === 'door' || e === 'broken' || e === 'exit';
+    };
+    return (v < near && door('N')) || (S - v < near && door('S')) || (u < near && door('W')) || (S - u < near && door('E'));
+  }
+
   dispose() {
+    this.robin?.dispose();
     this.mixer?.stopAllAction();
     this.creature?.dispose();
     this.image?.dispose();

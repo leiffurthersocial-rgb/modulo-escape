@@ -15,7 +15,8 @@
     "gen:dump": "tsx scripts/dump-level.ts",
     "assets:fetch": "NODE_USE_ENV_PROXY=1 tsx scripts/fetch-assets.ts",
     "assets:process": "NODE_USE_ENV_PROXY=1 tsx scripts/process-assets.ts",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "robin:build": "tsx scripts/robin/build-robin.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

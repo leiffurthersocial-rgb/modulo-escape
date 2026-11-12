@@ -41,6 +41,7 @@ import { EntityManager, type EntityContext } from '../ai/entities.ts';
 import { Monster } from '../ai/monster.ts';
 import { loadMonsterModel, type MonsterModel } from '../ai/monsterModel.ts';
 import { loadMonsterImage, type MonsterImage } from '../ai/monsterImage.ts';
+import { loadRobinBody, type RobinTemplate } from '../ai/robinBody.ts';
 
 export type GameState = 'ready' | 'playing' | 'paused' | 'won' | 'scare' | 'caught';
 
@@ -111,6 +112,7 @@ export class Game {
     private monsterModel: MonsterModel | null = null,
     /** Robin (robin.png) if present: the monster's body and the face of the jump scare. */
     readonly monsterImage: MonsterImage | null = null,
+    private robinBody: RobinTemplate | null = null,
   ) {
     this.scene = scene;
     this.renderer = renderer;
@@ -233,8 +235,8 @@ export class Game {
       .filter((n) => Math.floor(n / this.nav.N) === b.start.floor && (dist[n] ?? -1) > 0);
     const node = cands.sort((x, y) => dist[y]! - dist[x]!)[0] ?? dist.indexOf(Math.max(...dist));
     if (node < 0) return;
-    const kind = this.monsterModel ? 'model' : this.monsterImage ? 'image' : 'creature';
-    const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, kind, this.monsterImage);
+    const kind = this.monsterModel ? 'model' : this.robinBody ? 'robin' : this.monsterImage ? 'image' : 'creature';
+    const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, kind, this.monsterImage, this.robinBody);
     this.entities.add(m);
     this.monsterWakeAt = 6;
     this.monster = m;
@@ -645,7 +647,9 @@ export async function createGame(
   // Default body is procedural; ?monster=model uses the skinned GLB instead.
   const monsterModel = new URLSearchParams(location.search).get('monster') === 'model' ? await loadMonsterModel(renderer, lib.manifest) : null;
   const monsterImage = await loadMonsterImage();
-  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel, monsterImage);
+  // Robin's sculpted body (?monster=billboard keeps the old floating image).
+  const robinBody = monsterImage && !monsterModel && new URLSearchParams(location.search).get('monster') !== 'billboard' ? await loadRobinBody(monsterImage) : null;
+  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel, monsterImage, robinBody);
   onProgress('Compiling shaders…');
   await renderer.compileAsync(game.scene, game.player.camera).catch(() => {});
   renderer.domElement.style.visibility = '';
