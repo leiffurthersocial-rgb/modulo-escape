@@ -82,7 +82,7 @@ export const DEFAULT_TUNING: MonsterTuning = {
  */
 export const SPECIES_TUNING: Record<Species, MonsterTuning> = {
   robin: DEFAULT_TUNING,
-  leo: { walkSpeed: 0.95, chaseSpeed: 6.4, chaseRamp: 0, sightRange: 16, fov: 0.85, catchDistance: 1.6, memory: 1, searchTime: 9, driftEvery: 16, stalkAfter: 40, ears: 1.6 },
+  leo: { walkSpeed: 1.3, chaseSpeed: 6.4, chaseRamp: 0, sightRange: 16, fov: 0.85, catchDistance: 1.6, memory: 1, searchTime: 9, driftEvery: 12, stalkAfter: 18, ears: 1.6 },
   jovan: { walkSpeed: 0.9, chaseSpeed: 4.6, chaseRamp: 0, sightRange: 22, fov: 1.25, catchDistance: 1.9, memory: 4, searchTime: 10, driftEvery: 14, stalkAfter: 26, ears: 1 },
 };
 
@@ -388,7 +388,7 @@ export class Monster implements Entity {
     // ── stalking: the hunter never stays away for long ──
     if (this.tuning.stalkAfter > 0 && ctx.isHunter(this.id) && (this.state === 'patrol' || this.state === 'search') && this.time - this.lastEncounter > this.tuning.stalkAfter && this.stalk(ctx, me)) return;
     // Leo, hunting: sometimes he gets ahead of you and waits in a doorway instead.
-    if (leo && ctx.isHunter(this.id) && this.state === 'patrol' && this.time > this.nextDrift - 0.05 && sameFloor && flat < 30 && this.rng.next() < 0.45 && this.setAmbush(ctx, me)) return;
+    if (leo && ctx.isHunter(this.id) && this.state === 'patrol' && this.time > this.nextDrift - 0.05 && sameFloor && flat < 30 && this.rng.next() < 0.25 && this.setAmbush(ctx, me)) return;
 
     // ── behaviour ──
     let speed = this.tuning.walkSpeed;

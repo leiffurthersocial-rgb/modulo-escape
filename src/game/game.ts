@@ -255,7 +255,7 @@ export class Game {
     const dist = bfsFrom(b.nav.adj, startNode);
     const allowed = params.get('monsters')?.split(',');
     const species: { tpl: RobinTemplate | null; wake: number; sameFloor: boolean }[] = this.bodies.length
-      ? this.bodies.filter((t) => !allowed || allowed.includes(t.species)).map((t) => ({ tpl: t, wake: t.species === 'robin' ? 6 : t.species === 'leo' ? 18 : 30, sameFloor: t.species === 'robin' }))
+      ? this.bodies.filter((t) => !allowed || allowed.includes(t.species)).map((t) => ({ tpl: t, wake: t.species === 'robin' ? 6 : t.species === 'leo' ? 18 : 30, sameFloor: t.species !== 'jovan' }))
       : [{ tpl: null, wake: 6, sameFloor: true }];
     const taken: number[] = [];
     for (const sp of species) {
@@ -283,6 +283,9 @@ export class Game {
   private hunterId = '';
   private hunterUntil = 0;
   private hunterRng = Math.random;
+  /** When you last actually saw each monster (on screen, in line of sight, within 30 m). */
+  private lastShown = new Map<string, number>();
+  private shownCheck = 0;
   private pickHunter() {
     const awake = this.monsters.filter((x) => x.active && x.m.state !== 'dormant');
     if (!awake.length) return;
@@ -293,10 +296,11 @@ export class Game {
       this.hunterUntil = this.time + 20;
       return;
     }
+    // Mostly whoever you've seen least lately (so each monster gets its turn), with some chance.
     const others = awake.filter((x) => x.m.id !== this.hunterId);
-    const pool = others.length ? others : awake;
-    this.hunterId = pool[Math.floor(this.hunterRng() * pool.length)]!.m.id;
-    this.hunterUntil = this.time + 60 + this.hunterRng() * 50;
+    const pool = (others.length ? others : awake).slice().sort((a, b) => (this.lastShown.get(a.m.id) ?? -1e9) - (this.lastShown.get(b.m.id) ?? -1e9));
+    this.hunterId = (this.hunterRng() < 0.75 ? pool[0] : pool[Math.floor(this.hunterRng() * pool.length)])!.m.id;
+    this.hunterUntil = this.time + 45 + this.hunterRng() * 40;
   }
   /** Debug mode (unlocked by pressing pause three times): cheats and monster controls. */
   readonly debug = { invisible: false, noCatch: false, freeze: false };
@@ -573,6 +577,19 @@ export class Game {
     this.gate.update(dt);
     this.director.update(dt);
     this.senses.update(dt);
+    this.shownCheck -= dt;
+    if (this.shownCheck < 0) {
+      this.shownCheck = 0.5;
+      const eye = this.player.camera.position;
+      const fwd = this.player.camera.getWorldDirection(new THREE.Vector3());
+      for (const x of this.monsters) {
+        if (!x.active || x.m.floor !== this.player.floor) continue;
+        const at = x.m.position.clone().setY(x.m.position.y + 1.6);
+        const to = at.clone().sub(eye);
+        const d = to.length();
+        if (d < 30 && to.divideScalar(d).dot(fwd) > 0.6 && this.senses.lineOfSight(eye, at)) this.lastShown.set(x.m.id, this.time);
+      }
+    }
     if (this.time > this.hunterUntil || !this.monsters.some((x) => x.m.id === this.hunterId && x.active && x.m.state !== 'dormant')) this.pickHunter();
     let tension = 0;
     let threat = Infinity;
