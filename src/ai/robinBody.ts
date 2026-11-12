@@ -49,6 +49,14 @@ export interface BodyStyle {
   maxStoop?: number;
   /** Head tilt and twitch strength (Jovan's head lolls and snaps sideways). */
   headTilt?: number;
+  /** 0..1: body skin matches the face's tone (instead of the drained grey). */
+  skinMatch?: number;
+  /** Half the face width the photo may cover, in eye distances (stops before the ears). */
+  faceHalf?: number;
+  /** 0..1: shift the face's colour towards the body's skin (the other way round). */
+  faceToBody?: number;
+  /** Where to read the skin colour in the aligned photo. */
+  skinBox?: [number, number, number, number];
   /** Fixed hair colour (when the photo's hair is hard to sample). */
   hairColor?: number;
   /** Where to read the hair colour in the aligned photo (x0, y0, x1, y1 px). */
@@ -58,8 +66,8 @@ export interface BodyStyle {
 }
 
 export const BODY_STYLES: Record<Species, BodyStyle> = {
-  robin: { idleHunch: 0.45, walkHunch: 0.55, runHunch: 0.35, runLean: 0.55, walkStride: 1.55, runStride: 2.5, armSwing: 0.38, armOut: 0.12, footLift: 0.14, tint: 0x8a9096, tintAmount: 0, headroom: 3.45, shirtColor: 0xc8c5bd, pantsColor: 0x4a4c54, print: true, gait: 'biped', hairBox: [150, 180, 250, 230] },
-  leo: { idleHunch: 1.0, walkHunch: 1.05, runHunch: 1.15, runLean: 0.5, walkStride: 2.0, runStride: 3.6, armSwing: 0.5, armOut: 0.2, footLift: 0.12, tint: 0x9a8478, tintAmount: 0, headroom: 3.45, shirtColor: 0x66777c, pantsColor: 0x4a443c, print: false, gait: 'knuckle', hairBox: [165, 212, 225, 232], jaw: { mouth: -1.12, drop: 0.85 } },
+  robin: { idleHunch: 0.45, walkHunch: 0.55, runHunch: 0.35, runLean: 0.55, walkStride: 1.55, runStride: 2.5, armSwing: 0.38, armOut: 0.12, footLift: 0.14, tint: 0x8a9096, tintAmount: 0, headroom: 3.45, shirtColor: 0xc8c5bd, pantsColor: 0x4a4c54, print: true, gait: 'biped', hairBox: [150, 180, 250, 230], faceHalf: 1.0 },
+  leo: { idleHunch: 1.0, walkHunch: 1.05, runHunch: 1.15, runLean: 0.5, walkStride: 2.0, runStride: 3.6, armSwing: 0.5, armOut: 0.2, footLift: 0.12, tint: 0x9a8478, tintAmount: 0, headroom: 3.45, shirtColor: 0x66777c, pantsColor: 0x4a443c, print: false, gait: 'knuckle', hairBox: [165, 212, 225, 232], jaw: { mouth: -1.12, drop: 0.85 }, faceToBody: 0.75, skinBox: [138, 398, 172, 424] },
   jovan: { idleHunch: 0.35, walkHunch: 0.4, runHunch: 0.45, runLean: 0.3, walkStride: 2.8, runStride: 4.0, armSwing: 0.22, armOut: 0.05, footLift: 0.16, tint: 0x8a97a2, tintAmount: 0.65, headroom: 3.5, maxStoop: 2.6, headTilt: 1.9, shirtColor: 0x26262b, pantsColor: 0x1d1d21, print: false, gait: 'ceiling', hairBox: [165, 272, 225, 300], hairColor: 0x3a2a20 },
 };
 
@@ -79,7 +87,7 @@ export interface BodyMeta {
   shoeY?: number;
 }
 
-export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=9`;
+export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=12`;
 export const ROBIN_BODY_URL = bodyUrl('robin');
 
 /** Photo layout (pixels in robin.png): eye centres, and where the shirt collar sits. */
@@ -106,11 +114,11 @@ export interface RobinTemplate {
 export const loadRobinBody = (photo: MonsterImage | null) => loadBody('robin', photo);
 
 /** Load a sculpted body and build its material (null if the GLB is missing). No photo = faceless. */
-export async function loadBody(species: Species, photo: MonsterImage | null): Promise<RobinTemplate | null> {
+export async function loadBody(species: Species, photo: MonsterImage | null, retry = 1): Promise<RobinTemplate | null> {
   try {
     const [gltf, meta] = await Promise.all([
       new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(bodyUrl(species)),
-      fetch(`/assets/monster/${species}_body.json?v=9`).then((r) => r.json() as Promise<BodyMeta>),
+      fetch(`/assets/monster/${species}_body.json?v=12`).then((r) => r.json() as Promise<BodyMeta>),
     ]);
     let mesh: THREE.SkinnedMesh | null = null;
     gltf.scene.traverse((o) => {
@@ -133,7 +141,8 @@ export async function loadBody(species: Species, photo: MonsterImage | null): Pr
     return { scene: gltf.scene, mesh: m, species, meta };
   } catch (e) {
     console.warn(`${species} body failed to load`, e);
-    return null;
+    // A flaky connection shouldn't cost a monster: try once more.
+    return retry > 0 ? loadBody(species, photo, retry - 1) : null;
   }
 }
 
@@ -168,7 +177,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
   const Hh = img?.height ?? 658;
   const P = ROBIN_PHOTO;
   const ang = Math.atan2(P.eyeR[1] - P.eyeL[1], P.eyeR[0] - P.eyeL[0]);
-  const skin = img ? sampleColor(img, 150, 380, 178, 405, 0xd9a58a) : new THREE.Color(0xd9a58a);
+  const skin = img ? sampleColor(img, ...(style.skinBox ?? [150, 380, 178, 405]), 0xd9a58a) : new THREE.Color(0xd9a58a);
   const hair = style.hairColor !== undefined ? new THREE.Color(style.hairColor) : img ? sampleColor(img, ...style.hairBox, 0x5a3b28) : new THREE.Color(0x5a3b28);
   const uniforms = {
     uPhoto: { value: photo?.texture ?? null },
@@ -198,6 +207,9 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
     uHemY: { value: meta?.hemY ?? 1.97 },
     uShoeY: { value: meta?.shoeY ?? -1 },
     uTintAmt: { value: style.tintAmount },
+    uSkinMatch: { value: style.skinMatch ?? 0 },
+    uFaceToBody: { value: style.faceToBody ?? 0 },
+    uFaceHalf: { value: (style.faceHalf ?? 1.25) * 2 * (meta?.eyeHalf ?? P.eyeHalf) },
     uEyeHalf: { value: meta?.eyeHalf ?? P.eyeHalf },
     uSkin: { value: skin },
     uHair: { value: hair },
@@ -276,6 +288,9 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         uniform float uGlow;
         uniform vec3 uTint;
         uniform float uTintAmt;
+        uniform float uSkinMatch;
+        uniform float uFaceToBody;
+        uniform float uFaceHalf;
         uniform vec3 uShirtCol;
         uniform vec3 uPantsCol;
         uniform float uPrint;
@@ -325,7 +340,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
           float mott = rFbm(p * 7.0);
           // Sickly grey-pale on the body, warming to the photo's own tone towards the head so the
           // face doesn't sit on the neck like a mask.
-          float headward = smoothstep(uFaceY - 0.55, uFaceY - 0.15, p.y);
+          float headward = max(smoothstep(uFaceY - 0.55, uFaceY - 0.15, p.y), uSkinMatch);
           vec3 grey = vec3(dot(uSkin, vec3(0.3, 0.55, 0.15))) * vec3(0.9, 0.95, 0.97);
           vec3 sk = mix(mix(uSkin, grey, 0.5), uSkin * 0.92, headward) * mix(0.68 + 0.4 * mott, 0.9 + 0.15 * mott, headward);
           sk = mix(sk, uTint * (0.62 + 0.45 * mott), uTintAmt * (1.0 - 0.6 * headward * uHasPhoto));
@@ -403,10 +418,14 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
           float aMin2 = min(min(texture2D(uPhoto2, fu2 + vec2(px.x, 0.0)).a, texture2D(uPhoto2, fu2 - vec2(px.x, 0.0)).a),
                             min(texture2D(uPhoto2, fu2 + vec2(0.0, px.y)).a, texture2D(uPhoto2, fu2 - vec2(0.0, px.y)).a));
           aMin = mix(aMin, aMin2, toScream);
-          float fw = uHasPhoto * smoothstep(0.12, 0.7, vMask2.y) * inside01(fu0) * smoothstep(0.75, 0.98, min(ph.a, aMin)) * (1.0 - smoothstep(uFaceBottom - 0.01, uFaceBottom + 0.01, 1.0 - fu0.y - (uFaceC.y / uPhotoSize.y)));
+          float fw = uHasPhoto * (1.0 - smoothstep(uFaceHalf * 0.88, uFaceHalf, abs(p.x))) * smoothstep(0.12, 0.7, vMask2.y) * inside01(fu0) * smoothstep(0.75, 0.98, min(ph.a, aMin)) * (1.0 - smoothstep(uFaceBottom - 0.01, uFaceBottom + 0.01, 1.0 - fu0.y - (uFaceC.y / uPhotoSize.y)));
           vec3 face = ph.rgb;
           // The face takes on the body's sickly tint (Leo green, Jovan grey).
           face = mix(face, vec3(dot(face, vec3(0.3, 0.55, 0.15))) * uTint * 1.3, uTintAmt * 0.45);
+          // Match the face to the body: keep its shading, take the body skin's hue.
+          float fl = dot(face, vec3(0.3, 0.55, 0.15));
+          vec3 bodyHue = sk / max(dot(sk, vec3(0.3, 0.55, 0.15)), 1e-3);
+          face = mix(face, bodyHue * fl, uFaceToBody);
           face = mix(face, face * vec3(0.8, 0.7, 0.7), uWarp * 0.4);
           face = mix(face, vec3(0.22, 0.0, 0.01), blood * min(1.0, uWarp * 1.5) * 0.85);
           face = mix(face, vec3(0.015, 0.0, 0.0), mouthHole);
@@ -439,7 +458,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         totalEmissiveRadiance += vec3(0.55, 0.62, 0.75) * rim * 0.07;`,
       );
   };
-  mat.customProgramCacheKey = () => 'robin-v11';
+  mat.customProgramCacheKey = () => 'robin-v13';
   return mat;
 }
 
@@ -695,11 +714,12 @@ export class RobinBody {
       else Object.assign(tgt, { hunch: 0.55, lean: 0.35, crouch: 0.1, reach: 1, spread: 1 });
     }
     // Stoop just enough to keep the head under the ceiling (or under a door lintel when ducking).
-    p.duck = expTo(p.duck, this.duck, realDt, 4 * rateK);
+    p.duck = expTo(p.duck, this.duck, realDt, 8 * rateK);
     const limit = THREE.MathUtils.lerp(st.headroom, 2.5, p.duck);
     // (Integral control on the measured head height, applied directly — no smoothing lag, so it
     // settles instead of overshooting.)
-    if (this.lastTop > 0 && sc < 0) this.stoop = THREE.MathUtils.clamp(this.stoop + (this.lastTop - limit) * realDt * 2.5, 0, st.maxStoop ?? 1);
+    // Ducking under a door: react fast, and fold as deep as it takes (knees and waist).
+    if (this.lastTop > 0 && sc < 0) this.stoop = THREE.MathUtils.clamp(this.stoop + (this.lastTop - limit) * realDt * (2.5 + 6 * p.duck), 0, (st.maxStoop ?? 1) + 2 * p.duck);
     if (sc >= 0) this.stoop = expTo(this.stoop, 0, realDt, 2);
     p.hunch = expTo(p.hunch, tgt.hunch, dt, 3 * rateK);
     p.lean = expTo(p.lean, tgt.lean, dt, 3 * rateK);

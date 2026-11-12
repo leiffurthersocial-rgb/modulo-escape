@@ -7,7 +7,7 @@
  * are evaluated where they were authored.
  */
 import { buildAnatomy, CLOTH, type BoneDef, type Prim, type V3 } from './anatomy.ts';
-import { buildFaceHead, JOVAN_FACE, type FaceParams } from './heads.ts';
+import { buildFaceHead, JOVAN_FACE, ROBIN_FACE, type FaceParams } from './heads.ts';
 import { buildLeoAnatomy, type ClothFn } from './leo.ts';
 
 export type CharacterName = 'robin' | 'leo' | 'jovan';
@@ -41,35 +41,35 @@ const side = (names: string[], s: BoneScale): Record<string, BoneScale> => {
 const fingers = (s: BoneScale) => side(['index1', 'index2', 'index3', 'middle1', 'middle2', 'middle3', 'ring1', 'ring2', 'ring3', 'pinky1', 'pinky2', 'pinky3', 'thumb1', 'thumb2', 'thumb3'], s);
 
 export const CHARACTERS: Record<CharacterName, Character> = {
-  robin: { name: 'robin', bones: {}, shirt: true, pants: 'long' },
+  robin: { name: 'robin', bones: {}, shirt: true, pants: 'long', face: ROBIN_FACE },
   /** Leo: his own sculpt (scripts/robin/leo.ts). */
-  leo: { name: 'leo', bones: {}, shirt: true, pants: 'short', custom: 'leo' },
+  leo: { name: 'leo', bones: {}, shirt: false, pants: 'short', custom: 'leo' },
   /**
    * Jovan: impossibly tall and lanky (≈ 4 m standing), so he walks stooped with his palms pressed
    * flat against the ceiling. Long torso and limbs, narrow but not skeletal, big spidery hands.
    */
   jovan: {
     name: 'jovan',
-    // ≈ 4.4 m: folded under the 3.6 m ceiling. Gaunt; a ripped black shirt; torn black trousers; barefoot.
+    // ≈ 4.9 m: folded under the 3.6 m ceiling. Gaunt; a ripped black shirt; torn black trousers; barefoot.
     shirt: true,
     ripped: true,
     pants: 'long',
     face: JOVAN_FACE,
     bones: {
-      hips: { len: 1.15, thick: [1.0, 1.0, 0.95] },
-      spine1: { len: 1.3, thick: [0.95, 1, 0.92] },
-      spine2: { len: 1.3, thick: [0.97, 1, 0.94] },
-      chest: { len: 1.2, thick: [1.05, 1, 0.96] },
-      neck1: { len: 1.15, thick: 1.0 },
-      neck2: { len: 1.15, thick: 1.0 },
+      hips: { len: 1.2, thick: [1.0, 1.0, 0.95] },
+      spine1: { len: 1.42, thick: [0.95, 1, 0.92] },
+      spine2: { len: 1.42, thick: [0.97, 1, 0.94] },
+      chest: { len: 1.28, thick: [1.05, 1, 0.96] },
+      neck1: { len: 1.22, thick: 1.0 },
+      neck2: { len: 1.22, thick: 1.0 },
       head: { len: 1, thick: 0.97 },
       ...side(['clavicle'], { len: 1.25, thick: 1.0 }),
-      ...side(['upperarm'], { len: 1.55, thick: 0.95 }),
-      ...side(['forearm'], { len: 1.6, thick: 0.92 }),
+      ...side(['upperarm'], { len: 1.7, thick: 0.95 }),
+      ...side(['forearm'], { len: 1.75, thick: 0.92 }),
       ...side(['hand'], { len: 1.4, thick: 1.1 }),
       ...fingers({ len: 1.8, thick: 0.95 }),
-      ...side(['thigh'], { len: 1.6, thick: 1.0 }),
-      ...side(['shin'], { len: 1.6, thick: 0.98 }),
+      ...side(['thigh'], { len: 1.8, thick: 1.0 }),
+      ...side(['shin'], { len: 1.8, thick: 0.98 }),
       ...side(['foot'], { len: 1.2, thick: 1.0 }),
     },
   },
@@ -110,7 +110,9 @@ export function buildCharacter(c: Character): Retargeted {
   let prims = anat.prims;
   if (c.face) {
     // Robin's eyes sit at y 2.994, cornea z ≈ 0.14, 11.35 cm apart (head scale 1.32).
-    prims = prims.filter((q) => q.bone !== 'head');
+    prims = prims.filter((q) => q.bone !== 'head' || (q.kind === 'hair' && !c.face!.hair));
+    // The kept hair cap must still cover the new (slightly bigger) skull.
+    for (const q of prims) if (q.kind === 'hair' && q.r) q.r = [q.r[0] * 1.08, q.r[1] * 1.06, q.r[2] * 1.1];
     buildFaceHead(c.face, [0, 2.994, 0.14], 0.1135, prims);
   }
   if (c.hoodie) {

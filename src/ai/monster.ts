@@ -27,6 +27,7 @@ import { Creature, type CreatureMode } from './creature.ts';
 import { ImageBody, type MonsterImage } from './monsterImage.ts';
 import { RobinBody, type RobinTemplate, type Species } from './robinBody.ts';
 import { getEdge } from '../gen/grid.ts';
+import { DOOR_WIDTH } from '../gen/config.ts';
 
 export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search' | 'attack' | 'roar' | 'charge' | 'stunned';
 
@@ -75,7 +76,7 @@ export const DEFAULT_TUNING: MonsterTuning = {
  */
 export const SPECIES_TUNING: Record<Species, MonsterTuning> = {
   robin: DEFAULT_TUNING,
-  leo: { walkSpeed: 0.95, chaseSpeed: 6.4, chaseRamp: 0, sightRange: 10, fov: 0.85, catchDistance: 1.6, memory: 1, searchTime: 9, driftEvery: 16, stalkAfter: 0, ears: 1.6 },
+  leo: { walkSpeed: 0.95, chaseSpeed: 6.4, chaseRamp: 0, sightRange: 10, fov: 0.85, catchDistance: 1.6, memory: 1, searchTime: 9, driftEvery: 16, stalkAfter: 40, ears: 1.6 },
   jovan: { walkSpeed: 0.9, chaseSpeed: 4.6, chaseRamp: 0, sightRange: 22, fov: 1.25, catchDistance: 1.9, memory: 4, searchTime: 10, driftEvery: 14, stalkAfter: 26, ears: 1 },
 };
 
@@ -273,7 +274,7 @@ export class Monster implements Entity {
     this.creature?.update(dt);
     this.image?.update(dt, this.eyeTarget.copy(ctx.player.eye));
     if (this.robin) {
-      this.robin.duck = this.state !== 'attack' && this.needsDuck(ctx) ? 1 : 0;
+      this.robin.duck = this.state !== 'attack' ? this.duckAmount(ctx) : 0;
       this.robin.update(dt, this.eyeTarget.copy(ctx.player.eye));
     }
     if (this.state === 'dormant' || this.state === 'attack') return;
@@ -418,7 +419,16 @@ export class Monster implements Entity {
       const turn = THREE.MathUtils.clamp(ang, -0.55 * dt, 0.55 * dt);
       this.chargeDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), -turn).normalize();
     }
-    const speed = this.tuning.chaseSpeed;
+    let speed = this.tuning.chaseSpeed;
+    // A doorway ahead: if he's roughly lined up he squeezes through the middle (slowing down);
+    // otherwise he runs into the wall beside it.
+    const door = this.doorAhead(ctx, 2.6);
+    if (door && Math.abs(door.offset) < 1.6) {
+      const to = door.centre.clone().sub(this.position).setY(0).normalize();
+      const ang = Math.atan2(this.chargeDir.x * to.z - this.chargeDir.z * to.x, this.chargeDir.dot(to));
+      this.chargeDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), -THREE.MathUtils.clamp(ang, -3 * dt, 3 * dt)).normalize();
+      speed *= THREE.MathUtils.lerp(0.5, 1, Math.min(1, door.dist / 2.6));
+    }
     this.setPose('run');
     if (this.robin) this.robin.speed = speed;
     const next = this.position.clone().addScaledVector(this.chargeDir, speed * dt);
@@ -453,10 +463,50 @@ export class Monster implements Entity {
       return k !== 'void' && k !== 'shaft' && k !== 'stair';
     };
     if (!walk(bx, bz)) return true;
-    const pass = (e: string) => e === 'open' || e === 'door' || e === 'broken';
-    if (bx !== ax && !pass(getEdge(l, ax, az, bx > ax ? 'E' : 'W'))) return true;
-    if (bz !== az && !pass(getEdge(l, bx !== ax ? bx : ax, az, bz > az ? 'S' : 'N'))) return true;
+    // Doors and broken walls only let him through the opening (minus half his body width), not
+    // the wall beside it.
+    const half = DOOR_WIDTH / 2 - 0.4;
+    const pass = (e: string, off: number) => e === 'open' || ((e === 'door' || e === 'broken' || e === 'exit') && Math.abs(off) < half);
+    if (bx !== ax) {
+      const ex = (bx > ax ? ax + 1 : ax) * S;
+      const zc = a.z + ((ahead.z - a.z) * (ex - a.x)) / (ahead.x - a.x || 1e-6);
+      if (!pass(getEdge(l, ax, az, bx > ax ? 'E' : 'W'), zc - (az + 0.5) * S)) return true;
+    }
+    if (bz !== az) {
+      const cx = bx !== ax ? bx : ax;
+      const ez = (bz > az ? az + 1 : az) * S;
+      const xc = a.x + ((ahead.x - a.x) * (ez - a.z)) / (ahead.z - a.z || 1e-6);
+      if (!pass(getEdge(l, cx, az, bz > az ? 'S' : 'N'), xc - (cx + 0.5) * S)) return true;
+    }
     return false;
+  }
+
+  /** The first doorway (door / broken wall / exit) the charge line crosses within `range`. */
+  private doorAhead(ctx: EntityContext, range: number): { centre: THREE.Vector3; offset: number; dist: number } | null {
+    const l = ctx.building.floors[this.floor];
+    if (!l) return null;
+    const S = l.cellSize;
+    let cx = Math.floor(this.position.x / S);
+    let cz = Math.floor(this.position.z / S);
+    const p = new THREE.Vector3();
+    for (let d = 0.2; d <= range; d += 0.2) {
+      p.copy(this.position).addScaledVector(this.chargeDir, d);
+      const nx = Math.floor(p.x / S);
+      const nz = Math.floor(p.z / S);
+      if (nx === cx && nz === cz) continue;
+      const side = nx > cx ? 'E' : nx < cx ? 'W' : nz > cz ? 'S' : 'N';
+      if (cx < 0 || cz < 0 || cx >= l.width || cz >= l.height) return null;
+      const e = getEdge(l, cx, cz, side);
+      if (e === 'door' || e === 'broken' || e === 'exit') {
+        const centre = side === 'E' || side === 'W' ? new THREE.Vector3((side === 'E' ? cx + 1 : cx) * S, this.position.y, (cz + 0.5) * S) : new THREE.Vector3((cx + 0.5) * S, this.position.y, (side === 'S' ? cz + 1 : cz) * S);
+        const offset = side === 'E' || side === 'W' ? p.z - centre.z : p.x - centre.x;
+        return { centre, offset, dist: d };
+      }
+      if (e !== 'open') return null;
+      cx = nx;
+      cz = nz;
+    }
+    return null;
   }
 
   /**
@@ -575,7 +625,8 @@ export class Monster implements Entity {
       return;
     }
     d.divideScalar(len);
-    this.position.addScaledVector(d, Math.min(len, speed * dt));
+    // Squeeze through doorways: slow down in them.
+    this.position.addScaledVector(d, Math.min(len, speed * dt * (1 - 0.4 * (this.robin?.duck ?? 0))));
     this.face(d, dt);
   }
 
@@ -586,23 +637,33 @@ export class Monster implements Entity {
   }
 
   /** Robin is 3.1 m tall: crouch under door lintels (2.6 m) and on stairs. */
-  private needsDuck(ctx: EntityContext): boolean {
+  /**
+   * 0..1: how much to duck. Ramps up from 2.5 m before a doorway (or broken wall / the exit) to
+   * fully ducked 0.7 m from it, so the bend starts in time and eases out after; stairs: always.
+   */
+  private duckAmount(ctx: EntityContext): number {
     const l = ctx.building.floors[this.floor];
-    if (!l) return false;
+    if (!l) return 0;
     const S = l.cellSize;
     const cx = Math.floor(this.position.x / S);
     const cz = Math.floor(this.position.z / S);
-    if (cx < 0 || cz < 0 || cx >= l.width || cz >= l.height) return false;
-    if (l.cells[cz * l.width + cx]!.kind === 'stair') return true;
+    if (cx < 0 || cz < 0 || cx >= l.width || cz >= l.height) return 0;
+    if (l.cells[cz * l.width + cx]!.kind === 'stair') return 1;
     const u = this.position.x - cx * S;
     const v = this.position.z - cz * S;
-    const near = 1.5;
     const door = (side: 'N' | 'E' | 'S' | 'W') => {
       const e = getEdge(l, cx, cz, side);
       return e === 'door' || e === 'broken' || e === 'exit';
     };
-    return (v < near && door('N')) || (S - v < near && door('S')) || (u < near && door('W')) || (S - u < near && door('E'));
+    let d = Infinity;
+    if (door('N')) d = Math.min(d, v);
+    if (door('S')) d = Math.min(d, S - v);
+    if (door('W')) d = Math.min(d, u);
+    if (door('E')) d = Math.min(d, S - u);
+    const fast = this.robin?.speed ?? 0;
+    return 1 - THREE.MathUtils.smoothstep(d, 0.7, 2.5 + 0.3 * fast);
   }
+
 
   dispose() {
     this.robin?.dispose();

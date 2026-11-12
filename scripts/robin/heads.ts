@@ -32,7 +32,8 @@ export interface FaceParams {
   ear: number;
   /** Cranium scale (x, y, z). */
   skull: V3;
-  hair: { vol: V3; centre: V3; front: number; side: number; back: number; mess: number };
+  /** Hair volume; leave out to keep the body's own hair (Robin's sculpted cap). */
+  hair?: { vol: V3; centre: V3; front: number; side: number; back: number; mess: number };
 }
 
 export interface HairClip {
@@ -71,6 +72,25 @@ export const LEO_FACE: FaceParams = {
   ear: 1.0,
   skull: [1.06, 1.0, 1.0],
   hair: { vol: [1.42, 1.56, 1.66], centre: [0, 0.62, -1.24], front: 1.18, side: 0.35, back: -1.25, mess: 0.75 },
+};
+
+export const ROBIN_FACE: FaceParams = {
+  wEye: 2.24,
+  wMouth: 1.75,
+  wJaw: 1.6,
+  browZ: 0.28,
+  browR: 0.15,
+  noseY: -0.65,
+  noseZ: 0.62,
+  noseW: 0.57,
+  mouthY: -0.95,
+  mouthW: 0.86,
+  lips: 1.0,
+  chinY: -1.4,
+  chinZ: 0.15,
+  chinW: 0.8,
+  ear: 1.0,
+  skull: [0.95, 1.0, 1.0],
 };
 
 export const JOVAN_FACE: FaceParams = {
@@ -134,6 +154,7 @@ export function buildFaceHead(f: FaceParams, origin: V3, D: number, prims: Prim[
 
   // Hair: a volume, clipped at the hairline, clumpy.
   const h = f.hair;
+  if (!h) return;
   const clip: HairClip = { origin, D, front: h.front, side: h.side, back: h.back, mess: h.mess };
   push({ kind: 'ell', a: P(h.centre), b: P([h.centre[0], h.centre[1] + 1, h.centre[2]]), ra: 0, rb: 0, r: [h.vol[0] * D, h.vol[1] * D, h.vol[2] * D], k: 0.06 * D, region: 'hair', clip });
 }

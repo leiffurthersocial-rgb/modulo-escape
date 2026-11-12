@@ -261,7 +261,7 @@ for (const size of SIZES) {
 }
 
 describe('KZU naming and floors', () => {
-  it('room numbers carry the floor (E, 1, 2, …); start and exit floors vary', () => {
+  it('room numbers carry the floor (E, 1, 2, …); start on a random upper floor, the exit is always on the ground floor', () => {
     for (const size of SIZES) {
       const startFloors = new Set<number>();
       const exitFloors = new Set<number>();
@@ -277,8 +277,9 @@ describe('KZU naming and floors', () => {
           expect(l.dressing.roomLabels.join('|')).not.toMatch(/C \d\./);
         }
       }
-      expect(startFloors.size, size).toBe(SIZE_CONFIG[size].floors);
-      expect(exitFloors.size, size).toBe(SIZE_CONFIG[size].floors);
+      expect(startFloors.size, size).toBe(SIZE_CONFIG[size].floors - 1);
+      expect(startFloors.has(0), size).toBe(false);
+      expect([...exitFloors], size).toEqual([0]);
     }
   });
 });
@@ -287,9 +288,9 @@ describe('golden seeds', () => {
   // Locks layouts so later phases (props, materials, decals) can't silently change existing seeds.
   // Update deliberately with: GEN_UPDATE_GOLDEN=1 (prints new values).
   const golden: Record<string, string> = {
-    'kzu:small': '0bfdcd6f',
-    'kzu:medium': 'd9bb3291',
-    'abc123:large': 'ef453f77',
+    'kzu:small': 'b95211a1',
+    'kzu:medium': 'f14ecd6f',
+    'abc123:large': '79bbcc93',
   };
   it('layout fingerprints are stable', () => {
     for (const key of Object.keys(golden)) {

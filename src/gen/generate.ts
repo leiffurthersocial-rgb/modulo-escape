@@ -6,7 +6,7 @@
  *  1. place stair flights between adjacent floors (spread apart so each floor must be crossed)
  *  2. per floor: reserve stair / shaft / landing cells, place classrooms and pillared halls,
  *     link rooms + landings (MST + loops), carve corridors with A*, dead-end spurs, assign walls/doors
- *  3. global nav graph (floors + stairs); start on a random floor, exit gate on a random floor
+ *  3. global nav graph (floors + stairs); start on a random upper floor, exit gate on the ground floor
  *     on an outward wall far along the path (over open air above the ground floor);
  *     enforce a minimum path
  *  4. per floor: props, lights, spawn points, dressing (separate RNG sub-streams)
@@ -145,10 +145,11 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
     adj[land]!.push(top);
   }
 
-  // ── start and exit: each on a random floor; the exit far along the path from the start ──
+  // ── start on a random upper floor; the exit always on the ground floor, far along the path
+  // (you have to find your way down) ──
   const pick = streamRng(seed, 'startexit', attempt);
-  const startF = pick.int(0, cfg.floors - 1);
-  const exitF = pick.int(0, cfg.floors - 1);
+  const startF = pick.int(1, cfg.floors - 1);
+  const exitF = 0;
   const free = (f: number, i: number) => {
     const c = works[f]!.cells[i]!;
     return isWalkable(c.kind) && c.kind !== 'stair' && !isLanding(works[f]!, i);

@@ -260,8 +260,20 @@ export function buildLeoAnatomy() {
   }
 
   /** The shirt is burst, ripped and sleeveless; ragged shorts. (Rules in unscaled space.) */
+  // LEO_SHIRT=none (default: bare-chested, shorts only) | torn | full — to compare looks.
+  const shirtStyle = (typeof process !== 'undefined' && process.env.LEO_SHIRT) || 'none';
   const cloth: ClothFn = (p0, b, h) => {
     const [x, y, z]: V3 = [p0[0] / S, p0[1] / S, p0[2] / S];
+    if (shirtStyle !== 'torn') {
+      const torso = b === 'chest' || b === 'spine2' || b.startsWith('clavicle') || b === 'spine1' || b === 'neck1';
+      const neck = Math.hypot(x, (z + 0.02) * 1.1) < 0.24 && y > 1.98;
+      const waist = 1.15 + 0.02 * h.noise(x * 15, 0, z * 15);
+      if (shirtStyle === 'full' && torso && y > HEM_Y - 0.02) return neck ? 'skin' : 'shirt';
+      if (shirtStyle === 'full' && b.startsWith('upperarm')) return h.along(b, p0) < 0.45 ? 'shirt' : 'skin';
+      if (b === 'hips' || (b === 'spine1' && y < waist)) return y < waist ? 'pants' : 'skin';
+      if (b.startsWith('thigh')) return h.along(b, p0) < 0.48 + 0.1 * h.fbm(x * 18, y * 7, z * 18, 2) ? 'pants' : 'skin';
+      return 'skin';
+    }
     const torso = b === 'chest' || b === 'spine2' || b.startsWith('clavicle') || b === 'spine1' || b === 'neck1';
     const hole = h.fbm(x * 3.2 + 3, y * 3.2, z * 3.2 + 7, 3) > 0.12;
     const rip = z > 0.12 && y > 1.42 && Math.abs(x - 0.06 - 0.05 * Math.sin(y * 12)) < 0.05 + 0.12 * (y - 1.42);

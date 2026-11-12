@@ -1,12 +1,13 @@
 {
  "character": "robin",
  "hemY": 1.97,
+ "shoeY": -1,
  "eyeY": 2.99444,
  "eyeHalf": 0.05676,
  "eyeZ": 0,
  "collarY": 2.49,
  "shirtHalfWidth": 0.3,
  "hipsY": 1.55,
- "height": 3.2426000000000004,
+ "height": 3.2499919999999998,
  "shirt": true
 }

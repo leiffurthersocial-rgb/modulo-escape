@@ -142,7 +142,7 @@ export class Game {
     }
     this.computeNearStairs();
 
-    // The exit is on a random floor; above the ground floor the gate opens straight onto the night.
+    // The exit is always on the ground floor (opening onto the night outside).
     const exitLevel = building.floors[building.exit.floor]!;
     this.gateMat = assets.kit.get('metal')!.clone();
     this.gateMat.color.set(0xc08070);
@@ -648,7 +648,7 @@ export class Game {
     this.env.fog.color.copy(ind.fogColor).multiplyScalar(0.3).lerp(out.fogColor, sky);
     this.env.fog.density = THREE.MathUtils.lerp(0.03, out.fogDensity, sky);
 
-    for (const e of this.entities.entities.values()) e.object.visible = Math.abs(e.floor - this.player.floor) <= 1;
+    for (const x of this.monsters) x.m.object.visible = x.active && Math.abs(x.m.floor - this.player.floor) <= 1;
     const cfw = this.player.camera.getWorldDirection(this.tmpV);
     this.audio.updateListener(cam, cfw, this.player.floor);
     this.renderer.info.reset();

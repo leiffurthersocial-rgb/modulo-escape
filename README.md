@@ -3,7 +3,7 @@
 A first-person horror game in the browser. It's night, and you're trapped inside an abandoned,
 procedurally generated KZU school building: several floors of raw-concrete corridors,
 classrooms, halls and stairwells. Flickering fluorescent tubes light the way. You wake up on a
-random floor; the only way out is a gate on a random floor. Find it before Robin finds you.
+random upper floor; the only way out is a gate on the ground floor. Find it before Robin finds you.
 
 Three.js + Rapier + Vite + TypeScript. Runs on desktop and iPad (touch controls, battery-saver preset).
 
@@ -33,8 +33,8 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
 - **Building:**
   - Seeded generator (`src/gen`): 2–4 floors joined by U-shaped stairwells (two half flights
     with a landing between them).
-  - Start and exit are each on a random floor. An exit above the ground floor opens straight
-    onto the night.
+  - You start on a random upper floor; the exit gate is always on the ground floor, far along
+    the path, so you have to find your way down.
   - Corridors form loops so you can circle away from the monster, with only a few deliberate dead
     ends.
   - Classrooms have a blackboard, a teacher's desk and rows of desks; small rooms are offices or
@@ -50,15 +50,14 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
     stalks back, appearing a few rooms away out of your sight.
   - **Movement:** it ducks under doors and screams when it's near.
   - **Getting caught:** ends in a jump scare.
-- **Leo** (wakes after ~18 s): a hulking, heavily muscled brute with his own sculpt: V-shaped torso, abs, a hump of
-  muscle, a small head, arms as long as he is tall with huge fists, short bowed legs, a burst
-  T-shirt and ragged shorts. He walks on his knuckles like a gorilla and gallops on all fours when
+- **Leo** (wakes after ~18 s): a hulking, heavily muscled brute with his own sculpt, bare-chested: V-shaped torso, abs, a hump of
+  muscle, a small head, arms as long as he is tall with huge fists, short bowed legs and ragged shorts. He walks on his knuckles like a gorilla and gallops on all fours when
   he charges. He hears best of all three. When he spots you he rears up, roars and pounds his
   chest, then charges in a straight line much faster than you can run, but he can barely steer:
   dodge round a corner and he slams into the wall and staggers, clutching his head, for a couple
   of seconds. Up close he hammers both fists down. You feel his stomps (camera shake) before you
   see him.
-- **Jovan** (wakes after ~30 s): so tall (≈ 4.4 m, gaunt, black hollow eyes, in a ripped black shirt) that he walks
+- **Jovan** (wakes after ~30 s): so tall (≈ 4.8 m, gaunt, black hollow eyes, in a ripped black shirt) that he walks
   stooped with his palms pressed flat against the ceiling, hand over hand. He sees furthest, and he only moves while you're not looking at him: keep him on
   screen and he freezes; look away (or look back with Q) and he comes, fast and almost silent.
   You hear his head dragging along the ceiling, and lights stutter around him.
