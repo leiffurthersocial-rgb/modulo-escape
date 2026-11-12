@@ -21,7 +21,8 @@ const CH = CHARACTERS[CHAR];
 if (!CH) throw new Error(`unknown character ${CHAR}`);
 const OUT = `public/assets/monster/${CHAR}_body.glb`;
 
-const { bones, prims, toOrig, girth } = buildCharacter(CH);
+const RT = buildCharacter(CH);
+const { bones, prims, toOrig, girth } = RT;
 const boneIndex = new Map(bones.map((b, i) => [b.name, i]));
 // Cloth rules, hairline and noise are evaluated in Robin's (authored) space.
 const orig = buildAnatomy();
@@ -176,8 +177,16 @@ const smax = (a: number, b: number, k: number) => -smin(-a, -b, k);
 /** Cloth/hair/nail region for a point given its dominant primitive. */
 function regionAt(px: number, py: number, pz: number, q: P): Region {
   if (q.region) return q.region;
+  if (RT.cloth) return RT.cloth([px, py, pz], q.src.bone, clothHelpers);
   const [x, y, z] = q.back([px, py, pz]);
   const r = clothRule(x, y, z, q.src.bone);
+  if (CH.longSleeves && q.src.bone.startsWith('upperarm')) return 'shirt';
+  if (CH.longSleeves && q.src.bone.startsWith('forearm')) {
+    const a = bonePos.get(q.src.bone)!;
+    const c = childOf.get(q.src.bone)!;
+    const t = ((x - a[0]) * (c[0] - a[0]) + (y - a[1]) * (c[1] - a[1]) + (z - a[2]) * (c[2] - a[2])) / ((c[0] - a[0]) ** 2 + (c[1] - a[1]) ** 2 + (c[2] - a[2]) ** 2);
+    return t < 0.88 + 0.05 * noise(x * 40, y * 40, z * 40) ? 'shirt' : 'skin';
+  }
   if (r === 'shirt' && !CH.shirt) return 'skin';
   if (r === 'pants' && CH.pants === 'short' && q.src.bone.startsWith('thigh')) {
     const a = bonePos.get(q.src.bone)!;
@@ -188,6 +197,19 @@ function regionAt(px: number, py: number, pz: number, q: P): Region {
   if (r === 'pants' && CH.pants === 'short' && q.src.bone.startsWith('shin')) return 'skin';
   return r;
 }
+
+const ownChild = new Map<string, V3>();
+for (const b of bones) if (b.parent && !ownChild.has(b.parent)) ownChild.set(b.parent, b.pos);
+const clothHelpers = {
+  noise,
+  fbm,
+  along: (bn: string, p: V3) => {
+    const a = bones.find((b) => b.name === bn)!.pos;
+    const c = ownChild.get(bn)!;
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    return ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy + (p[2] - a[2]) * vz) / (vx * vx + vy * vy + vz * vz);
+  },
+};
 
 /** Robin's clothing rules (in his space). */
 function clothRule(x: number, y: number, z: number, b: string): Region {
@@ -572,8 +594,9 @@ await io.write(OUT, doc);
   const chestThick = typeof cs === 'number' ? cs : cs[0];
   const eyeY0 = 2.84 + (2.957 - 2.84) * HEAD_SCALE;
   const top = Math.max(...P.map((q) => q.max[1])) - 0.02;
-  const meta = {
+  const meta = RT.meta ? { character: CHAR, ...RT.meta, hipsY: bones.find((b) => b.name === 'hips')!.pos[1], height: top, shirt: CH.shirt } : {
     character: CHAR,
+    hemY: RT.hemY,
     eyeY: head[1] + (eyeY0 - headO[1]) * headThick,
     eyeHalf: 0.043 * HEAD_SCALE * headThick,
     eyeZ: head[2],

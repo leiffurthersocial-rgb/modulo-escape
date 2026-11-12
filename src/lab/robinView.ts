@@ -79,6 +79,11 @@ const setMode = (m: RobinMode) => {
 };
 for (const m of ['idle', 'walk', 'run', 'attack'] as RobinMode[]) button(m, () => setMode(m));
 button('scream', () => body.scream());
+for (const a of ['roar', 'stunned'] as const)
+  button(a, () => {
+    body.act = a;
+    setTimeout(() => (body.act = 'none'), a === 'roar' ? 1200 : 2400);
+  });
 const duckB = button('duck', () => {
   body.duck = body.duck > 0.5 ? 0 : 1;
   duckB.classList.toggle('on', body.duck > 0.5);
@@ -113,6 +118,7 @@ loop();
   camera,
   controls,
   setMode,
+  setAct: (a: 'none' | 'roar' | 'stunned') => (body.act = a),
   /** Advance the animation deterministically and render once. */
   step(t: number, n = 30) {
     for (let i = 0; i < n && !q.get('rest'); i++) {

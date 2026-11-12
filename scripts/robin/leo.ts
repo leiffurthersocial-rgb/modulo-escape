@@ -1,0 +1,261 @@
+/**
+ * Leo's anatomy: his own sculpt on the shared 53-bone skeleton (same bone names as anatomy.ts, so
+ * the animation rig drives him too). A hulking brute: barrel chest and gut, a hump of trapezius
+ * with the small head sunk forward in front of it, boulder shoulders, arms nearly as long as he is
+ * tall with enormous forearms and fists (he walks on his knuckles), short thick bowed legs and wide
+ * feet. Wears what's left of a T-shirt (burst at the back, torn open at the chest, sleeves gone)
+ * and ragged shorts.
+ */
+import type { BoneDef, Prim, Region, V3 } from './anatomy.ts';
+
+/** Overall scale of the sculpt below. */
+export const LEO_SCALE = 1.08;
+
+export interface ClothHelpers {
+  noise: (x: number, y: number, z: number) => number;
+  fbm: (x: number, y: number, z: number, o?: number) => number;
+  /** Position along a bone (0 at its joint, 1 at its first child). */
+  along: (bone: string, p: V3) => number;
+}
+export type ClothFn = (p: V3, bone: string, h: ClothHelpers) => Region;
+
+const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul = (a: V3, s: number): V3 => [a[0] * s, a[1] * s, a[2] * s];
+const norm = (a: V3): V3 => {
+  const l = Math.hypot(a[0], a[1], a[2]) || 1;
+  return [a[0] / l, a[1] / l, a[2] / l];
+};
+const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const rot = (v: V3, k: V3, t: number): V3 => {
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const kv = cross(k, v);
+  const d = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
+  return [v[0] * c + kv[0] * s + k[0] * d * (1 - c), v[1] * c + kv[1] * s + k[1] * d * (1 - c), v[2] * c + kv[2] * s + k[2] * d * (1 - c)];
+};
+
+/** Eye line and half eye distance (unscaled), for the face photo. */
+const EYE_Y = 2.49;
+const EYE_HALF = 0.05;
+const HEM_Y = 1.2;
+
+export function buildLeoAnatomy() {
+  const bones: BoneDef[] = [];
+  const prims: Prim[] = [];
+  const bone = (name: string, parent: string | null, pos: V3) => bones.push({ name, parent, pos });
+  const cone = (bn: string, a: V3, ra: number, b: V3, rb: number, k: number, region?: Region) => prims.push({ kind: 'cone', a, b, ra, rb, k, bone: bn, region });
+  const sphere = (bn: string, c: V3, r: number, k: number, region?: Region) => prims.push({ kind: 'cone', a: c, b: c, ra: r, rb: r, k, bone: bn, region });
+  const ell = (bn: string, c: V3, r: V3, k: number, axisTo?: V3, region?: Region) => prims.push({ kind: 'ell', a: c, b: axisTo ?? add(c, [0, 1, 0]), ra: 0, rb: 0, r, k, bone: bn, region });
+  const carve = (bn: string, c: V3, r: V3, k: number) => prims.push({ kind: 'ell', a: c, b: add(c, [0, 1, 0]), ra: 0, rb: 0, r, k, sub: true, bone: bn });
+
+  // ── spine, neck, head ──
+  bone('hips', null, [0, 1.0, 0]);
+  bone('spine1', 'hips', [0, 1.2, -0.01]);
+  bone('spine2', 'spine1', [0, 1.47, -0.03]);
+  bone('chest', 'spine2', [0, 1.76, -0.04]);
+  bone('neck1', 'chest', [0, 2.08, 0.0]);
+  bone('neck2', 'neck1', [0, 2.22, 0.08]);
+  bone('head', 'neck2', [0, 2.34, 0.15]);
+
+  // Pelvis, glutes, gut, obliques, a faint six-pack under the fat.
+  ell('hips', [0, 1.0, -0.02], [0.34, 0.2, 0.25], 0.08);
+  for (const s of [1, -1]) ell('hips', [s * 0.15, 0.95, -0.14], [0.17, 0.17, 0.14], 0.06);
+  ell('spine1', [0, 1.27, 0.04], [0.36, 0.28, 0.3], 0.1);
+  for (const s of [1, -1]) ell('spine1', [s * 0.3, 1.3, 0], [0.12, 0.2, 0.16], 0.08);
+  // Ribcage, pecs, lats, back hump, trapezius.
+  ell('chest', [0, 1.74, -0.03], [0.44, 0.36, 0.33], 0.1);
+  ell('chest', [0, 1.92, -0.2], [0.36, 0.25, 0.18], 0.1);
+  ell('chest', [0, 2.07, -0.1], [0.36, 0.17, 0.24], 0.1);
+  ell('chest', [0, 1.6, -0.25], [0.3, 0.25, 0.1], 0.08);
+  for (const s of [1, -1]) {
+    ell('chest', [s * 0.19, 1.87, 0.19], [0.24, 0.12, 0.11], 0.12);
+    ell('chest', [s * 0.34, 1.66, -0.12], [0.15, 0.3, 0.2], 0.08, [s * 0.45, 1.95, -0.08]);
+    cone('chest', [0, 2.18, -0.06], 0.15, [s * 0.52, 2.1, -0.05], 0.13, 0.08);
+    cone(`clavicle${s === 1 ? 'L' : 'R'}`, [s * 0.12, 2.06, 0.08], 0.09, [s * 0.55, 2.1, 0.0], 0.1, 0.07);
+  }
+  // Spine furrow between the back muscles.
+  carve('chest', [0, 1.7, -0.37], [0.035, 0.3, 0.04], 0.06);
+  // Neck: short and thick, the head pushed forward of it.
+  cone('neck1', [0, 1.98, -0.02], 0.2, [0, 2.24, 0.1], 0.15, 0.08);
+  cone('neck2', [0, 2.22, 0.1], 0.15, [0, 2.36, 0.17], 0.12, 0.06);
+  // Head: low skull, heavy brow, wide jaw, broad flat nose, small ears.
+  ell('head', [0, 2.5, 0.13], [0.135, 0.15, 0.15], 0.04);
+  cone('head', [-0.09, 2.535, 0.255], 0.036, [0.09, 2.535, 0.255], 0.036, 0.03);
+  cone('head', [0, 2.42, 0.12], 0.12, [0, 2.37, 0.22], 0.085, 0.05);
+  sphere('head', [0, 2.355, 0.25], 0.045, 0.03);
+  for (const s of [1, -1]) {
+    sphere('head', [s * 0.075, 2.45, 0.22], 0.05, 0.04);
+    sphere('head', [s * 0.1, 2.4, 0.14], 0.05, 0.04);
+    carve('head', [s * EYE_HALF, EYE_Y, 0.278], [0.03, 0.022, 0.02], 0.02);
+    ell('head', [s * 0.135, 2.48, 0.12], [0.015, 0.035, 0.025], 0.015);
+    sphere('head', [s * 0.022, 2.452, 0.3], 0.016, 0.012);
+  }
+  cone('head', [0, 2.505, 0.272], 0.017, [0, 2.455, 0.3], 0.028, 0.02);
+  ell('head', [0, 2.405, 0.268], [0.048, 0.015, 0.017], 0.02);
+
+  // ── arms: boulder shoulders, huge forearms, fists ──
+  for (const [s, side] of [
+    [1, 'L'],
+    [-1, 'R'],
+  ] as const) {
+    const X = (v: V3): V3 => [s * v[0], v[1], v[2]];
+    const shoulder = X([0.6, 2.08, -0.02]);
+    const u: V3 = norm(X([0.5, -0.866, 0])); // rest: hanging 30° out (as the shared rig expects)
+    const elbow = add(shoulder, mul(u, 0.8));
+    const wrist = add(elbow, mul(u, 0.78));
+    bone(`clavicle${side}`, 'chest', X([0.12, 2.08, 0.06]));
+    bone(`upperarm${side}`, `clavicle${side}`, shoulder);
+    bone(`forearm${side}`, `upperarm${side}`, elbow);
+    bone(`hand${side}`, `forearm${side}`, wrist);
+    ell(`upperarm${side}`, X([0.62, 2.07, 0]), [0.2, 0.21, 0.21], 0.07);
+    cone(`upperarm${side}`, shoulder, 0.17, elbow, 0.13, 0.05);
+    ell(`upperarm${side}`, add(add(shoulder, mul(u, 0.42)), [0, 0, 0.06]), [0.15, 0.3, 0.15], 0.06, elbow);
+    ell(`upperarm${side}`, add(add(shoulder, mul(u, 0.38)), [0, 0, -0.07]), [0.14, 0.32, 0.13], 0.06, elbow);
+    sphere(`forearm${side}`, add(elbow, [0, 0, -0.07]), 0.09, 0.05);
+    cone(`forearm${side}`, elbow, 0.15, wrist, 0.115, 0.05);
+    ell(`forearm${side}`, add(elbow, mul(u, 0.27)), [0.23, 0.36, 0.21], 0.08, wrist);
+    ell(`forearm${side}`, add(elbow, mul(u, 0.5)), [0.16, 0.25, 0.14], 0.07, wrist);
+    // Raised veins over the forearm.
+    for (const [dz, ph] of [
+      [0.12, 0],
+      [-0.1, 1.7],
+    ] as const) {
+      let p = add(add(elbow, mul(u, 0.12)), [0, 0, dz]);
+      for (let i = 0; i < 6; i++) {
+        const q = add(add(p, mul(u, 0.1)), [0, 0, -0.012 * Math.sin(i * 1.3 + ph)]);
+        cone(`forearm${side}`, add(p, mul(norm(X([-0.866, -0.5, 0])), -0.05)), 0.011, add(q, mul(norm(X([-0.866, -0.5, 0])), -0.05)), 0.011, 0.012);
+        p = q;
+      }
+    }
+    // Hand: palm faces the thigh (n), fingers spread along ±z. Thick, short fingers; blunt claws.
+    const n: V3 = norm(X([-0.866, -0.5, 0]));
+    const zA: V3 = [0, 0, 1];
+    const handP = prims.length;
+    const handB = bones.length;
+    const palmC = add(wrist, mul(u, 0.1));
+    ell(`hand${side}`, palmC, [0.06, 0.11, 0.11], 0.04, add(palmC, u));
+    const fingers: { name: string; dz: number; len: [number, number, number] }[] = [
+      { name: 'index', dz: 0.075, len: [0.1, 0.072, 0.058] },
+      { name: 'middle', dz: 0.025, len: [0.108, 0.078, 0.062] },
+      { name: 'ring', dz: -0.025, len: [0.102, 0.074, 0.058] },
+      { name: 'pinky', dz: -0.072, len: [0.085, 0.062, 0.05] },
+    ];
+    for (const f of fingers) {
+      const knuckle = add(add(wrist, mul(u, 0.2)), mul(zA, f.dz));
+      let dir = norm(add(u, mul(zA, f.dz * 1.2)));
+      const curlAxis = norm(cross(dir, n));
+      sphere(`hand${side}`, add(knuckle, mul(n, -0.01)), 0.042, 0.02);
+      let p = knuckle;
+      let r = 0.036;
+      for (let j = 0; j < 3; j++) {
+        dir = norm(rot(dir, curlAxis, j === 0 ? 0.1 : 0.2));
+        const bn = `${f.name}${j + 1}${side}`;
+        bone(bn, j === 0 ? `hand${side}` : `${f.name}${j}${side}`, p);
+        const q = add(p, mul(dir, f.len[j]!));
+        const r2 = r * 0.9;
+        cone(bn, p, r, q, r2, 0.012);
+        if (j < 2) sphere(bn, q, r2 * 1.1, 0.01);
+        else cone(bn, add(add(p, mul(dir, f.len[j]! * 0.4)), mul(n, -r2 * 0.75)), r2 * 0.7, add(add(q, mul(dir, 0.022)), mul(n, 0.004)), 0.004, 0.006, 'nail');
+        p = q;
+        r = r2;
+      }
+    }
+    {
+      const base = add(add(wrist, mul(u, 0.05)), add(mul(zA, 0.085), mul(n, 0.03)));
+      let dir = norm(add(add(mul(u, 0.55), mul(zA, 0.75)), mul(n, 0.35)));
+      const lens = [0.085, 0.07, 0.055];
+      let p = base;
+      let r = 0.042;
+      for (let j = 0; j < 3; j++) {
+        const bn = `thumb${j + 1}${side}`;
+        bone(bn, j === 0 ? `hand${side}` : `thumb${j}${side}`, p);
+        dir = norm(rot(dir, norm(cross(dir, n)), 0.15));
+        const q = add(p, mul(dir, lens[j]!));
+        const r2 = r * 0.86;
+        cone(bn, p, r, q, r2, j === 0 ? 0.03 : 0.01);
+        if (j === 2) cone(bn, add(add(p, mul(dir, 0.02)), mul(n, -r2 * 0.7)), r2 * 0.7, add(add(q, mul(dir, 0.02)), mul(n, 0.004)), 0.004, 0.006, 'nail');
+        else sphere(bn, q, r2 * 1.08, 0.01);
+        p = q;
+        r = r2;
+      }
+    }
+    // Big fists: scale the whole hand about the wrist.
+    const HSC = 1.3;
+    const about = (v: V3): V3 => add(wrist, mul(add(v, mul(wrist, -1)), HSC));
+    for (let i = handP; i < prims.length; i++) {
+      const q = prims[i]!;
+      q.a = about(q.a);
+      q.b = about(q.b);
+      q.ra *= HSC;
+      q.rb *= HSC;
+      q.k *= HSC;
+      if (q.r) q.r = mul(q.r, HSC);
+    }
+    for (let i = handB; i < bones.length; i++) bones[i]!.pos = about(bones[i]!.pos);
+  }
+
+  // ── legs: short, thick, bowed; wide feet ──
+  for (const [s, side] of [
+    [1, 'L'],
+    [-1, 'R'],
+  ] as const) {
+    const X = (v: V3): V3 => [s * v[0], v[1], v[2]];
+    const hip = X([0.22, 0.95, 0]);
+    const knee = X([0.28, 0.53, 0.07]);
+    const ankle = X([0.29, 0.13, -0.02]);
+    const ball = X([0.31, 0.04, 0.2]);
+    bone(`thigh${side}`, 'hips', hip);
+    bone(`shin${side}`, `thigh${side}`, knee);
+    bone(`foot${side}`, `shin${side}`, ankle);
+    bone(`toes${side}`, `foot${side}`, ball);
+    cone(`thigh${side}`, hip, 0.21, knee, 0.14, 0.07);
+    ell(`thigh${side}`, X([0.27, 0.76, 0.08]), [0.17, 0.24, 0.15], 0.07, knee);
+    ell(`thigh${side}`, X([0.15, 0.8, 0]), [0.1, 0.2, 0.12], 0.07);
+    ell(`shin${side}`, add(knee, [0, 0, 0.1]), [0.07, 0.07, 0.04], 0.04);
+    cone(`shin${side}`, knee, 0.13, ankle, 0.085, 0.06);
+    ell(`shin${side}`, X([0.29, 0.38, -0.07]), [0.14, 0.2, 0.13], 0.07, ankle);
+    sphere(`shin${side}`, X([0.34, 0.12, -0.02]), 0.04, 0.03);
+    sphere(`shin${side}`, X([0.24, 0.13, -0.02]), 0.04, 0.03);
+    cone(`foot${side}`, X([0.29, 0.07, -0.1]), 0.07, ball, 0.055, 0.05);
+    ell(`foot${side}`, X([0.3, 0.05, 0.07]), [0.045, 0.14, 0.1], 0.04, ball);
+    [0.24, 0.28, 0.32, 0.36].forEach((x, i) => {
+      const base: V3 = X([x, 0.035, 0.21 - Math.abs(i - 1.2) * 0.02]);
+      const tip = add(base, X([(x - 0.3) * 0.3, -0.005, 0.07]));
+      cone(`toes${side}`, base, 0.03, tip, 0.024, 0.012);
+      cone(`toes${side}`, add(base, [0, 0.015, 0.03]), 0.016, add(tip, [0, 0.008, 0.012]), 0.004, 0.006, 'nail');
+    });
+  }
+
+  // Scale everything.
+  const S = LEO_SCALE;
+  const sc = (v: V3): V3 => [v[0] * S, v[1] * S, v[2] * S];
+  for (const b of bones) b.pos = sc(b.pos);
+  for (const q of prims) {
+    q.a = sc(q.a);
+    q.b = sc(q.b);
+    q.ra *= S;
+    q.rb *= S;
+    q.k *= S;
+    if (q.r) q.r = sc(q.r);
+  }
+
+  /** The shirt is burst, ripped and sleeveless; ragged shorts. (Rules in unscaled space.) */
+  const cloth: ClothFn = (p0, b, h) => {
+    const [x, y, z]: V3 = [p0[0] / S, p0[1] / S, p0[2] / S];
+    const torso = b === 'chest' || b === 'spine2' || b.startsWith('clavicle') || b === 'spine1' || b === 'neck1';
+    const hole = h.fbm(x * 3.2 + 3, y * 3.2, z * 3.2 + 7, 3) > 0.17;
+    const rip = z > 0.12 && y > 1.42 && Math.abs(x - 0.1 - 0.05 * Math.sin(y * 12)) < 0.035 + 0.06 * (y - 1.42);
+    const burst = z < -0.18 && y > 1.38 && Math.abs(x + 0.05 * Math.sin(y * 9)) < 0.05 + 0.16 * (y - 1.38);
+    const torn = hole || rip || burst;
+    const hem = HEM_Y + 0.07 * h.fbm(x * 6, 0, z * 6, 2) + 0.05 * Math.max(0, h.noise(x * 25, 3.3, z * 25));
+    const neck = Math.hypot(x, (z + 0.02) * 1.1) < 0.25 + 0.03 * h.noise(x * 20, 1, z * 20) && y > 1.98;
+    const waist = 1.15 + 0.02 * h.noise(x * 15, 0, z * 15);
+    if (torso && y > hem) return !torn && !neck ? 'shirt' : 'skin';
+    if (b.startsWith('upperarm')) return h.along(b, p0) < 0.1 + 0.08 * h.noise(x * 20, y * 20, z * 20) && !hole ? 'shirt' : 'skin';
+    if (b === 'hips' || (b === 'spine1' && y < waist)) return y < waist ? 'pants' : 'skin';
+    if (b.startsWith('thigh')) return h.along(b, p0) < 0.48 + 0.1 * h.fbm(x * 18, y * 7, z * 18, 2) ? 'pants' : 'skin';
+    return 'skin';
+  };
+  const meta = { eyeY: EYE_Y * S, eyeHalf: EYE_HALF * S, eyeZ: 0.15 * S, collarY: 2.0 * S, shirtHalfWidth: 0.5 * S, hemY: HEM_Y * S };
+  return { bones, prims, cloth, meta };
+}

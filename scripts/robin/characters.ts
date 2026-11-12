@@ -6,7 +6,8 @@
  * Every primitive keeps a map back to Robin's space, so cloth rules, hairline and noise patterns
  * are evaluated where they were authored.
  */
-import { buildAnatomy, type BoneDef, type Prim, type V3 } from './anatomy.ts';
+import { buildAnatomy, CLOTH, type BoneDef, type Prim, type V3 } from './anatomy.ts';
+import { buildLeoAnatomy, type ClothFn } from './leo.ts';
 
 export type CharacterName = 'robin' | 'leo' | 'jovan';
 
@@ -21,6 +22,10 @@ export interface Character {
   /** Clothing: the T-shirt, and trousers ('long' to the shins, 'short' above the knee). */
   shirt: boolean;
   pants: 'long' | 'short';
+  /** Long sleeves down to the wrists. */
+  longSleeves?: boolean;
+  /** A sculpt of its own (same skeleton) instead of re-proportioning Robin. */
+  custom?: 'leo';
 }
 
 const side = (names: string[], s: BoneScale): Record<string, BoneScale> => {
@@ -32,50 +37,33 @@ const fingers = (s: BoneScale) => side(['index1', 'index2', 'index3', 'middle1',
 
 export const CHARACTERS: Record<CharacterName, Character> = {
   robin: { name: 'robin', bones: {}, shirt: true, pants: 'long' },
-  /** Leo: a hulking brute — huge shoulders and forearms, short thick legs, no neck, small head. */
-  leo: {
-    name: 'leo',
-    shirt: false,
-    pants: 'short',
-    bones: {
-      hips: { len: 0.9, thick: [1.9, 1.3, 1.7] },
-      spine1: { len: 0.9, thick: [1.9, 1.0, 1.6] },
-      spine2: { len: 0.95, thick: [2.1, 1.0, 1.75] },
-      chest: { len: 0.9, thick: [2.15, 1.05, 1.85] },
-      neck1: { len: 0.35, thick: 2.5 },
-      neck2: { len: 0.35, thick: 2.3 },
-      head: { len: 1, thick: 1.05 },
-      ...side(['clavicle'], { len: 2.1, thick: 2.2 }),
-      ...side(['upperarm'], { len: 1.1, thick: 2.7 }),
-      ...side(['forearm'], { len: 1.1, thick: 3.0 }),
-      ...side(['hand'], { len: 1.35, thick: 2.3 }),
-      ...fingers({ len: 0.85, thick: 1.9 }),
-      ...side(['thigh'], { len: 0.72, thick: 2.1 }),
-      ...side(['shin'], { len: 0.75, thick: 2.0 }),
-      ...side(['foot'], { len: 1.15, thick: 1.6 }),
-      ...side(['toes'], { len: 1.0, thick: 1.5 }),
-    },
-  },
-  /** Jovan: impossibly tall and thin — his head scrapes the ceiling, arms hang past his knees. */
+  /** Leo: his own sculpt (scripts/robin/leo.ts). */
+  leo: { name: 'leo', bones: {}, shirt: true, pants: 'short', custom: 'leo' },
+  /**
+   * Jovan: impossibly tall and lanky (≈ 4 m standing), so he walks stooped with his palms pressed
+   * flat against the ceiling. Long torso and limbs, narrow but not skeletal, big spidery hands.
+   */
   jovan: {
     name: 'jovan',
     shirt: true,
     pants: 'long',
+    longSleeves: true,
     bones: {
-      hips: { len: 1, thick: 0.92 },
-      spine1: { len: 1.15, thick: 0.9 },
-      spine2: { len: 1.15, thick: 0.9 },
-      chest: { len: 1.12, thick: 0.92 },
-      neck1: { len: 1.25, thick: 0.85 },
-      neck2: { len: 1.25, thick: 0.85 },
-      ...side(['clavicle'], { len: 1.0, thick: 0.9 }),
-      ...side(['upperarm'], { len: 1.3, thick: 0.82 }),
-      ...side(['forearm'], { len: 1.32, thick: 0.8 }),
-      ...side(['hand'], { len: 1.25, thick: 0.9 }),
-      ...fingers({ len: 1.35, thick: 0.85 }),
-      ...side(['thigh'], { len: 1.27, thick: 0.85 }),
-      ...side(['shin'], { len: 1.27, thick: 0.85 }),
-      ...side(['foot'], { len: 1.1, thick: 0.9 }),
+      hips: { len: 1.1, thick: [1.1, 1.0, 1.05] },
+      spine1: { len: 1.2, thick: [1.12, 1, 1.08] },
+      spine2: { len: 1.2, thick: [1.14, 1, 1.1] },
+      chest: { len: 1.12, thick: [1.16, 1, 1.12] },
+      neck1: { len: 1.0, thick: 0.95 },
+      neck2: { len: 1.0, thick: 0.95 },
+      head: { len: 1, thick: 0.97 },
+      ...side(['clavicle'], { len: 1.18, thick: 1.0 }),
+      ...side(['upperarm'], { len: 1.32, thick: 1.1 }),
+      ...side(['forearm'], { len: 1.34, thick: 1.08 }),
+      ...side(['hand'], { len: 1.3, thick: 1.05 }),
+      ...fingers({ len: 1.4, thick: 0.95 }),
+      ...side(['thigh'], { len: 1.32, thick: 1.22 }),
+      ...side(['shin'], { len: 1.34, thick: 1.2 }),
+      ...side(['foot'], { len: 1.15, thick: 1.0 }),
     },
   },
 };
@@ -87,6 +75,12 @@ export interface Retargeted {
   toOrig: ((p: V3) => V3)[];
   /** Per primitive: the bone's thickness scale (average), for displacement amplitudes. */
   girth: number[];
+  /** Own clothing rules (custom sculpts; evaluated in the body's own space). */
+  cloth?: ClothFn;
+  /** Face / shirt / hem placement (custom sculpts). */
+  meta?: { eyeY: number; eyeHalf: number; eyeZ: number; collarY: number; shirtHalfWidth: number; hemY: number };
+  /** Height of Robin's shirt hem on this body. */
+  hemY: number;
 }
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -99,6 +93,11 @@ const norm = (a: V3): V3 => {
 };
 
 export function buildCharacter(c: Character): Retargeted {
+  if (c.custom === 'leo') {
+    const L = buildLeoAnatomy();
+    const id = (p: V3) => p;
+    return { bones: L.bones, prims: L.prims, toOrig: L.prims.map(() => id), girth: L.prims.map(() => 1), cloth: L.cloth, meta: L.meta, hemY: L.meta.hemY };
+  }
   const { bones, prims } = buildAnatomy();
   const byName = new Map(bones.map((b) => [b.name, b]));
   const scale = (n: string) => c.bones[n] ?? {};
@@ -179,5 +178,5 @@ export function buildCharacter(c: Character): Retargeted {
     girth.push(tAvg);
   }
   const outBones = bones.map((b) => ({ ...b, pos: newPos.get(b.name)! }));
-  return { bones: outBones, prims: outPrims, toOrig, girth };
+  return { bones: outBones, prims: outPrims, toOrig, girth, hemY: map('spine1').fwd([0, CLOTH.hemY, 0.1])[1] };
 }

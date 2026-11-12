@@ -211,6 +211,7 @@ export class Monster implements Entity {
   /** Jump scare: stand at `at` facing `look` and attack (the AI stops). */
   lunge(at: THREE.Vector3, look: THREE.Vector3) {
     this.state = 'attack';
+    if (this.robin) this.robin.act = 'none';
     this.path = [];
     this.position.copy(at);
     this.object.position.copy(at);
@@ -244,6 +245,7 @@ export class Monster implements Entity {
     this.state = s;
     this.stateTime = 0;
     this.path = [];
+    if (this.robin) this.robin.act = s === 'roar' ? 'roar' : s === 'stunned' ? 'stunned' : 'none';
   }
 
   update(dt: number, ctx: EntityContext) {

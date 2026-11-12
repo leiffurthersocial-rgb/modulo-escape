@@ -39,12 +39,18 @@ export interface BodyStyle {
   tintAmount: number;
   /** Highest the top of the head may go when not ducking (the ceiling is at 3.6 m). */
   headroom: number;
+  shirtColor: number;
+  pantsColor: number;
+  /** The photo printed on the shirt (Robin's T-shirt). */
+  print: boolean;
+  /** How the arms work while moving: hanging (biped), on the knuckles (Leo), on the ceiling (Jovan). */
+  gait: 'biped' | 'knuckle' | 'ceiling';
 }
 
 export const BODY_STYLES: Record<Species, BodyStyle> = {
-  robin: { idleHunch: 0.45, walkHunch: 0.55, runHunch: 0.35, runLean: 0.55, walkStride: 1.55, runStride: 2.5, armSwing: 0.38, armOut: 0.12, footLift: 0.14, tint: 0x8a9096, tintAmount: 0, headroom: 3.45 },
-  leo: { idleHunch: 0.85, walkHunch: 0.9, runHunch: 0.75, runLean: 0.65, walkStride: 1.9, runStride: 3.3, armSwing: 0.62, armOut: 0.38, footLift: 0.1, tint: 0x6f8a5e, tintAmount: 0.7, headroom: 3.45 },
-  jovan: { idleHunch: 0.2, walkHunch: 0.25, runHunch: 0.2, runLean: 0.25, walkStride: 2.1, runStride: 3.1, armSwing: 0.22, armOut: 0.05, footLift: 0.12, tint: 0xb8bfc4, tintAmount: 0.3, headroom: 3.52 },
+  robin: { idleHunch: 0.45, walkHunch: 0.55, runHunch: 0.35, runLean: 0.55, walkStride: 1.55, runStride: 2.5, armSwing: 0.38, armOut: 0.12, footLift: 0.14, tint: 0x8a9096, tintAmount: 0, headroom: 3.45, shirtColor: 0xc8c5bd, pantsColor: 0x4a4c54, print: true, gait: 'biped' },
+  leo: { idleHunch: 1.0, walkHunch: 1.05, runHunch: 1.15, runLean: 0.5, walkStride: 2.0, runStride: 3.6, armSwing: 0.5, armOut: 0.2, footLift: 0.12, tint: 0x6f8a5e, tintAmount: 0.75, headroom: 3.45, shirtColor: 0x66777c, pantsColor: 0x4a443c, print: false, gait: 'knuckle' },
+  jovan: { idleHunch: 0.2, walkHunch: 0.25, runHunch: 0.3, runLean: 0.3, walkStride: 2.3, runStride: 3.4, armSwing: 0.22, armOut: 0.05, footLift: 0.12, tint: 0xb8bfc4, tintAmount: 0.3, headroom: 3.5, shirtColor: 0x4a4c52, pantsColor: 0x2c2d33, print: false, gait: 'ceiling' },
 };
 
 /** Measured on the sculpt (public/assets/monster/<name>_body.json). */
@@ -55,9 +61,11 @@ export interface BodyMeta {
   shirtHalfWidth: number;
   hipsY: number;
   height: number;
+  /** Where the shirt hem sits (grime collects there). */
+  hemY?: number;
 }
 
-export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=2`;
+export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=3`;
 export const ROBIN_BODY_URL = bodyUrl('robin');
 
 /** Photo layout (pixels in robin.png): eye centres, and where the shirt collar sits. */
@@ -88,7 +96,7 @@ export async function loadBody(species: Species, photo: MonsterImage | null): Pr
   try {
     const [gltf, meta] = await Promise.all([
       new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(bodyUrl(species)),
-      fetch(`/assets/monster/${species}_body.json`).then((r) => r.json() as Promise<BodyMeta>),
+      fetch(`/assets/monster/${species}_body.json?v=3`).then((r) => r.json() as Promise<BodyMeta>),
     ]);
     let mesh: THREE.SkinnedMesh | null = null;
     gltf.scene.traverse((o) => {
@@ -158,6 +166,10 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
     uShirtY: { value: meta?.collarY ?? P.collarY },
     uShirtS: { value: (meta?.shirtHalfWidth ?? P.shirtHalfWidth) / P.shirtHalfWidthPx },
     uTint: { value: new THREE.Color(style.tint) },
+    uShirtCol: { value: new THREE.Color(style.shirtColor) },
+    uPantsCol: { value: new THREE.Color(style.pantsColor) },
+    uPrint: { value: style.print ? 1 : 0 },
+    uHemY: { value: meta?.hemY ?? 1.97 },
     uTintAmt: { value: style.tintAmount },
     uEyeHalf: { value: meta?.eyeHalf ?? P.eyeHalf },
     uSkin: { value: skin },
@@ -208,6 +220,10 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         uniform float uGlow;
         uniform vec3 uTint;
         uniform float uTintAmt;
+        uniform vec3 uShirtCol;
+        uniform vec3 uPantsCol;
+        uniform float uPrint;
+        uniform float uHemY;
         uniform float uEyeHalf;
         uniform float uWarp;
         uniform float uScareTime;
@@ -252,10 +268,10 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
           float mott = rFbm(p * 7.0);
           // Sickly grey-pale on the body, warming to the photo's own tone towards the head so the
           // face doesn't sit on the neck like a mask.
-          float headward = smoothstep(2.45, 2.85, p.y);
+          float headward = smoothstep(uFaceY - 0.55, uFaceY - 0.15, p.y);
           vec3 grey = vec3(dot(uSkin, vec3(0.3, 0.55, 0.15))) * vec3(0.9, 0.95, 0.97);
           vec3 sk = mix(mix(uSkin, grey, 0.5), uSkin * 0.92, headward) * mix(0.68 + 0.4 * mott, 0.9 + 0.15 * mott, headward);
-          sk = mix(sk, uTint * (0.62 + 0.45 * mott), uTintAmt * (1.0 - 0.6 * headward));
+          sk = mix(sk, uTint * (0.62 + 0.45 * mott), uTintAmt * (1.0 - 0.6 * headward * uHasPhoto));
           float vein = pow(1.0 - abs(rNoise(p * vec3(16.0, 5.0, 16.0)) * 2.0 - 1.0), 14.0);
           sk = mix(sk, vec3(0.22, 0.24, 0.36), vein * 0.4);
           sk = mix(sk, vec3(0.32, 0.18, 0.2), smoothstep(0.58, 0.8, rFbm(p * 3.1 + 4.0)) * 0.55);
@@ -263,16 +279,16 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
           sk *= mix(0.65, 1.0, smoothstep(0.1, 1.2, p.y));
           // Shirt: off-white, sweat-yellowed, filthy hem, old blood.
           float dirt = rFbm(p * 5.0 + 9.0);
-          vec3 sh = vec3(0.8, 0.78, 0.72) * (0.72 + 0.35 * dirt);
-          sh = mix(sh, vec3(0.55, 0.46, 0.3), smoothstep(2.15, 1.95, p.y) * 0.6);
+          vec3 sh = uShirtCol * 1.4 * (0.62 + 0.45 * dirt);
+          sh = mix(sh, vec3(0.55, 0.46, 0.3) * 0.7, smoothstep(uHemY + 0.18, uHemY - 0.02, p.y) * 0.6 * (1.0 - smoothstep(0.4, 0.55, abs(p.x))));
           sh = mix(sh, vec3(0.22, 0.05, 0.04), smoothstep(0.62, 0.78, rFbm(p * 4.0 + 2.0)) * 0.85);
           // Print from the photo on the chest.
           vec2 su = shirtUV(p);
           vec4 pr = texture2D(uPhoto, su);
-          float prW = uHasPhoto * inside01(su) * pr.a * smoothstep(0.0, 0.06, p.z) * smoothstep(0.1, 0.5, vRestN.z);
+          float prW = uPrint * uHasPhoto * inside01(su) * pr.a * smoothstep(0.0, 0.06, p.z) * smoothstep(0.1, 0.5, vRestN.z);
           sh = mix(sh, pr.rgb * (0.65 + 0.35 * dirt), prW);
           // Trousers: dark, worn, torn.
-          vec3 pa = vec3(0.07, 0.075, 0.09) * (0.7 + 0.6 * rFbm(p * vec3(9.0, 3.0, 9.0)));
+          vec3 pa = uPantsCol * (0.62 + 0.75 * rFbm(p * vec3(9.0, 3.0, 9.0)));
           vec3 ha = uHair * (0.55 + 0.7 * rNoise(p * vec3(60.0, 18.0, 60.0)));
           vec3 na = vec3(0.32, 0.27, 0.17) * (0.6 + 0.5 * rNoise(p * 120.0));
           vec3 col = sk * skinM + sh * shirt + pa * pants + ha * hairM + na * nail;
@@ -345,7 +361,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         totalEmissiveRadiance += vec3(0.55, 0.62, 0.75) * rim * 0.07;`,
       );
   };
-  mat.customProgramCacheKey = () => 'robin-v5';
+  mat.customProgramCacheKey = () => 'robin-v7';
   return mat;
 }
 
@@ -395,6 +411,10 @@ interface Finger {
 
 interface Arm {
   side: 1 | -1;
+  /** Upper arm / forearm lengths (IK). */
+  a: number;
+  b: number;
+  planted: boolean;
   clav: THREE.Bone;
   upper: THREE.Bone;
   fore: THREE.Bone;
@@ -438,6 +458,14 @@ export class RobinBody {
   private lastTop = 0;
   /** Freeze in place (Jovan while you look at him): no gait, no breathing — only twitches. */
   frozen = false;
+  /** One-off performances the AI asks for (Leo: roar = rear up and pound the chest; stunned). */
+  act: 'none' | 'roar' | 'stunned' = 'none';
+  private actT = 0;
+  private actW = 0;
+  /** 0..1: arms on the ground (Leo) / on the ceiling (Jovan). */
+  private armIK = 0;
+  /** Ceiling height above the feet (Jovan presses his palms against it). */
+  ceiling = 3.6;
 
   constructor(tpl: RobinTemplate) {
     this.species = tpl.species ?? 'robin';
@@ -488,6 +516,9 @@ export class RobinBody {
         swing: { x: 0, v: 0 },
         out: { x: 0, v: 0 },
         elbow: { x: 0.3, v: 0 },
+        a: wp(`upperarm${side}`).distanceTo(wp(`forearm${side}`)),
+        b: wp(`forearm${side}`).distanceTo(wp(`hand${side}`)),
+        planted: true,
       });
     }
   }
@@ -553,6 +584,10 @@ export class RobinBody {
       if (this.screamT > 1.6) this.screamT = -1;
     }
     const scream = this.screamT >= 0 ? Math.sin(Math.min(1, this.screamT / 1.6) * Math.PI) : 0;
+    const act = sc >= 0 ? 'none' : this.act;
+    this.actT = act === 'none' ? 0 : this.actT + dt;
+    this.actW = expTo(this.actW, act === 'none' ? 0 : 1, dt, 8);
+    const leo = this.species === 'leo';
 
     // ── posture targets ──
     const p = this.post;
@@ -565,6 +600,15 @@ export class RobinBody {
       spread: mode === 'attack' ? 1 : scream * 0.6,
     };
     let rateK = 1;
+    if (act === 'roar') Object.assign(tgt, { hunch: -0.15, lean: 0, crouch: 0.12, reach: 0, spread: 0 });
+    if (act === 'stunned') Object.assign(tgt, { hunch: 0.5, lean: 0, crouch: 0.3, reach: 0, spread: 0 });
+    // Leo's slam: rear up with both fists overhead, then bring them down (period 0.9 s).
+    const slamPh = leo && mode === 'attack' && sc < 0 ? (this.attackT % 0.9) / 0.9 : -1;
+    if (slamPh >= 0) {
+      const down = THREE.MathUtils.smoothstep(slamPh, 0.45, 0.58) * (1 - THREE.MathUtils.smoothstep(slamPh, 0.75, 1));
+      Object.assign(tgt, { hunch: THREE.MathUtils.lerp(-0.2, 1.2, down), lean: 0, crouch: 0.1 + 0.15 * down, reach: 0, spread: 0 });
+      rateK = 5;
+    }
     if (sc >= 0) {
       rateK = 6;
       if (sc < hit) Object.assign(tgt, { hunch: 0.85, lean: 0, crouch: 0.28, reach: 0, spread: 0 });
@@ -597,7 +641,9 @@ export class RobinBody {
     const ph2 = this.phase * Math.PI * 4;
     const bob = this.gaitAmp * (-0.03 - 0.03 * p.run) * Math.cos(ph2);
     hips.position.set(this.gaitAmp * 0.025 * Math.sin(this.phase * Math.PI * 2) * (1 - p.run), this.hipsY - (p.crouch + this.stoop * 0.3) * 0.6 * (this.hipsY / 1.55) + bob + Math.sin(this.t * 1.3) * 0.006, -p.lean * 0.05);
-    hips.quaternion.setFromEuler(new THREE.Euler(p.lean * 0.35, this.gaitAmp * 0.1 * Math.sin(this.phase * Math.PI * 2), this.gaitAmp * 0.05 * Math.cos(this.phase * Math.PI * 2)));
+    const dizzy = act === 'stunned' ? this.actW : 0;
+    hips.position.x += dizzy * 0.09 * Math.sin(this.actT * 2.3);
+    hips.quaternion.setFromEuler(new THREE.Euler(p.lean * 0.35, this.gaitAmp * 0.1 * Math.sin(this.phase * Math.PI * 2), this.gaitAmp * 0.05 * Math.cos(this.phase * Math.PI * 2) + dizzy * 0.12 * Math.sin(this.actT * 2.3 + 0.6)));
 
     // Spine: hunch spread over the vertebrae, counter-rotation against the hips, breathing.
     const breath = Math.sin(this.t * (1.1 + p.run * 1.5)) * (0.025 + p.run * 0.03) + scream * 0.12;
@@ -605,7 +651,10 @@ export class RobinBody {
     const counter = -this.gaitAmp * 0.12 * Math.sin(this.phase * Math.PI * 2);
     B('spine1').quaternion.setFromEuler(new THREE.Euler(hunch * 0.22, counter * 0.4, 0));
     B('spine2').quaternion.setFromEuler(new THREE.Euler(hunch * 0.33 - breath * 0.4, counter * 0.4, 0));
-    B('chest').quaternion.setFromEuler(new THREE.Euler(hunch * 0.45 - breath - scream * 0.25, counter * 0.4, Math.sin(this.t * 0.37) * 0.04));
+    // Galloping on his knuckles, Leo's back rocks; roaring, he arches back.
+    const rock = st.gait === 'knuckle' ? this.gaitAmp * p.run * 0.16 * Math.sin(this.phase * Math.PI * 2 + 0.8) : 0;
+    const arch = act === 'roar' ? this.actW * 0.3 : 0;
+    B('chest').quaternion.setFromEuler(new THREE.Euler(hunch * 0.45 - breath - scream * 0.25 + rock - arch, counter * 0.4, Math.sin(this.t * 0.37) * 0.04 - dizzy * 0.1 * Math.sin(this.actT * 2.3)));
     B('neck1').quaternion.setFromEuler(new THREE.Euler(p.hunch * 0.25, 0, 0));
 
     // ── arms ──
@@ -630,7 +679,11 @@ export class RobinBody {
       const splay = Math.max(p.reach * (1 - grab), p.spread * 0.6, scream * 0.8);
       arm.fingers.forEach((f, fi) => {
         const tw = Math.max(0, Math.sin(this.t * (3.1 + fi * 0.7) + s * 2 + fi)) ** 6 * 0.35;
-        const curl = 0.25 + tw - splay * 0.35 + grab * 1.0;
+        let curl = 0.25 + tw - splay * 0.35 + grab * 1.0;
+        // Fist for the knuckles (and Leo's roar), flat palm against the ceiling.
+        const fist = st.gait === 'knuckle' ? Math.max(this.armIK, this.actW, slamPh >= 0 ? 1 : 0) : 0;
+        if (fist > 0) curl = THREE.MathUtils.lerp(curl, f.thumb ? 0.7 : 1.45, fist);
+        if (st.gait === 'ceiling') curl = THREE.MathUtils.lerp(curl, -0.06 + tw * 0.4, this.armIK);
         const spreadA = (fi - 2) * 0.09 * splay * s;
         f.bones.forEach((b, j) => {
           b.quaternion.setFromAxisAngle(f.axis, curl * (j === 0 ? 0.6 : 1) * (f.thumb ? 0.5 : 1));
@@ -640,10 +693,15 @@ export class RobinBody {
     }
 
     this.object.updateMatrixWorld(true);
+    if (leo && (this.actW > 0.001 || slamPh >= 0)) {
+      this.leoActArms(act, slamPh);
+      this.object.updateMatrixWorld(true);
+    }
     // ── legs (IK) ──
     const objQ = this.object.getWorldQuaternion(new THREE.Quaternion());
     for (const leg of this.legs) {
-      const lp = (this.phase + leg.phaseOffset) % 1;
+      const off = st.gait === 'knuckle' ? (leg.side === 1 ? 0 : THREE.MathUtils.lerp(0.5, 0.12, p.run)) : leg.phaseOffset;
+      const lp = (this.phase + off) % 1;
       let z: number;
       let lift = 0;
       let footPitch: number;
@@ -676,6 +734,13 @@ export class RobinBody {
       leg.toes.quaternion.setFromAxisAngle(X, footPitch < 0 ? footPitch * 0.9 : 0);
       leg.foot.updateMatrixWorld(true);
     }
+
+    // ── arms on the ground (Leo) / pressed against the ceiling (Jovan) ──
+    let ikW = 0;
+    if (st.gait === 'knuckle') ikW = mode === 'attack' || act !== 'none' || sc >= 0 ? 0 : 1;
+    if (st.gait === 'ceiling') ikW = mode === 'attack' || sc >= 0 || p.duck > 0.3 ? 0 : 1;
+    this.armIK = expTo(this.armIK, ikW, dt, 6);
+    if (this.armIK > 0.002) this.armsIK(stride, beta, objQ, p.run);
 
     // ── head: tilt, twitch, look at the target ──
     this.nextTwitch -= realDt;
@@ -718,6 +783,147 @@ export class RobinBody {
     head.quaternion.copy(fkWorld.invert()).multiply(this.headLook).multiply(extra);
     head.updateMatrixWorld(true);
     this.lastTop = this.headTop();
+  }
+
+  /**
+   * Leo's performances, posed over the FK arms (weight actW):
+   *   roar     — fists up in a double flex, then pounding his chest, alternating
+   *   stunned  — one hand clutching his head, the other arm hanging limp
+   *   slam     — (attack) both fists high overhead, then hammered down
+   */
+  private leoActArms(act: 'none' | 'roar' | 'stunned', slamPh: number) {
+    const t = this.actT;
+    for (const arm of this.arms) {
+      const s = arm.side;
+      let pitch: number;
+      let out: number;
+      let elbow: number;
+      let w = this.actW;
+      if (slamPh >= 0) {
+        const down = THREE.MathUtils.smoothstep(slamPh, 0.45, 0.58) * (1 - THREE.MathUtils.smoothstep(slamPh, 0.75, 1));
+        pitch = THREE.MathUtils.lerp(-2.9, -0.55, down);
+        out = 0.25;
+        elbow = THREE.MathUtils.lerp(0.9, 0.15, down);
+        w = 1;
+      } else if (act === 'roar') {
+        const flex = 1 - THREE.MathUtils.smoothstep(t, 0.3, 0.45);
+        const beat = Math.max(0, Math.sin(t * 21 + (s === 1 ? 0 : Math.PI)));
+        pitch = THREE.MathUtils.lerp(-0.5 - 0.25 * beat, -0.3, flex);
+        out = THREE.MathUtils.lerp(-0.2 + 0.25 * beat, 1.5, flex);
+        elbow = THREE.MathUtils.lerp(2.25 + 0.2 * beat, 2.1, flex);
+      } else {
+        // Stunned: left hand to the head, right arm limp.
+        pitch = s === 1 ? -1.35 : 0.15 + 0.1 * Math.sin(t * 2.3);
+        out = s === 1 ? 0.65 : 0.3;
+        elbow = s === 1 ? 2.35 : 0.12;
+      }
+      _q.setFromEuler(new THREE.Euler(pitch, 0, s * (out - 0.35)));
+      arm.upper.quaternion.slerp(_q, w);
+      _q.setFromAxisAngle(_v.set(0.5 * s, -0.866, 0).cross(Z).normalize(), elbow);
+      arm.fore.quaternion.slerp(_q, w);
+      // Fists placed by IK: pounding the chest (roar), clutching the head (stunned, left hand).
+      const beatIK = act === 'roar' ? THREE.MathUtils.smoothstep(t, 0.3, 0.45) : act === 'stunned' && s === 1 ? 1 : 0;
+      if (beatIK > 0 && slamPh < 0) {
+        arm.upper.updateMatrixWorld(true);
+        const objQ = this.object.getWorldQuaternion(new THREE.Quaternion());
+        let target: THREE.Vector3;
+        if (act === 'roar') {
+          const beat = Math.max(0, Math.sin(t * 19 + (s === 1 ? 0 : Math.PI)));
+          const chest = this.bones.get('chest')!.getWorldPosition(new THREE.Vector3());
+          target = chest.add(_v.set(s * 0.2, 0.12, 0.95 - 0.4 * beat).applyQuaternion(objQ));
+        } else {
+          const head = this.head.getWorldPosition(new THREE.Vector3());
+          target = head.add(_v.set(s * 0.3, 0.12, -0.05).applyQuaternion(objQ));
+        }
+        const fkU = arm.upper.quaternion.clone();
+        const fkF = arm.fore.quaternion.clone();
+        this.solveArm(arm, target, _v3.set(s, -0.7, -0.4).applyQuaternion(objQ).normalize());
+        arm.upper.quaternion.copy(fkU.slerp(arm.upper.quaternion, beatIK * w));
+        arm.fore.quaternion.copy(fkF.slerp(arm.fore.quaternion, beatIK * w));
+      }
+      arm.upper.updateMatrixWorld(true);
+    }
+  }
+
+  /** Arms as legs (Leo's knuckles) or hands walking along the ceiling (Jovan), blended by armIK. */
+  private armsIK(stride: number, beta: number, objQ: THREE.Quaternion, run: number) {
+    const st = this.style;
+    const knuckle = st.gait === 'knuckle';
+    const w = this.armIK;
+    for (const arm of this.arms) {
+      const s = arm.side;
+      // Gait phase: Leo walks like a gorilla (each hand with the opposite leg, a little later) and
+      // gallops with both hands together; Jovan's hands go with the opposite leg.
+      const off = knuckle ? (s === 1 ? THREE.MathUtils.lerp(0.6, 0.5, run) : THREE.MathUtils.lerp(0.1, 0.6, run)) : s === 1 ? 0.5 : 0;
+      const lp = (this.phase + off) % 1;
+      const half = stride * 0.5;
+      let z: number;
+      let lift = 0;
+      if (lp < beta) {
+        z = THREE.MathUtils.lerp(beta * half, -beta * half, lp / beta);
+        if (!arm.planted) {
+          arm.planted = true;
+          if (knuckle && this.gaitAmp > 0.3) this.onStep(arm.hand.getWorldPosition(new THREE.Vector3()), 0.35 + run * 0.4);
+        }
+      } else {
+        const u = (lp - beta) / (1 - beta);
+        z = THREE.MathUtils.lerp(-beta * half, beta * half, (1 - Math.cos(u * Math.PI)) / 2);
+        lift = Math.sin(u * Math.PI) * (knuckle ? 0.18 + run * 0.15 : 0.12);
+        arm.planted = false;
+      }
+      z *= this.gaitAmp;
+      lift *= this.gaitAmp;
+      const sh = this.object.worldToLocal(arm.upper.getWorldPosition(_v2));
+      const local = knuckle
+        ? _v.set(sh.x + s * 0.12, 0.2 + lift, sh.z + 0.45 + z)
+        : _v.set(sh.x + s * 0.22, this.ceiling - 0.07 - lift, sh.z + 0.3 + z * 0.8 + 0.05 * Math.sin(this.t * 0.7 + s));
+      // Out of reach: pull the target in towards the shoulder.
+      const reach = (arm.a + arm.b) * 0.985;
+      const d = local.distanceTo(sh);
+      if (d > reach) local.lerp(sh, 1 - reach / d);
+      const target = this.object.localToWorld(local.clone());
+      const pole = knuckle ? _v3.set(s * 0.5, -0.2, -1) : _v3.set(s * 1, -0.5, -0.2);
+      pole.applyQuaternion(objQ).normalize();
+      const fkU = arm.upper.quaternion.clone();
+      const fkF = arm.fore.quaternion.clone();
+      const fkH = arm.hand.quaternion.clone();
+      this.solveArm(arm, target, pole);
+      // Hand: knuckles down, palm facing back (Leo); palm flat up against the ceiling (Jovan).
+      const uT = knuckle ? _v.set(0, -1, 0.12).normalize() : _v.set(s * 0.35, 0, 0.94).normalize();
+      const nT = knuckle ? _v2.set(-0.35 * s, 0, -0.94) : _v2.set(0, 1, 0);
+      nT.addScaledVector(uT, -nT.dot(uT)).normalize();
+      const uR = new THREE.Vector3(0.5 * s, -0.866, 0);
+      const nR = new THREE.Vector3(-0.866 * s, -0.5, 0);
+      const mT = new THREE.Matrix4().makeBasis(uT, nT, new THREE.Vector3().crossVectors(uT, nT));
+      const mR = new THREE.Matrix4().makeBasis(uR, nR, new THREE.Vector3().crossVectors(uR, nR));
+      const qObj = new THREE.Quaternion().setFromRotationMatrix(mT.multiply(mR.transpose()));
+      const foreW = arm.fore.getWorldQuaternion(new THREE.Quaternion());
+      const ikH = foreW.invert().multiply(objQ.clone().multiply(qObj));
+      arm.upper.quaternion.copy(fkU.slerp(arm.upper.quaternion, w));
+      arm.fore.quaternion.copy(fkF.slerp(arm.fore.quaternion, w));
+      arm.hand.quaternion.copy(fkH.slerp(ikH, w));
+      arm.hand.updateMatrixWorld(true);
+    }
+  }
+
+  /** Two-bone IK for an arm: upper arm / forearm so the wrist reaches `target`; elbow towards `pole`. */
+  private solveArm(arm: Arm, target: THREE.Vector3, pole: THREE.Vector3) {
+    const A = arm.upper.getWorldPosition(new THREE.Vector3());
+    const toT = target.clone().sub(A);
+    const d = THREE.MathUtils.clamp(toT.length(), Math.abs(arm.a - arm.b) + 1e-3, arm.a + arm.b - 1e-3);
+    const dir = toT.normalize();
+    const cosA = THREE.MathUtils.clamp((arm.a * arm.a + d * d - arm.b * arm.b) / (2 * arm.a * d), -1, 1);
+    // Bend plane: contains dir and the pole.
+    const axis = new THREE.Vector3().crossVectors(dir, pole).normalize();
+    const elbowDir = dir.clone().applyAxisAngle(axis, Math.acos(cosA));
+    const K = A.clone().addScaledVector(elbowDir, arm.a);
+    const T = A.clone().addScaledVector(dir, d);
+    const parentQ = arm.upper.parent!.getWorldQuaternion(new THREE.Quaternion());
+    arm.upper.quaternion.setFromUnitVectors(arm.fore.position.clone().normalize(), elbowDir.applyQuaternion(parentQ.invert()));
+    arm.upper.updateMatrixWorld(true);
+    const upQ = arm.upper.getWorldQuaternion(new THREE.Quaternion());
+    arm.fore.quaternion.setFromUnitVectors(arm.hand.position.clone().normalize(), T.sub(K).normalize().applyQuaternion(upQ.invert()));
+    arm.fore.updateMatrixWorld(true);
   }
 
   /** Analytic two-bone IK: thigh/shin so the ankle reaches `target`; knee towards `pole`. */
