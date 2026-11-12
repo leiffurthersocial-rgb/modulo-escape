@@ -163,65 +163,222 @@ export function setListener(ctx: AudioContext, pos: { x: number; y: number; z: n
   }
 }
 
+interface ScreamOpts {
+  /** Start pitch → peak (fast slide up) → end pitch (collapse). Hz. */
+  f0: number;
+  peak: number;
+  end: number;
+  gain: number;
+  /** Amplitude-modulation "roughness" rate (Hz, 30–150 is what makes screams alarming) and depth 0..1. */
+  rough: number;
+  roughDepth: number;
+  /** Subharmonic (period-doubling growl) level 0..1. */
+  sub: number;
+  /** Formant scale: 1 = human vocal tract, < 1 = huge, inhuman throat. */
+  tract: number;
+  /** Soft-clip drive. */
+  drive: number;
+  /** Pitch break: jump up this factor at ~45 % (0 = none). */
+  crack: number;
+}
+
 /**
- * A scream: a few detuned sawtooth "voices" with fast vibrato, shaped by vowel formants (an open
- * "aah" sliding towards "eee"), plus breath noise. `intensity` 0..1 scales length and harshness.
+ * One scream voice. Source: detuned saws + a subharmonic, with vibrato, random pitch jitter and a
+ * register crack; shaped by vowel formants sliding "aah" → "eeh" → collapsing; rough amplitude
+ * flutter at 50–110 Hz; breath rasp through the same flutter; soft-clipped.
  */
-function screamVoice(ctx: AudioContext, dest: AudioNode, t: number, dur: number, f0: number, f1: number, gain: number) {
-  const voices = [0, 7, -11, 15];
-  const mix = ctx.createGain();
-  mix.gain.value = gain;
-  // Formants: F1 ~850→350, F2 ~1250→2300, F3 ~2800 (aah → eee).
-  const formants: [number, number, number, number][] = [
-    [850, 350, 7, 1],
-    [1250, 2300, 9, 0.7],
-    [2800, 3100, 10, 0.45],
+function screamVoice(ctx: AudioContext, dest: AudioNode, t: number, dur: number, o: ScreamOpts) {
+  const nodes: AudioScheduledSourceNode[] = [];
+  const end = t + dur + 0.05;
+  const src = ctx.createGain();
+  // Pitch contour shared by every oscillator (via a ConstantSource → frequency).
+  const pitch = ctx.createConstantSource();
+  pitch.offset.setValueAtTime(o.f0, t);
+  pitch.offset.exponentialRampToValueAtTime(o.peak, t + 0.11);
+  pitch.offset.exponentialRampToValueAtTime(o.peak * 0.93, t + dur * 0.42);
+  if (o.crack) {
+    pitch.offset.setValueAtTime(o.peak * o.crack, t + dur * 0.45);
+    pitch.offset.exponentialRampToValueAtTime(o.peak * o.crack * 0.9, t + dur * 0.7);
+  }
+  pitch.offset.exponentialRampToValueAtTime(o.end, t + dur);
+  nodes.push(pitch);
+  // Vibrato (5–8 Hz) and jitter (filtered noise, a few %).
+  const vib = ctx.createOscillator();
+  vib.frequency.value = 5 + Math.random() * 3;
+  const vibG = ctx.createGain();
+  vibG.gain.value = o.peak * 0.035;
+  vib.connect(vibG);
+  nodes.push(vib);
+  const jit = ctx.createBufferSource();
+  jit.buffer = noise(ctx);
+  jit.loop = true;
+  const jitLp = ctx.createBiquadFilter();
+  jitLp.type = 'lowpass';
+  jitLp.frequency.value = 25;
+  const jitG = ctx.createGain();
+  jitG.gain.value = o.peak * 0.12;
+  jit.connect(jitLp).connect(jitG);
+  nodes.push(jit);
+  const osc = (type: OscillatorType, mult: number, detune: number, level: number) => {
+    const x = ctx.createOscillator();
+    x.type = type;
+    x.frequency.value = 0;
+    x.detune.value = detune;
+    const m = ctx.createGain();
+    m.gain.value = mult;
+    pitch.connect(m).connect(x.frequency);
+    vibG.connect(m);
+    jitG.connect(m);
+    const g = ctx.createGain();
+    g.gain.value = level;
+    x.connect(g).connect(src);
+    nodes.push(x);
+  };
+  osc('sawtooth', 1, -14, 0.5);
+  osc('sawtooth', 1, 9, 0.5);
+  osc('square', 1, 3, 0.18);
+  if (o.sub) osc('sawtooth', 0.5, 0, 0.45 * o.sub); // period doubling: a growl inside the scream
+  // Breath rasp.
+  const rasp = ctx.createBufferSource();
+  rasp.buffer = noise(ctx);
+  rasp.loop = true;
+  const raspF = ctx.createBiquadFilter();
+  raspF.type = 'bandpass';
+  raspF.frequency.value = 2600 * o.tract;
+  raspF.Q.value = 0.7;
+  const raspG = ctx.createGain();
+  raspG.gain.value = 0.35;
+  rasp.connect(raspF).connect(raspG).connect(src);
+  nodes.push(rasp);
+  // Roughness: fast amplitude flutter.
+  const rough = ctx.createGain();
+  rough.gain.value = 1 - o.roughDepth * 0.5;
+  const am = ctx.createOscillator();
+  am.type = 'triangle';
+  am.frequency.setValueAtTime(o.rough * 0.7, t);
+  am.frequency.linearRampToValueAtTime(o.rough * 1.3, t + dur * 0.6);
+  am.frequency.linearRampToValueAtTime(o.rough * 0.5, t + dur);
+  const amG = ctx.createGain();
+  amG.gain.value = o.roughDepth * 0.5;
+  am.connect(amG).connect(rough.gain);
+  nodes.push(am);
+  src.connect(rough);
+  // Vowel formants: open "aah" → strained "eeh" → collapsing "uhh"; scaled by the tract size.
+  const formants: [number, number, number, number, number][] = [
+    [900, 600, 380, 6, 1],
+    [1300, 2200, 1000, 8, 0.8],
+    [2800, 3000, 2500, 9, 0.5],
+    [3600, 3900, 3300, 10, 0.3],
   ];
-  const sum = ctx.createGain();
-  for (const [a, b, q, g] of formants) {
+  const mix = ctx.createGain();
+  for (const [a, b, c, q, g] of formants) {
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.Q.value = q;
-    bp.frequency.setValueAtTime(a, t);
-    bp.frequency.linearRampToValueAtTime(b, t + dur * 0.8);
+    bp.frequency.setValueAtTime(a * o.tract, t);
+    bp.frequency.linearRampToValueAtTime(b * o.tract, t + dur * 0.55);
+    bp.frequency.linearRampToValueAtTime(c * o.tract, t + dur);
     const fg = ctx.createGain();
-    fg.gain.value = g;
-    sum.connect(bp).connect(fg).connect(mix);
+    fg.gain.value = g * 2.2;
+    rough.connect(bp).connect(fg).connect(mix);
   }
-  for (const cents of voices) {
-    const o = ctx.createOscillator();
-    o.type = 'sawtooth';
-    o.detune.value = cents;
-    o.frequency.setValueAtTime(f0, t);
-    o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.35);
-    o.frequency.exponentialRampToValueAtTime(f1 * 0.85, t + dur);
-    const vib = ctx.createOscillator();
-    vib.frequency.value = 7 + Math.random() * 3;
-    const vg = ctx.createGain();
-    vg.gain.value = f1 * 0.03;
-    vib.connect(vg).connect(o.frequency);
-    o.connect(sum);
-    o.start(t);
-    o.stop(t + dur + 0.05);
-    vib.start(t);
-    vib.stop(t + dur + 0.05);
-  }
+  const clip = ctx.createWaveShaper();
+  clip.curve = distortionCurve(o.drive) as Float32Array<ArrayBuffer>;
+  clip.oversample = '2x';
   const env = ctx.createGain();
   env.gain.setValueAtTime(0.0001, t);
-  env.gain.exponentialRampToValueAtTime(1, t + 0.04);
-  env.gain.setValueAtTime(1, t + dur * 0.7);
+  env.gain.exponentialRampToValueAtTime(o.gain, t + 0.035);
+  env.gain.linearRampToValueAtTime(o.gain * 0.85, t + dur * 0.4);
+  env.gain.linearRampToValueAtTime(o.gain, t + dur * 0.62);
   env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  mix.connect(env).connect(dest);
-  noiseBurst(ctx, dest, t, dur * 0.9, 'bandpass', 3000, 1.2, gain * 0.5, 0.03);
+  mix.connect(clip).connect(env).connect(dest);
+  for (const n of nodes) {
+    n.start(t);
+    n.stop(end);
+  }
 }
 
-/** Positional proximity scream (Robin is near). */
+/** A sharp, wet inhale (the breath before the scream). */
+function gasp(ctx: AudioContext, dest: AudioNode, t: number, dur: number, gain: number) {
+  const n = ctx.createBufferSource();
+  n.buffer = noise(ctx);
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = 2.5;
+  bp.frequency.setValueAtTime(700, t);
+  bp.frequency.exponentialRampToValueAtTime(2600, t + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + dur * 0.9);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.03);
+  // A wet catch in the throat: a short burst of flutter.
+  const am = ctx.createOscillator();
+  am.frequency.value = 38;
+  const amG = ctx.createGain();
+  amG.gain.value = 0.4;
+  const flutter = ctx.createGain();
+  flutter.gain.value = 0.6;
+  am.connect(amG).connect(flutter.gain);
+  n.connect(bp).connect(flutter).connect(g).connect(dest);
+  n.start(t, Math.random());
+  n.stop(t + dur + 0.05);
+  am.start(t);
+  am.stop(t + dur + 0.05);
+}
+
+/** Choking, gurgling rattle (vocal fry) — the end of a scream. */
+function rattle(ctx: AudioContext, dest: AudioNode, t: number, dur: number, gain: number) {
+  const n = ctx.createBufferSource();
+  n.buffer = noise(ctx);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'bandpass';
+  lp.frequency.value = 520;
+  lp.Q.value = 1.4;
+  const fry = ctx.createGain();
+  fry.gain.value = 0;
+  const pulse = ctx.createOscillator();
+  pulse.type = 'square';
+  pulse.frequency.setValueAtTime(34, t);
+  pulse.frequency.linearRampToValueAtTime(19, t + dur);
+  const pg = ctx.createGain();
+  pg.gain.value = 0.5;
+  pulse.connect(pg).connect(fry.gain);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(gain, t);
+  g.gain.linearRampToValueAtTime(gain * 0.7, t + dur * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  n.connect(lp).connect(fry).connect(g).connect(dest);
+  n.start(t, Math.random());
+  n.stop(t + dur + 0.05);
+  pulse.start(t);
+  pulse.stop(t + dur + 0.05);
+}
+
+/** Positional proximity scream (Robin is near): often a gasp first, then a rough, cracking scream. */
 export function creatureScream(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
   const d = sink(ctx, out, o);
-  const t = ctx.currentTime;
-  const dur = 0.7 + Math.random() * 0.8;
-  const base = 420 + Math.random() * 200;
-  screamVoice(ctx, d, t, dur, base, base * (1.6 + Math.random() * 0.5), 0.5);
+  let t = ctx.currentTime;
+  if (Math.random() < 0.55) {
+    gasp(ctx, d, t, 0.28, 0.5);
+    t += 0.3;
+  }
+  const dur = 0.8 + Math.random() * 0.9;
+  const base = 380 + Math.random() * 180;
+  screamVoice(ctx, d, t, dur, {
+    f0: base * 0.7,
+    peak: base * (1.7 + Math.random() * 0.5),
+    end: base * 0.55,
+    gain: 0.55,
+    rough: 60 + Math.random() * 40,
+    roughDepth: 0.75,
+    sub: 0.6,
+    tract: 0.9,
+    drive: 6,
+    crack: Math.random() < 0.5 ? 1.22 : 0,
+  });
+  // A low, inhuman second throat under it.
+  screamVoice(ctx, d, t + 0.02, dur * 0.95, { f0: base * 0.25, peak: base * 0.45, end: base * 0.2, gain: 0.18, rough: 42, roughDepth: 0.9, sub: 1, tract: 0.6, drive: 10, crack: 0 });
+  if (Math.random() < 0.4) rattle(ctx, d, t + dur * 0.92, 0.45, 0.3);
 }
 
 function distortionCurve(amount: number): Float32Array {
@@ -235,31 +392,54 @@ function distortionCurve(amount: number): Float32Array {
 }
 
 /**
- * Jump-scare scream: several overlapping screams (one very high), overdriven, a sub hit and a
- * noise blast. ~2 s. Deliberately the loudest thing in the game.
+ * Jump-scare scream, timed so its attack lands at `at`: a sharp inhale right before, then three
+ * throats at once — a human scream that cracks upwards, a piercing shriek, and a huge low
+ * growl-scream — panned wide, rough and overdriven, over a sub hit and a noise blast; it ends in a
+ * choking rattle. Deliberately the loudest thing in the game.
  */
 export function screamSting(ctx: AudioContext, out: AudioNode, at = ctx.currentTime) {
   const t = at;
-  const drive = ctx.createWaveShaper();
-  drive.curve = distortionCurve(18) as Float32Array<ArrayBuffer>;
-  drive.oversample = '2x';
+  // Brick-wall-ish limiter: loud and saturated, never digitally clipped.
+  const lim = ctx.createDynamicsCompressor();
+  lim.threshold.value = -8;
+  lim.knee.value = 4;
+  lim.ratio.value = 14;
+  lim.attack.value = 0.002;
+  lim.release.value = 0.12;
+  lim.connect(out);
+  // Presence: push the 2–4 kHz band where screams pierce.
+  const pres = ctx.createBiquadFilter();
+  pres.type = 'peaking';
+  pres.frequency.value = 2800;
+  pres.Q.value = 0.8;
+  pres.gain.value = 9;
+  pres.connect(lim);
   const master = ctx.createGain();
-  master.gain.value = 0.55;
-  drive.connect(master).connect(out);
-  screamVoice(ctx, drive, t, 1.9, 520, 1150, 0.8);
-  screamVoice(ctx, drive, t + 0.04, 1.6, 700, 1600, 0.6);
-  screamVoice(ctx, drive, t + 0.1, 1.2, 1100, 2400, 0.35);
+  master.gain.value = 0.6;
+  master.connect(pres);
+  const pan = (p: number) => {
+    const sp = ctx.createStereoPanner();
+    sp.pan.value = p;
+    sp.connect(master);
+    return sp;
+  };
+  if (t - ctx.currentTime > 0.3) gasp(ctx, master, t - 0.3, 0.28, 0.7);
+  const dur = 1.75;
+  screamVoice(ctx, pan(-0.35), t, dur, { f0: 420, peak: 1150, end: 300, gain: 1, rough: 75, roughDepth: 0.8, sub: 0.7, tract: 1, drive: 20, crack: 1.3 });
+  screamVoice(ctx, pan(0.4), t + 0.05, dur * 0.8, { f0: 900, peak: 2500, end: 700, gain: 0.8, rough: 110, roughDepth: 0.6, sub: 0.2, tract: 1.15, drive: 14, crack: 1.15 });
+  screamVoice(ctx, pan(0), t, dur * 1.05, { f0: 110, peak: 240, end: 70, gain: 0.3, rough: 45, roughDepth: 0.95, sub: 1, tract: 0.55, drive: 26, crack: 0 });
+  rattle(ctx, master, t + dur * 0.9, 0.6, 0.45);
   // Sub hit + blast (clean, so it thumps).
   const sub = ctx.createOscillator();
-  sub.frequency.setValueAtTime(65, t);
-  sub.frequency.exponentialRampToValueAtTime(28, t + 0.5);
+  sub.frequency.setValueAtTime(70, t);
+  sub.frequency.exponentialRampToValueAtTime(26, t + 0.6);
   const sg = ctx.createGain();
-  sg.gain.setValueAtTime(1, t);
-  sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-  sub.connect(sg).connect(out);
+  sg.gain.setValueAtTime(0.7, t);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+  sub.connect(sg).connect(lim);
   sub.start(t);
-  sub.stop(t + 0.75);
-  noiseBurst(ctx, out, t, 0.9, 'highpass', 400, 0.7, 0.6, 0.005);
+  sub.stop(t + 0.85);
+  noiseBurst(ctx, lim, t, 0.7, 'highpass', 500, 0.7, 0.55, 0.004);
 }
 
 /** Your own footstep on concrete: soft scuff (crouch), step (walk), hard slap (sprint). */
