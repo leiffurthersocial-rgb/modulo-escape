@@ -39,6 +39,7 @@ export class TouchControls {
         <button data-act="sprint" class="tbtn">RUN</button>
         <button data-act="crouch" class="tbtn">DUCK</button>
         <button data-act="flashlight" class="tbtn">LIGHT</button>
+        <button data-act="lookBack" class="tbtn">BACK</button>
       </div>`;
     parent.appendChild(this.el);
     this.stickBase = this.el.querySelector('.stick-base')!;
@@ -113,6 +114,9 @@ export class TouchControls {
           this.sprintButtonHeld = true;
           this.input.virtualHeld.add('sprint');
           btn.classList.add('on');
+        } else if (act === 'lookBack') {
+          this.input.virtualHeld.add('lookBack');
+          btn.classList.add('on');
         } else if (act === 'crouch') {
           this.crouchOn = !this.crouchOn;
           if (this.crouchOn) this.input.virtualHeld.add('crouch');
@@ -124,6 +128,15 @@ export class TouchControls {
           this.input.press(act);
         }
       });
+      if (act === 'lookBack') {
+        const up = () => {
+          this.input.virtualHeld.delete('lookBack');
+          btn.classList.remove('on');
+        };
+        btn.addEventListener('pointerup', up);
+        btn.addEventListener('pointercancel', up);
+        btn.addEventListener('pointerleave', up);
+      }
       if (act === 'sprint') {
         const up = () => {
           this.sprintButtonHeld = false;

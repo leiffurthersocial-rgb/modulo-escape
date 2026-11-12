@@ -4,7 +4,7 @@
  * node positions and random reachable places.
  */
 import * as THREE from 'three';
-import type { Building } from '../gen/types.ts';
+import { stairCells, type Building } from '../gen/types.ts';
 import { cellIndex, isWalkable } from '../gen/grid.ts';
 import type { Rng } from '../core/rng.ts';
 
@@ -42,8 +42,17 @@ export class NavQuery {
     const level = this.b.floors[f]!;
     let y = level.elevation;
     if (level.cells[i]!.kind === 'stair') {
-      const s = this.b.stairs.find((st) => st.lower === f && st.x === cx && (st.z === cz || st.z + 1 === cz))!;
-      y += ((cz - s.z + 0.5) / 2) * this.b.floorStep;
+      // U staircase: flight A a quarter up, the landing half way, flight B three quarters.
+      const s = this.b.stairs.find((st) => {
+        if (st.lower !== f) return false;
+        const c = stairCells(st);
+        return cx >= c.x0 && cx <= c.x0 + 1 && (cz === st.z || cz === st.z + 1);
+      });
+      if (s) {
+        const c = stairCells(s);
+        const frac = cz === c.mid.z ? 0.5 : cx === c.a.x ? 0.25 : 0.75;
+        y += frac * this.b.floorStep;
+      }
     }
     return out.set((cx + 0.5) * this.b.cellSize, y, (cz + 0.5) * this.b.cellSize);
   }

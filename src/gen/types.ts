@@ -175,13 +175,32 @@ export interface LevelData {
 }
 
 /**
- * A straight stair flight: ramp cells (x,z) and (x,z+1) on floor `lower`, rising towards +z.
- * Lower landing (x,z-1) on `lower`; upper landing (x,z+2) on `lower + 1`, where (x,z..z+1) is a shaft.
+ * A U-shaped (switchback) staircase on floor `lower`, 2 × 2 cells:
+ *   flight A in (x,z) rises +z to half height → a flat landing across (x,z+1) and (x+side,z+1) →
+ *   turn 180° → flight B in (x+side,z) rises −z to the upper floor.
+ * Lower landing (x,z−1) on `lower`; upper landing (x+side,z−1) on `lower + 1`, where the four
+ * stair cells are a shaft (an open stairwell).
  */
 export interface Stair {
   x: number;
   z: number;
   lower: number;
+  /** Which side the second flight is on: +1 (east) or −1 (west). */
+  turn: 1 | -1;
+}
+
+/** The cells of a U staircase: flight A, the two landing cells, flight B, and both floor landings. */
+export function stairCells(s: Stair) {
+  return {
+    a: { x: s.x, z: s.z },
+    mid: { x: s.x, z: s.z + 1 },
+    mid2: { x: s.x + s.turn, z: s.z + 1 },
+    b: { x: s.x + s.turn, z: s.z },
+    lowerLanding: { x: s.x, z: s.z - 1 },
+    upperLanding: { x: s.x + s.turn, z: s.z - 1 },
+    /** North-west corner of the 2 × 2 block. */
+    x0: Math.min(s.x, s.x + s.turn),
+  };
 }
 
 export interface BuildingStats {

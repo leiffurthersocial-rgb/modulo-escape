@@ -24,13 +24,15 @@ Then open the URL it prints.
 - `?monster=off|on|billboard|model`: no monster / force it on / the old floating-image Robin / the zombie test model
 
 **Controls:** WASD to move · Shift to sprint (stamina bar) · C/Z to crouch · F for the flashlight ·
+hold Q to look back (keep running forward) ·
 Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, materials). Touch controls
-(joystick, Run, Duck, Light) are on by default; turn them off in Settings.
+(joystick, Run, Duck, Light, Back) are on by default; turn them off in Settings.
 
 ## The game
 
 - **Building:**
-  - Seeded generator (`src/gen`): 2–4 floors joined by stairwells.
+  - Seeded generator (`src/gen`): 2–4 floors joined by U-shaped stairwells (two half flights
+    with a landing between them).
   - Start and exit are each on a random floor. An exit above the ground floor opens straight
     onto the night.
   - Corridors form loops so you can circle away from the monster, with only a few deliberate dead

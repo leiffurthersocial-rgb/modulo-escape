@@ -7,7 +7,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import type { Building } from '../gen/types.ts';
 import { kitPieces } from '../gen/kit.ts';
 import { KIT, transformBox } from '../kit/greybox.ts';
-import { stairRamp } from '../world/stairs.ts';
+import { stairColliders } from '../world/stairs.ts';
 
 /** Key for a prop across floors. */
 export const propKey = (floor: number, index: number) => floor * 100000 + index;
@@ -61,13 +61,14 @@ export class PhysicsWorld {
         }
       });
     }
-    // Stair flights: one smooth ramp collider each (the steps are visual only).
+    // Staircases: a smooth ramp per flight + the mid landing (the steps are visual only).
     for (const s of b.stairs) {
-      const r = stairRamp(b, s);
-      this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(r.halfWidth, 0.1, r.halfLength).setTranslation(r.center.x, r.center.y, r.center.z).setRotation(r.rotation).setFriction(0.9),
-        fixed,
-      );
+      for (const r of stairColliders(b, s)) {
+        this.world.createCollider(
+          RAPIER.ColliderDesc.cuboid(r.half.x, r.half.y, r.half.z).setTranslation(r.center.x, r.center.y, r.center.z).setRotation(r.rotation).setFriction(0.9),
+          fixed,
+        );
+      }
     }
     // Ground outside the building (so you can walk out of the exit).
     const W = b.width * b.cellSize;

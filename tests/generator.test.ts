@@ -13,6 +13,7 @@ import {
   kitPieces,
   SIDES,
   SIZE_CONFIG,
+  stairCells,
   type Building,
   type LevelData,
   type LevelSize,
@@ -156,14 +157,24 @@ function check(b: Building): string[] {
   if (inBounds(f0, ox, oz) && f0.cells[cellIndex(f0, ox, oz)]!.kind !== 'void') errs.push('exit leads inside');
   const exits = b.floors.flatMap((f) => [...f.edgesX, ...f.edgesZ]).filter((e) => e === 'exit').length;
   if (exits !== 1) errs.push('exactly one exit');
-  // Stairs line up: ramp on the lower floor, shaft above, landings both ends.
+  // U staircases line up: four stair cells below, an open stairwell above, landings at both ends,
+  // and the way up goes landing → flight A → mid landing → flight B → upper landing.
   for (const s of b.stairs) {
     const lo = b.floors[s.lower]!;
     const up = b.floors[s.lower + 1]!;
-    if (lo.cells[cellIndex(lo, s.x, s.z)]!.kind !== 'stair' || lo.cells[cellIndex(lo, s.x, s.z + 1)]!.kind !== 'stair') errs.push('stair cells');
-    if (up.cells[cellIndex(up, s.x, s.z)]!.kind !== 'shaft' || up.cells[cellIndex(up, s.x, s.z + 1)]!.kind !== 'shaft') errs.push('shaft cells');
-    if (!isPassable(getEdge(lo, s.x, s.z, 'N'))) errs.push('stair entrance closed');
-    if (!isPassable(getEdge(up, s.x, s.z + 1, 'S'))) errs.push('stair exit closed');
+    const c = stairCells(s);
+    for (const q of [c.a, c.mid, c.mid2, c.b]) {
+      if (lo.cells[cellIndex(lo, q.x, q.z)]!.kind !== 'stair') errs.push('stair cells');
+      if (up.cells[cellIndex(up, q.x, q.z)]!.kind !== 'shaft') errs.push('shaft cells');
+    }
+    if (!isWalkable(lo.cells[cellIndex(lo, c.lowerLanding.x, c.lowerLanding.z)]!.kind)) errs.push('lower landing');
+    if (!isWalkable(up.cells[cellIndex(up, c.upperLanding.x, c.upperLanding.z)]!.kind)) errs.push('upper landing');
+    if (!isPassable(getEdge(lo, c.a.x, c.a.z, 'N'))) errs.push('stair entrance closed');
+    if (!isPassable(getEdge(lo, c.a.x, c.a.z, 'S')) || !isPassable(getEdge(lo, c.mid.x, c.mid.z, s.turn === 1 ? 'E' : 'W')) || !isPassable(getEdge(lo, c.mid2.x, c.mid2.z, 'N')))
+      errs.push('stair path closed');
+    if (getEdge(lo, c.a.x, c.a.z, s.turn === 1 ? 'E' : 'W') !== 'solid') errs.push('no wall between the flights');
+    if (getEdge(lo, c.b.x, c.b.z, 'N') !== 'solid') errs.push('flight B open at the top on the lower floor');
+    if (!isPassable(getEdge(up, c.b.x, c.b.z, 'N'))) errs.push('stair exit closed');
   }
   return errs;
 }
@@ -276,9 +287,9 @@ describe('golden seeds', () => {
   // Locks layouts so later phases (props, materials, decals) can't silently change existing seeds.
   // Update deliberately with: GEN_UPDATE_GOLDEN=1 (prints new values).
   const golden: Record<string, string> = {
-    'kzu:small': '4eca8050',
-    'kzu:medium': '0b7cf258',
-    'abc123:large': '59c9d5c3',
+    'kzu:small': '0bfdcd6f',
+    'kzu:medium': 'd9bb3291',
+    'abc123:large': 'ef453f77',
   };
   it('layout fingerprints are stable', () => {
     for (const key of Object.keys(golden)) {

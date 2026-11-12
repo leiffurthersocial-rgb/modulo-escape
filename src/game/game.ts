@@ -11,7 +11,7 @@ import { isLevelSize } from '../gen/config.ts';
 import { cellCenter, cellIndex, SIDE_YAW } from '../gen/grid.ts';
 import { kitPieces } from '../gen/kit.ts';
 import { loadBuilding } from '../gen/load.ts';
-import type { Building, LevelData, LevelSize } from '../gen/types.ts';
+import { stairCells, type Building, type LevelData, type LevelSize } from '../gen/types.ts';
 import { Input } from '../input/input.ts';
 import { initPhysics, PhysicsWorld, propKey } from '../physics/physicsWorld.ts';
 import { Player } from '../player/player.ts';
@@ -251,11 +251,14 @@ export class Game {
     const b = this.building;
     const N = this.nav.N;
     for (const s of b.stairs) {
+      const c = stairCells(s);
       const cells: [number, number, number][] = [
-        [s.lower, s.x, s.z - 1],
-        [s.lower, s.x, s.z],
-        [s.lower, s.x, s.z + 1],
-        [s.lower + 1, s.x, s.z + 2],
+        [s.lower, c.lowerLanding.x, c.lowerLanding.z],
+        [s.lower, c.a.x, c.a.z],
+        [s.lower, c.mid.x, c.mid.z],
+        [s.lower, c.mid2.x, c.mid2.z],
+        [s.lower, c.b.x, c.b.z],
+        [s.lower + 1, c.upperLanding.x, c.upperLanding.z],
       ];
       for (const [f, x, z] of cells) {
         const node = f * N + cellIndex(b, x, z);
@@ -405,6 +408,7 @@ export class Game {
     const input = this.input;
     this.time += dt;
     if (this.state === 'scare') {
+      this.player.lookBackHeld = false;
       // Only the scare runs: monster animation + camera; then the caught screen.
       for (const e of this.entities.entities.values()) e.update(dt, this.entityContext());
       if (this.scare.update(dt, this.player)) this.setState('caught');
@@ -420,6 +424,7 @@ export class Game {
     }
     const look = input.consumeLook();
     this.player.look(look.dx, look.dy);
+    this.player.lookBackHeld = input.isDown('lookBack');
 
     // Fixed-step physics.
     const step = 1 / this.stepHz;

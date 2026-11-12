@@ -233,7 +233,17 @@ export class Player {
   }
 
   /** Interpolate camera between physics states. alpha ∈ [0,1]. */
+  /** 0..1 how far the view is swung round to look behind (held key); movement keeps `yaw`. */
+  lookBack = 0;
+  /** Target for `lookBack` (set by the game from the held key / touch button). */
+  lookBackHeld = false;
+
   updateCamera(alpha: number, dt: number) {
+    // Look back: swing the view 180° (always through the left) in ~0.15 s, and back on release.
+    const target = this.lookBackHeld ? 1 : 0;
+    this.lookBack += (target - this.lookBack) * Math.min(1, dt * 14);
+    if (Math.abs(target - this.lookBack) < 0.002) this.lookBack = target;
+    const back = this.lookBack * this.lookBack * (3 - 2 * this.lookBack);
     const x = this.prevFeet.x + (this.feet.x - this.prevFeet.x) * alpha;
     const y = this.prevFeet.y + (this.feet.y - this.prevFeet.y) * alpha;
     const z = this.prevFeet.z + (this.feet.z - this.prevFeet.z) * alpha;
@@ -249,7 +259,7 @@ export class Player {
     const cos = Math.cos(this.yaw);
     const sin = Math.sin(this.yaw);
     this.camera.position.set(x + cos * bobX, y + this.eye + bobY, z - sin * bobX);
-    this.camera.rotation.set(this.pitch, this.yaw, roll);
+    this.camera.rotation.set(this.pitch, this.yaw + Math.PI * back, roll);
     // Sprint widens the FOV a touch.
     const fovTarget = settings.fov + (this.sprinting ? 6 : 0);
     if (Math.abs(this.camera.fov - fovTarget) > 0.01) {

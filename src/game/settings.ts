@@ -9,6 +9,7 @@ export type Action =
   | 'sprint'
   | 'crouch'
   | 'flashlight'
+  | 'lookBack'
   | 'interact'
   | 'pause'
   | 'debug'
@@ -22,6 +23,7 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'sprint', label: 'Sprint' },
   { id: 'crouch', label: 'Crouch' },
   { id: 'flashlight', label: 'Flashlight' },
+  { id: 'lookBack', label: 'Look back (hold)' },
   { id: 'interact', label: 'Interact' },
   { id: 'pause', label: 'Pause' },
   { id: 'debug', label: 'Debug overlay' },
@@ -36,6 +38,7 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   sprint: ['ShiftLeft', 'ShiftRight'],
   crouch: ['KeyC', 'KeyZ'],
   flashlight: ['KeyF'],
+  lookBack: ['KeyQ'],
   interact: ['KeyE'],
   pause: ['Escape', 'KeyP'],
   debug: ['F3', 'Backquote'],

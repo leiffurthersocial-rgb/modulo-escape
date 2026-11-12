@@ -19,7 +19,7 @@ import { buildNav, bfs } from './nav.ts';
 import { placeProps, placeLights, pickSpawnPoints } from './props.ts';
 import { dressLevel } from './dressing.ts';
 import { assignKzu } from './kzu.ts';
-import type { Building, Cell, EdgeKind, LevelData, LevelSize, Room, Side, Stair } from './types.ts';
+import { stairCells, type Building, type Cell, type EdgeKind, type LevelData, type LevelSize, type Room, type Side, type Stair } from './types.ts';
 
 export class GenerationError extends Error {}
 
@@ -63,16 +63,17 @@ const edgeKey = (w: Work, x: number, z: number, side: Side) => {
   return `x:${z * (w.width + 1) + x + 1}`;
 };
 
-/** Cells a stair occupies on its lower and upper floor (including landings). */
+/** Cells a U staircase occupies on its lower and upper floor (including landings). */
 function stairFootprint(s: Stair): { lower: Reservation[]; upper: Reservation[] } {
+  const c = stairCells(s);
   return {
     lower: [
-      { kind: 'landing', x: s.x, z: s.z - 1, w: 1, h: 1 },
-      { kind: 'stair', x: s.x, z: s.z, w: 1, h: 2 },
+      { kind: 'landing', x: c.lowerLanding.x, z: c.lowerLanding.z, w: 1, h: 1 },
+      { kind: 'stair', x: c.x0, z: s.z, w: 2, h: 2 },
     ],
     upper: [
-      { kind: 'shaft', x: s.x, z: s.z, w: 1, h: 2 },
-      { kind: 'landing', x: s.x, z: s.z + 2, w: 1, h: 1 },
+      { kind: 'shaft', x: c.x0, z: s.z, w: 2, h: 2 },
+      { kind: 'landing', x: c.upperLanding.x, z: c.upperLanding.z, w: 1, h: 1 },
     ],
   };
 }
@@ -90,7 +91,8 @@ function placeStairs(cfg: SizeConfig, rng: Rng): Stair[] {
       let best: Stair | null = null;
       let bestScore = -1;
       for (let t = 0; t < 40; t++) {
-        const s: Stair = { x: rng.int(1, cfg.width - 2), z: rng.int(2, cfg.height - 4), lower: f };
+        const turn: 1 | -1 = rng.chance(0.5) ? 1 : -1;
+        const s: Stair = { x: turn === 1 ? rng.int(1, cfg.width - 3) : rng.int(2, cfg.width - 2), z: rng.int(2, cfg.height - 3), lower: f, turn };
         const fp = stairFootprint(s);
         if (fp.lower.some((r) => clash(reserved[f]!, r, 2)) || fp.upper.some((r) => clash(reserved[f + 1]!, r, 2))) continue;
         const others = stairs.filter((o) => Math.abs(o.lower - f) <= 1);
@@ -125,7 +127,7 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
       if (s.lower === f) res.push(...fp.lower);
       if (s.lower + 1 === f) res.push(...fp.upper);
     }
-    const r = generateFloor(seed, cfg, f, res, attempt);
+    const r = generateFloor(seed, cfg, f, res, attempt, stairs);
     works.push(r.w);
     stats.loops += r.loops;
     stats.deadEnds += r.deadEnds;
@@ -136,8 +138,9 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
   const adj: number[][] = [];
   works.forEach((_, f) => localNav[f]!.adj.forEach((list, i) => (adj[f * N + i] = list.map((j) => f * N + j))));
   for (const s of stairs) {
-    const top = s.lower * N + cellIndex(cfg, s.x, s.z + 1);
-    const land = (s.lower + 1) * N + cellIndex(cfg, s.x, s.z + 2);
+    const c = stairCells(s);
+    const top = s.lower * N + cellIndex(cfg, c.b.x, c.b.z);
+    const land = (s.lower + 1) * N + cellIndex(cfg, c.upperLanding.x, c.upperLanding.z);
     adj[top]!.push(land);
     adj[land]!.push(top);
   }
@@ -278,7 +281,7 @@ function firstLanding(w: Work): number {
 }
 
 /** One storey: reservations first, then rooms, corridors, dead ends and edges. */
-function generateFloor(seed: string, cfg: SizeConfig, f: number, res: Reservation[], attempt: number): { w: Work; loops: number; deadEnds: number } {
+function generateFloor(seed: string, cfg: SizeConfig, f: number, res: Reservation[], attempt: number, stairs: Stair[]): { w: Work; loops: number; deadEnds: number } {
   const rng = streamRng(seed, `layout:${f}`, attempt);
   const { width, height } = cfg;
   const w: Work = {
@@ -318,7 +321,7 @@ function generateFloor(seed: string, cfg: SizeConfig, f: number, res: Reservatio
   pruneStubs(w, deadEnds > 0 ? deadEnds : 0, rng);
   assignEdges(w, rng);
   secondDoors(w, rng);
-  applyStairEdges(w);
+  applyStairEdges(w, stairs, f);
   const nav = buildNav(w);
   const first = firstWalkable(w);
   const d0 = bfs(nav.adj, first);
@@ -387,25 +390,32 @@ function secondDoors(w: Work, rng: Rng) {
   }
 }
 
-/** Stairs are walled in except their entrance; shafts open only towards the upper landing. */
-function applyStairEdges(w: Work) {
-  for (const r of w.rooms) {
-    if (r.kind === 'stair') {
-      for (const zz of [r.z, r.z + 1]) {
-        setEdge(w, r.x, zz, 'W', 'solid');
-        setEdge(w, r.x, zz, 'E', 'solid');
-      }
-      setEdge(w, r.x, r.z, 'N', 'open');
-      setEdge(w, r.x, r.z, 'S', 'open');
-      setEdge(w, r.x, r.z + 1, 'S', 'solid');
-    } else if (r.kind === 'shaft') {
-      for (const zz of [r.z, r.z + 1]) {
-        setEdge(w, r.x, zz, 'W', 'solid');
-        setEdge(w, r.x, zz, 'E', 'solid');
-      }
-      setEdge(w, r.x, r.z, 'N', 'solid');
-      setEdge(w, r.x, r.z, 'S', 'none');
-      setEdge(w, r.x, r.z + 1, 'S', 'open');
+/**
+ * U staircases are walled in. Lower floor: in from the lower landing to flight A, across the mid
+ * landing and back down the other side into flight B (a wall between the two flights; flight B's
+ * top end is a wall: you leave it upstairs). Upper floor: the 2 × 2 cells are one open stairwell,
+ * open only towards the upper landing.
+ */
+function applyStairEdges(w: Work, stairs: Stair[], f: number) {
+  const towards = (from: { x: number; z: number }, to: { x: number; z: number }): Side =>
+    to.x > from.x ? 'E' : to.x < from.x ? 'W' : to.z > from.z ? 'S' : 'N';
+  for (const s of stairs) {
+    const c = stairCells(s);
+    const cells = [c.a, c.mid, c.mid2, c.b];
+    if (s.lower !== f && s.lower + 1 !== f) continue;
+    for (const q of cells) for (const sd of SIDES) setEdge(w, q.x, q.z, sd, 'solid');
+    const link = (p: { x: number; z: number }, q: { x: number; z: number }, kind: EdgeKind) => setEdge(w, p.x, p.z, towards(p, q), kind);
+    if (s.lower === f) {
+      link(c.a, c.lowerLanding, 'open');
+      link(c.a, c.mid, 'open');
+      link(c.mid, c.mid2, 'open');
+      link(c.mid2, c.b, 'open');
+    } else {
+      link(c.a, c.mid, 'none');
+      link(c.mid, c.mid2, 'none');
+      link(c.mid2, c.b, 'none');
+      link(c.a, c.b, 'none');
+      link(c.b, c.upperLanding, 'open');
     }
   }
 }
