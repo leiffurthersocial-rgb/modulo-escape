@@ -9,7 +9,7 @@ import type { MatKey } from '../kit/greybox.ts';
 import type { PropType } from '../gen/types.ts';
 import type { TexTierName } from '../render/assetManifest.ts';
 import { buildFoliageAtlas } from '../render/foliageTextures.ts';
-import { buildMainAtlas, buildPlateAtlas } from '../render/decalAtlas.ts';
+import { buildMainAtlas, buildPlateAtlas, buildSignAtlas } from '../render/decalAtlas.ts';
 import { createSurfaceMaterial, surfaceUniforms } from '../render/surface.ts';
 import type { PbrSet, TextureLibrary } from '../render/textures.ts';
 import { buildTreeVariants, createLeafMaterial, type TreeVariant } from './flora.ts';
@@ -59,6 +59,8 @@ export class WorldAssets {
   puddle!: THREE.MeshStandardMaterial;
   decalMain!: THREE.MeshStandardMaterial;
   decalPlate!: THREE.MeshStandardMaterial;
+  /** German signs; the green emergency signs glow. */
+  decalSign!: THREE.MeshStandardMaterial;
   leaf!: THREE.MeshStandardMaterial;
   root!: THREE.MeshStandardMaterial;
   bark!: THREE.MeshStandardMaterial;
@@ -100,6 +102,13 @@ export class WorldAssets {
     a.decalMain = decal(main);
     a.decalPlate = decal(plate);
     a.decalPlate.roughness = 0.35;
+    const sign = buildSignAtlas(Math.min(256, Math.max(128, opts.decalRes)));
+    a.owned.push(sign.map, sign.glow);
+    a.decalSign = decal(sign.map);
+    a.decalSign.roughness = 0.4;
+    a.decalSign.emissive.set(0xffffff);
+    a.decalSign.emissiveMap = sign.glow;
+    a.decalSign.emissiveIntensity = 1.25;
     a.leaf = createLeafMaterial(foliage);
     a.puddle = createPuddleMaterial();
 
@@ -175,6 +184,7 @@ export class WorldAssets {
     this.puddle?.dispose();
     this.decalMain?.dispose();
     this.decalPlate?.dispose();
+    this.decalSign?.dispose();
     this.leaf?.dispose();
   }
 }

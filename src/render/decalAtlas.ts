@@ -2,6 +2,7 @@
  * Procedural decal atlases, painted on a 2D canvas at startup (no download):
  * main atlas 4×4 tiles: cracks, stains, water streaks, KZU stencils, graffiti, moss, floor stain.
  * plate atlas 16×8 tiles: enamel KZU door plates ("E07", "E12 · Chemie", "Mensa").
+ * sign atlas 8×4 tiles (+ glow map): Notausgang ← → ↑, Ausgang, Trakt E/1/2/3/4, hall directions.
  */
 import * as THREE from 'three';
 import { Rng } from '../core/rng.ts';
@@ -221,6 +222,130 @@ export function buildPlateAtlas(labels: string[], w = 256): THREE.CanvasTexture 
     ctx.restore();
   }
   return toTexture(canvas);
+}
+
+/** Sign tiles (8 × 4); keep in sync with SIGN_TILE in gen/dressing.ts. */
+export const SIGN_LAYOUT = {
+  notausgang: { left: 0, right: 1, up: 2 },
+  ausgang: 3,
+  trakt: { E: 4, '1': 5, '2': 6, '3': 7, '4': 8 } as Record<string, number>,
+  hallBase: 9, // + hallIndex * 2 + (right ? 1 : 0)
+  halls: ['Mensa', 'Aula', 'Turnhalle', 'Mediothek', 'Pausenhalle'],
+};
+
+/** German signs: glowing green emergency signs (colour + emissive maps), wing signs, hall arrows. */
+export function buildSignAtlas(w = 256): { map: THREE.CanvasTexture; glow: THREE.CanvasTexture } {
+  const h = w / 2;
+  const [canvas, ctx] = makeCanvas(w * 8, h * 4);
+  const [gc, gctx] = makeCanvas(w * 8, h * 4);
+  gctx.fillStyle = '#000';
+  gctx.fillRect(0, 0, w * 8, h * 4);
+  const at = (i: number) => [(i % 8) * w, Math.floor(i / 8) * h] as const;
+  const arrow = (c: Ctx, x: number, y: number, size: number, dir: 'left' | 'right' | 'up') => {
+    c.save();
+    c.translate(x, y);
+    c.rotate(dir === 'left' ? Math.PI : dir === 'up' ? -Math.PI / 2 : 0);
+    c.beginPath();
+    c.moveTo(-size * 0.5, -size * 0.14);
+    c.lineTo(size * 0.12, -size * 0.14);
+    c.lineTo(size * 0.12, -size * 0.36);
+    c.lineTo(size * 0.5, 0);
+    c.lineTo(size * 0.12, size * 0.36);
+    c.lineTo(size * 0.12, size * 0.14);
+    c.lineTo(-size * 0.5, size * 0.14);
+    c.closePath();
+    c.fill();
+    c.restore();
+  };
+  /** The ISO running figure, roughly: head, leaning body, limbs. */
+  const runner = (c: Ctx, x: number, y: number, s2: number) => {
+    c.save();
+    c.translate(x, y);
+    c.lineCap = 'round';
+    c.lineWidth = s2 * 0.13;
+    c.beginPath();
+    c.arc(s2 * 0.12, -s2 * 0.42, s2 * 0.1, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.moveTo(s2 * 0.05, -s2 * 0.25);
+    c.lineTo(-s2 * 0.08, s2 * 0.08); // body
+    c.moveTo(-s2 * 0.08, s2 * 0.08);
+    c.lineTo(s2 * 0.18, s2 * 0.22);
+    c.lineTo(s2 * 0.12, s2 * 0.45); // front leg
+    c.moveTo(-s2 * 0.08, s2 * 0.08);
+    c.lineTo(-s2 * 0.25, s2 * 0.3);
+    c.lineTo(-s2 * 0.42, s2 * 0.3); // back leg
+    c.moveTo(s2 * 0.02, -s2 * 0.17);
+    c.lineTo(s2 * 0.25, -s2 * 0.05); // front arm
+    c.moveTo(s2 * 0.02, -s2 * 0.17);
+    c.lineTo(-s2 * 0.22, -s2 * 0.12); // back arm
+    c.stroke();
+    c.restore();
+  };
+  const green = (i: number, dir: 'left' | 'right' | 'up' | null, label: string) => {
+    const [x, y] = at(i);
+    for (const [c, glow] of [
+      [ctx, false],
+      [gctx, true],
+    ] as const) {
+      c.save();
+      c.translate(x, y);
+      c.fillStyle = glow ? '#3dff8a' : '#0d8f45';
+      c.fillRect(6, 6, w - 12, h - 12);
+      c.fillStyle = glow ? '#ffffff' : '#f2fff6';
+      c.strokeStyle = c.fillStyle;
+      runner(c, w * 0.2, h * 0.47, h * 0.62);
+      if (dir) arrow(c, w * 0.43, h * 0.47, h * 0.5, dir);
+      c.font = `900 ${h * (dir ? 0.2 : 0.3)}px Arial, sans-serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(label, dir ? w * 0.74 : w * 0.64, h * 0.5);
+      c.restore();
+    }
+  };
+  green(SIGN_LAYOUT.notausgang.left, 'left', 'NOTAUSGANG');
+  green(SIGN_LAYOUT.notausgang.right, 'right', 'NOTAUSGANG');
+  green(SIGN_LAYOUT.notausgang.up, 'up', 'NOTAUSGANG');
+  green(SIGN_LAYOUT.ausgang, null, 'AUSGANG');
+  // Wing signs: dark blue enamel, big prefix.
+  for (const [prefix, i] of Object.entries(SIGN_LAYOUT.trakt)) {
+    const [x, y] = at(i);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = '#1f3552';
+    ctx.fillRect(6, 6, w - 12, h - 12);
+    ctx.strokeStyle = '#e8e3d3';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(14, 14, w - 28, h - 28);
+    ctx.fillStyle = '#e8e3d3';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 ${h * 0.2}px Arial, sans-serif`;
+    ctx.fillText('TRAKT', w * 0.3, h * 0.5);
+    ctx.font = `900 ${h * 0.62}px Arial, sans-serif`;
+    ctx.fillText(prefix, w * 0.68, h * 0.54);
+    ctx.restore();
+  }
+  // Hall direction signs: white with an arrow.
+  SIGN_LAYOUT.halls.forEach((name, k) => {
+    for (const right of [false, true]) {
+      const [x, y] = at(SIGN_LAYOUT.hallBase + k * 2 + (right ? 1 : 0));
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = '#ece8dc';
+      ctx.fillRect(6, 6, w - 12, h - 12);
+      ctx.fillStyle = '#1f2b3a';
+      arrow(ctx, right ? w * 0.84 : w * 0.16, h * 0.5, h * 0.42, right ? 'right' : 'left');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      let size = h * 0.34;
+      ctx.font = `800 ${size}px Arial, sans-serif`;
+      while (ctx.measureText(name).width > w * 0.62 && size > 10) ctx.font = `800 ${(size -= 2)}px Arial, sans-serif`;
+      ctx.fillText(name, right ? w * 0.42 : w * 0.58, h * 0.52);
+      ctx.restore();
+    }
+  });
+  return { map: toTexture(canvas), glow: toTexture(gc) };
 }
 
 function toTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {

@@ -158,11 +158,11 @@ export class ChunkManager {
       group.add(mesh);
     }
     // ── Decals ──
-    const decals = (this.decalsByChunk.get(key) ?? []).filter((d, i) => d.atlas === 'plate' || hash01(d.x * 7.3 + d.z * 3.1 + i) < this.opts.decals);
-    for (const atlas of ['main', 'plate'] as const) {
+    const decals = (this.decalsByChunk.get(key) ?? []).filter((d, i) => d.atlas !== 'main' || hash01(d.x * 7.3 + d.z * 3.1 + i) < this.opts.decals);
+    for (const atlas of ['main', 'plate', 'sign'] as const) {
       const list = decals.filter((d) => d.atlas === atlas);
       if (!list.length) continue;
-      const mesh = new THREE.Mesh(decalGeometry(list, atlas), atlas === 'main' ? a.decalMain : a.decalPlate);
+      const mesh = new THREE.Mesh(decalGeometry(list, atlas), atlas === 'main' ? a.decalMain : atlas === 'plate' ? a.decalPlate : a.decalSign);
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       mesh.renderOrder = 2;
@@ -427,7 +427,7 @@ function makeSurfaceFn(l: LevelData): SurfaceFn {
 }
 
 /** Merge decal quads (wall or floor) into one geometry with atlas UVs. */
-function decalGeometry(list: DecalSlot[], atlas: 'main' | 'plate'): THREE.BufferGeometry {
+function decalGeometry(list: DecalSlot[], atlas: 'main' | 'plate' | 'sign'): THREE.BufferGeometry {
   const pos: number[] = [];
   const nor: number[] = [];
   const uv: number[] = [];
@@ -453,7 +453,7 @@ function decalGeometry(list: DecalSlot[], atlas: 'main' | 'plate'): THREE.Buffer
         up.copy(u2);
       }
     }
-    const [u0, v0, u1, v1] = atlas === 'main' ? tileUv(d.tile, 4, 4) : tileUv(d.tile, 16, 8);
+    const [u0, v0, u1, v1] = atlas === 'main' ? tileUv(d.tile, 4, 4) : atlas === 'plate' ? tileUv(d.tile, 16, 8) : tileUv(d.tile, 8, 4);
     const b = pos.length / 3;
     const hw = d.w / 2;
     const hh = d.h / 2;
