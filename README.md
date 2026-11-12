@@ -50,7 +50,7 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
     stalks back, appearing a few rooms away out of your sight.
   - **Movement:** it ducks under doors and screams when it's near.
   - **Getting caught:** ends in a jump scare.
-- **Leo** (wakes after ~18 s): a hulking brute with his own sculpt: barrel chest, a hump of
+- **Leo** (wakes after ~18 s): a hulking, heavily muscled brute with his own sculpt: V-shaped torso, abs, a hump of
   muscle, a small head, arms as long as he is tall with huge fists, short bowed legs, a burst
   T-shirt and ragged shorts. He walks on his knuckles like a gorilla and gallops on all fours when
   he charges. He hears best of all three. When he spots you he rears up, roars and pounds his

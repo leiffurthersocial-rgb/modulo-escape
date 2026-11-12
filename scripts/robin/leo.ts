@@ -3,7 +3,7 @@
  * the animation rig drives him too). A hulking brute: barrel chest and gut, a hump of trapezius
  * with the small head sunk forward in front of it, boulder shoulders, arms nearly as long as he is
  * tall with enormous forearms and fists (he walks on his knuckles), short thick bowed legs and wide
- * feet. Wears what's left of a T-shirt (burst at the back, torn open at the chest, sleeves gone)
+ * feet. Wears what's left of a T-shirt (burst at the back, torn wide open at the chest, sleeves gone)
  * and ragged shorts.
  */
 import type { BoneDef, Prim, Region, V3 } from './anatomy.ts';
@@ -57,27 +57,44 @@ export function buildLeoAnatomy() {
   bone('neck2', 'neck1', [0, 2.22, 0.08]);
   bone('head', 'neck2', [0, 2.34, 0.15]);
 
-  // Pelvis, glutes, gut, obliques, a faint six-pack under the fat.
-  ell('hips', [0, 1.0, -0.02], [0.34, 0.2, 0.25], 0.08);
-  for (const s of [1, -1]) ell('hips', [s * 0.15, 0.95, -0.14], [0.17, 0.17, 0.14], 0.06);
-  ell('spine1', [0, 1.27, 0.04], [0.36, 0.28, 0.3], 0.1);
-  for (const s of [1, -1]) ell('spine1', [s * 0.3, 1.3, 0], [0.12, 0.2, 0.16], 0.08);
-  // Ribcage, pecs, lats, back hump, trapezius.
-  ell('chest', [0, 1.74, -0.03], [0.44, 0.36, 0.33], 0.1);
-  ell('chest', [0, 1.92, -0.2], [0.36, 0.25, 0.18], 0.1);
-  ell('chest', [0, 2.07, -0.1], [0.36, 0.17, 0.24], 0.1);
-  ell('chest', [0, 1.6, -0.25], [0.3, 0.25, 0.1], 0.08);
+  // A V-taper: narrow, hard waist; everything above it flares out. Tight blend radii keep the
+  // muscles separate (grooves between them) instead of melting into fat.
+  ell('hips', [0, 1.0, -0.02], [0.3, 0.19, 0.22], 0.05);
+  for (const s of [1, -1]) ell('hips', [s * 0.14, 0.95, -0.13], [0.16, 0.17, 0.13], 0.04);
+  ell('spine1', [0, 1.3, 0.0], [0.27, 0.27, 0.21], 0.06);
+  ell('spine2', [0, 1.5, 0.0], [0.27, 0.2, 0.18], 0.06);
+  // Ribcage: the frame the chest and back sit on.
+  ell('chest', [0, 1.74, -0.05], [0.38, 0.34, 0.27], 0.06);
   for (const s of [1, -1]) {
-    ell('chest', [s * 0.19, 1.87, 0.19], [0.24, 0.12, 0.11], 0.12);
-    ell('chest', [s * 0.34, 1.66, -0.12], [0.15, 0.3, 0.2], 0.08, [s * 0.45, 1.95, -0.08]);
-    cone('chest', [0, 2.18, -0.06], 0.15, [s * 0.52, 2.1, -0.05], 0.13, 0.08);
-    cone(`clavicle${s === 1 ? 'L' : 'R'}`, [s * 0.12, 2.06, 0.08], 0.09, [s * 0.55, 2.1, 0.0], 0.1, 0.07);
+    const cl = `clavicle${s === 1 ? 'L' : 'R'}`;
+    // Eight-pack, split down the middle; obliques; serratus fingers on the ribs.
+    for (const [y, bn, rz] of [
+      [1.17, 'spine1', 0.165],
+      [1.29, 'spine1', 0.19],
+      [1.41, 'spine2', 0.18],
+      [1.53, 'spine2', 0.17],
+    ] as const)
+      ell(bn, [s * 0.072, y, rz], [0.068, 0.054, 0.035], 0.035);
+    ell('spine1', [s * 0.22, 1.28, 0.04], [0.07, 0.17, 0.13], 0.04);
+    for (let i = 0; i < 3; i++) ell('chest', [s * 0.33, 1.55 + i * 0.075, 0.1 - i * 0.02], [0.045, 0.03, 0.05], 0.018);
+    // Pecs: broad slabs with a hard lower edge, tied into the shoulders.
+    ell('chest', [s * 0.18, 1.86, 0.17], [0.2, 0.135, 0.1], 0.035);
+    cone('chest', [s * 0.22, 1.9, 0.16], 0.085, [s * 0.52, 1.98, 0.1], 0.075, 0.035);
+    // Lats: wings from the armpits down to the waist.
+    ell('chest', [s * 0.33, 1.62, -0.1], [0.13, 0.34, 0.16], 0.04, [s * 0.48, 1.95, -0.06]);
+    // Traps sweeping out to the shoulders; upper back; erector ridges down the spine.
+    cone('chest', [0, 2.18, -0.08], 0.13, [s * 0.5, 2.1, -0.05], 0.1, 0.05);
+    ell('chest', [s * 0.15, 1.88, -0.25], [0.15, 0.15, 0.08], 0.04);
+    cone('spine1', [s * 0.07, 1.08, -0.17], 0.07, [s * 0.07, 1.55, -0.24], 0.07, 0.04);
+    cone(cl, [s * 0.12, 2.06, 0.08], 0.07, [s * 0.55, 2.1, 0.0], 0.08, 0.05);
+    // Neck: thick, with the cords standing out.
+    cone('neck1', [s * 0.06, 2.0, 0.12], 0.045, [s * 0.1, 2.36, 0.06], 0.04, 0.03);
   }
-  // Spine furrow between the back muscles.
-  carve('chest', [0, 1.7, -0.37], [0.035, 0.3, 0.04], 0.06);
-  // Neck: short and thick, the head pushed forward of it.
-  cone('neck1', [0, 1.98, -0.02], 0.2, [0, 2.24, 0.1], 0.15, 0.08);
-  cone('neck2', [0, 2.22, 0.1], 0.15, [0, 2.36, 0.17], 0.12, 0.06);
+  ell('chest', [0, 2.04, -0.12], [0.3, 0.16, 0.18], 0.05);
+  carve('chest', [0, 1.7, -0.33], [0.03, 0.3, 0.04], 0.05);
+  carve('spine1', [0, 1.35, 0.235], [0.012, 0.25, 0.03], 0.02); // linea alba
+  cone('neck1', [0, 1.98, -0.04], 0.17, [0, 2.24, 0.08], 0.14, 0.06);
+  cone('neck2', [0, 2.22, 0.1], 0.14, [0, 2.36, 0.17], 0.12, 0.05);
   // Head: low skull, heavy brow, wide jaw, broad flat nose, small ears.
   ell('head', [0, 2.5, 0.13], [0.135, 0.15, 0.15], 0.04);
   cone('head', [-0.09, 2.535, 0.255], 0.036, [0.09, 2.535, 0.255], 0.036, 0.03);
@@ -107,14 +124,20 @@ export function buildLeoAnatomy() {
     bone(`upperarm${side}`, `clavicle${side}`, shoulder);
     bone(`forearm${side}`, `upperarm${side}`, elbow);
     bone(`hand${side}`, `forearm${side}`, wrist);
-    ell(`upperarm${side}`, X([0.62, 2.07, 0]), [0.2, 0.21, 0.21], 0.07);
-    cone(`upperarm${side}`, shoulder, 0.17, elbow, 0.13, 0.05);
-    ell(`upperarm${side}`, add(add(shoulder, mul(u, 0.42)), [0, 0, 0.06]), [0.15, 0.3, 0.15], 0.06, elbow);
-    ell(`upperarm${side}`, add(add(shoulder, mul(u, 0.38)), [0, 0, -0.07]), [0.14, 0.32, 0.13], 0.06, elbow);
-    sphere(`forearm${side}`, add(elbow, [0, 0, -0.07]), 0.09, 0.05);
-    cone(`forearm${side}`, elbow, 0.15, wrist, 0.115, 0.05);
-    ell(`forearm${side}`, add(elbow, mul(u, 0.27)), [0.23, 0.36, 0.21], 0.08, wrist);
-    ell(`forearm${side}`, add(elbow, mul(u, 0.5)), [0.16, 0.25, 0.14], 0.07, wrist);
+    // Deltoid in three heads, biceps peak, triceps horseshoe, forearms like hams.
+    ell(`upperarm${side}`, X([0.61, 2.06, 0.09]), [0.12, 0.17, 0.11], 0.03);
+    ell(`upperarm${side}`, X([0.7, 2.05, 0]), [0.13, 0.18, 0.13], 0.03);
+    ell(`upperarm${side}`, X([0.61, 2.06, -0.09]), [0.12, 0.16, 0.11], 0.03);
+    cone(`upperarm${side}`, shoulder, 0.13, elbow, 0.1, 0.04);
+    const outw: V3 = X([0.866, 0.5, 0]);
+    ell(`upperarm${side}`, add(add(shoulder, mul(u, 0.46)), [0, 0, 0.075]), [0.13, 0.25, 0.14], 0.03, elbow);
+    ell(`upperarm${side}`, add(add(shoulder, mul(u, 0.35)), [0, 0, -0.08]), [0.12, 0.28, 0.12], 0.03, elbow);
+    ell(`upperarm${side}`, add(add(shoulder, mul(u, 0.4)), mul(outw, 0.06)), [0.1, 0.24, 0.1], 0.03, elbow);
+    sphere(`forearm${side}`, add(elbow, [0, 0, -0.07]), 0.075, 0.035);
+    cone(`forearm${side}`, elbow, 0.12, wrist, 0.1, 0.04);
+    ell(`forearm${side}`, add(add(elbow, mul(u, 0.22)), [0, 0, 0.05]), [0.17, 0.3, 0.15], 0.04, wrist);
+    ell(`forearm${side}`, add(add(elbow, mul(u, 0.3)), [0, 0, -0.06]), [0.15, 0.32, 0.13], 0.04, wrist);
+    ell(`forearm${side}`, add(add(elbow, mul(u, 0.12)), mul(outw, 0.07)), [0.1, 0.18, 0.1], 0.03, wrist);
     // Raised veins over the forearm.
     for (const [dz, ph] of [
       [0.12, 0],
@@ -208,12 +231,19 @@ export function buildLeoAnatomy() {
     bone(`shin${side}`, `thigh${side}`, knee);
     bone(`foot${side}`, `shin${side}`, ankle);
     bone(`toes${side}`, `foot${side}`, ball);
-    cone(`thigh${side}`, hip, 0.21, knee, 0.14, 0.07);
-    ell(`thigh${side}`, X([0.27, 0.76, 0.08]), [0.17, 0.24, 0.15], 0.07, knee);
-    ell(`thigh${side}`, X([0.15, 0.8, 0]), [0.1, 0.2, 0.12], 0.07);
-    ell(`shin${side}`, add(knee, [0, 0, 0.1]), [0.07, 0.07, 0.04], 0.04);
-    cone(`shin${side}`, knee, 0.13, ankle, 0.085, 0.06);
-    ell(`shin${side}`, X([0.29, 0.38, -0.07]), [0.14, 0.2, 0.13], 0.07, ankle);
+    // Quads in their separate heads (teardrop over the knee), hamstrings, split calves.
+    cone(`thigh${side}`, hip, 0.17, knee, 0.11, 0.04);
+    ell(`thigh${side}`, X([0.27, 0.78, 0.11]), [0.1, 0.24, 0.09], 0.03, knee);
+    ell(`thigh${side}`, X([0.36, 0.78, 0.03]), [0.1, 0.26, 0.12], 0.03, knee);
+    ell(`thigh${side}`, X([0.2, 0.62, 0.08]), [0.09, 0.12, 0.09], 0.03, knee);
+    ell(`thigh${side}`, X([0.27, 0.8, -0.1]), [0.12, 0.25, 0.11], 0.03, knee);
+    ell(`thigh${side}`, X([0.15, 0.82, 0]), [0.08, 0.18, 0.1], 0.04);
+    ell(`shin${side}`, add(knee, [0, 0, 0.09]), [0.06, 0.065, 0.035], 0.03);
+    cone(`shin${side}`, knee, 0.1, ankle, 0.075, 0.04);
+    ell(`shin${side}`, X([0.33, 0.4, -0.08]), [0.08, 0.16, 0.09], 0.03, ankle);
+    ell(`shin${side}`, X([0.25, 0.41, -0.08]), [0.08, 0.17, 0.09], 0.03, ankle);
+    ell(`shin${side}`, X([0.29, 0.27, -0.05]), [0.1, 0.14, 0.08], 0.04, ankle);
+    cone(`shin${side}`, X([0.3, 0.48, 0.07]), 0.04, X([0.3, 0.2, 0.04]), 0.03, 0.03);
     sphere(`shin${side}`, X([0.34, 0.12, -0.02]), 0.04, 0.03);
     sphere(`shin${side}`, X([0.24, 0.13, -0.02]), 0.04, 0.03);
     cone(`foot${side}`, X([0.29, 0.07, -0.1]), 0.07, ball, 0.055, 0.05);
@@ -243,8 +273,8 @@ export function buildLeoAnatomy() {
   const cloth: ClothFn = (p0, b, h) => {
     const [x, y, z]: V3 = [p0[0] / S, p0[1] / S, p0[2] / S];
     const torso = b === 'chest' || b === 'spine2' || b.startsWith('clavicle') || b === 'spine1' || b === 'neck1';
-    const hole = h.fbm(x * 3.2 + 3, y * 3.2, z * 3.2 + 7, 3) > 0.17;
-    const rip = z > 0.12 && y > 1.42 && Math.abs(x - 0.1 - 0.05 * Math.sin(y * 12)) < 0.035 + 0.06 * (y - 1.42);
+    const hole = h.fbm(x * 3.2 + 3, y * 3.2, z * 3.2 + 7, 3) > 0.12;
+    const rip = z > 0.12 && y > 1.42 && Math.abs(x - 0.06 - 0.05 * Math.sin(y * 12)) < 0.05 + 0.12 * (y - 1.42);
     const burst = z < -0.18 && y > 1.38 && Math.abs(x + 0.05 * Math.sin(y * 9)) < 0.05 + 0.16 * (y - 1.38);
     const torn = hole || rip || burst;
     const hem = HEM_Y + 0.07 * h.fbm(x * 6, 0, z * 6, 2) + 0.05 * Math.max(0, h.noise(x * 25, 3.3, z * 25));

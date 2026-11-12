@@ -65,7 +65,7 @@ export interface BodyMeta {
   hemY?: number;
 }
 
-export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=3`;
+export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=4`;
 export const ROBIN_BODY_URL = bodyUrl('robin');
 
 /** Photo layout (pixels in robin.png): eye centres, and where the shirt collar sits. */
@@ -96,7 +96,7 @@ export async function loadBody(species: Species, photo: MonsterImage | null): Pr
   try {
     const [gltf, meta] = await Promise.all([
       new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(bodyUrl(species)),
-      fetch(`/assets/monster/${species}_body.json?v=3`).then((r) => r.json() as Promise<BodyMeta>),
+      fetch(`/assets/monster/${species}_body.json?v=4`).then((r) => r.json() as Promise<BodyMeta>),
     ]);
     let mesh: THREE.SkinnedMesh | null = null;
     gltf.scene.traverse((o) => {

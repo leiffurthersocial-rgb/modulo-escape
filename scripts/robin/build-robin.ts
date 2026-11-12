@@ -15,7 +15,7 @@ import { buildAnatomy, CLOTH, HEAD_PIVOT, HEAD_SCALE, type Prim, type Region, ty
 import { buildCharacter, CHARACTERS, type CharacterName } from './characters.ts';
 
 const H = Number(process.env.ROBIN_RES ?? 0.0035);
-const TARGET_TRIS = Number(process.env.ROBIN_TRIS ?? 70000);
+const TARGET_TRIS = Number(process.env.ROBIN_TRIS ?? 85000);
 const CHAR = (process.argv[2] ?? 'robin') as CharacterName;
 const CH = CHARACTERS[CHAR];
 if (!CH) throw new Error(`unknown character ${CHAR}`);

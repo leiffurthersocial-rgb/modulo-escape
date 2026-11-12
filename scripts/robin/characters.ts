@@ -24,6 +24,8 @@ export interface Character {
   pants: 'long' | 'short';
   /** Long sleeves down to the wrists. */
   longSleeves?: boolean;
+  /** A looser shirt that hangs over the ribs instead of clinging to them. */
+  looseShirt?: boolean;
   /** A sculpt of its own (same skeleton) instead of re-proportioning Robin. */
   custom?: 'leo';
 }
@@ -48,6 +50,7 @@ export const CHARACTERS: Record<CharacterName, Character> = {
     shirt: true,
     pants: 'long',
     longSleeves: true,
+    looseShirt: true,
     bones: {
       hips: { len: 1.1, thick: [1.1, 1.0, 1.05] },
       spine1: { len: 1.2, thick: [1.12, 1, 1.08] },
@@ -99,6 +102,12 @@ export function buildCharacter(c: Character): Retargeted {
     return { bones: L.bones, prims: L.prims, toOrig: L.prims.map(() => id), girth: L.prims.map(() => 1), cloth: L.cloth, meta: L.meta, hemY: L.meta.hemY };
   }
   const { bones, prims } = buildAnatomy();
+  if (c.looseShirt) {
+    // Cloth shells over the ribcage and belly (in Robin's space; mapped like everything else).
+    const shell = (bone: string, ctr: V3, r: V3, k: number) => prims.push({ kind: 'ell', a: ctr, b: [ctr[0], ctr[1] + 1, ctr[2]], ra: 0, rb: 0, r, k, bone });
+    shell('chest', [0, 2.19, -0.01], [0.19, 0.24, 0.146], 0.04);
+    shell('spine2', [0, 2.02, -0.005], [0.172, 0.13, 0.135], 0.05);
+  }
   const byName = new Map(bones.map((b) => [b.name, b]));
   const scale = (n: string) => c.bones[n] ?? {};
   const thickV = (n: string): V3 => {
