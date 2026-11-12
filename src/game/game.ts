@@ -140,11 +140,12 @@ export class Game {
     }
     this.computeNearStairs();
 
-    const ground = building.floors[0]!;
+    // The exit is on a random floor; above the ground floor the gate opens straight onto the night.
+    const exitLevel = building.floors[building.exit.floor]!;
     this.gateMat = assets.kit.get('metal')!.clone();
     this.gateMat.color.set(0xc08070);
-    this.gate = new ExitGate(ground, this.gateMat);
-    this.outdoors = new Outdoors(ground, assets, quality.vegetation, building.floors);
+    this.gate = new ExitGate(exitLevel, this.gateMat);
+    this.outdoors = new Outdoors(exitLevel, assets, quality.vegetation, building.floors);
     this.scene.add(this.outdoors.group);
     this.scene.add(this.gate.object);
     this.physics.setGateBlocker(
@@ -152,6 +153,7 @@ export class Game {
       building.exit.side === 'N' || building.exit.side === 'S',
       this.gate.width,
       this.gate.height,
+      exitLevel.elevation,
     );
 
     const startLevel = building.floors[building.start.floor]!;
@@ -510,8 +512,8 @@ export class Game {
     const g = this.gate.position;
     const toGate = Math.hypot(cam.x - g.x, cam.z - g.z);
     const outdoor = this.gate.opening ? THREE.MathUtils.clamp(1 - (toGate - 2) / 10, 0, 1) * this.gate.openAmount : 0;
-    const groundFloor = this.player.floor === 0 ? 1 : 0;
-    const sky = outdoor * groundFloor;
+    const exitFloor = this.player.floor === this.building.exit.floor ? 1 : 0;
+    const sky = outdoor * exitFloor;
     this.env.sun.intensity = this.env.params.sunIntensity * sky;
     this.env.sun.shadow.autoUpdate = sky > 0.01;
     // Inside keeps the tuned indoor fill; stepping out of the gate fades to the night outside.
@@ -580,7 +582,7 @@ export class Game {
   }
 
   private checkExit() {
-    if (this.player.floor !== 0) return;
+    if (this.player.floor !== this.building.exit.floor) return;
     const f = this.player.feet;
     const g = this.gate.position;
     const dx = f.x - g.x;
@@ -592,9 +594,10 @@ export class Game {
       bus.emit('exit:approached', { x: this.building.exit.x, z: this.building.exit.z, side: this.building.exit.side });
       bus.emit('exit:opened', {});
     }
-    // Won once the player is through the gate.
+    // Won once the player is through the gate (on upper floors right at the threshold, before the drop).
     const out = dx * this.gate.outward.x + dz * this.gate.outward.z;
-    if (this.gate.opening && out > 1.2 && this.state === 'playing') {
+    const through = this.gate.position.y > 0.5 ? 0.35 : 1.2;
+    if (this.gate.opening && out > through && this.state === 'playing') {
       bus.emit('level:won', { seed: this.building.seed, timeMs: this.elapsedMs });
       this.setState('won');
     }

@@ -8,7 +8,6 @@ import type { Building } from '../gen/types.ts';
 import { kitPieces } from '../gen/kit.ts';
 import { KIT, transformBox } from '../kit/greybox.ts';
 import { stairRamp } from '../world/stairs.ts';
-import { BOX_SIZE } from '../gen/furnish.ts';
 
 /** Key for a prop across floors. */
 export const propKey = (floor: number, index: number) => floor * 100000 + index;
@@ -53,7 +52,7 @@ export class PhysicsWorld {
         } else if (p.w !== undefined && p.d !== undefined) {
           // Box furniture against a wall (benches, counters, stalls…) or long models.
           const along = Math.abs(Math.cos(p.rot)) > 0.5;
-          const h = BOX_SIZE[p.type]?.h ?? 0.9;
+          const h = 0.9;
           const y = (p.y ?? 0) + y0;
           this.world.createCollider(RAPIER.ColliderDesc.cuboid((along ? p.w : p.d) / 2, h / 2, (along ? p.d : p.w) / 2).setTranslation(p.x, y + h / 2, p.z), fixed);
         } else {
@@ -89,11 +88,11 @@ export class PhysicsWorld {
   }
 
   /** Blocks the exit opening until the gate opens. */
-  setGateBlocker(center: { x: number; z: number }, alongX: boolean, width: number, height: number) {
+  setGateBlocker(center: { x: number; z: number }, alongX: boolean, width: number, height: number, elevation = 0) {
     const fixed = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     const hx = alongX ? width / 2 : 0.15;
     const hz = alongX ? 0.15 : width / 2;
-    this.gateCollider = this.world.createCollider(RAPIER.ColliderDesc.cuboid(hx, height / 2, hz).setTranslation(center.x, height / 2, center.z), fixed);
+    this.gateCollider = this.world.createCollider(RAPIER.ColliderDesc.cuboid(hx, height / 2, hz).setTranslation(center.x, elevation + height / 2, center.z), fixed);
   }
 
   removeGateBlocker() {

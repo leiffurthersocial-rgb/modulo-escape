@@ -157,8 +157,9 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
         const r2 = rng.next();
         if (keepClear || walls === 0) continue;
         void roll; // (was: rubble) — no loose clutter, only school furniture
-        // Furniture by room use comes from furnish.ts; just the odd stray chair here.
-        if (cell.kind === 'room' && DESK_ROOMS.has(room?.use ?? 'classroom') && r2 < 0.06) add('chair', cx, cz, c.u, c.v);
+        // Small rooms are offices / store rooms: a desk or stacked chairs against the walls.
+        if (cell.kind === 'room' && room && room.w * room.h < 4 && r2 < 0.3) add(rng.chance(0.5) ? 'chair' : rng.chance(0.5) ? 'desk' : 'barrel', cx, cz, c.u, c.v);
+        else if (cell.kind === 'room' && r2 < 0.08) add('chair', cx, cz, c.u, c.v);
       }
 
       // Mid-wall slots: old pipes along corridor walls.

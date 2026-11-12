@@ -45,7 +45,7 @@ async function main() {
   const b = game.building;
   // Camera path: node centres along the shortest path across floors and stairs, eye height.
   const startNode = b.start.floor * game.nav.N + cellIndex(b, b.start.x, b.start.z);
-  const exitNode = cellIndex(b, b.exit.x, b.exit.z);
+  const exitNode = b.exit.floor * game.nav.N + cellIndex(b, b.exit.x, b.exit.z);
   const path = game.nav.path(startNode, exitNode).map((n) => game.nav.nodePos(n).add(new THREE.Vector3(0, 1.6, 0)));
   const curve = new THREE.CatmullRomCurve3(path, false, 'centripetal', 0.3);
   const length = curve.getLength();

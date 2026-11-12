@@ -12,7 +12,6 @@ import type { DecalSlot } from '../gen/dressing.ts';
 import { KIT, transformBox } from '../kit/greybox.ts';
 import { boxesToSurfaceGeometry, type AABB, type SurfaceFn } from './boxMesh.ts';
 import { propMatrix } from './props.ts';
-import { BOX_SIZE } from '../gen/furnish.ts';
 import type { PropModel } from './propModels.ts';
 import { ROLE_OF, type KitRole, type WorldAssets } from './worldAssets.ts';
 import { buildRoots, buildVines } from './flora.ts';
@@ -237,9 +236,6 @@ export class ChunkManager {
         const m = a.props?.models.get(q.model ?? '');
         return base + (m ? modelHeight(m) * (q.model === 'wooden_bookshelf_worn' ? 0.5 : 1) : 0.75);
       }
-      if (q.type === 'shelf') return base + 1.03;
-      const box = BOX_SIZE[q.type];
-      if (box) return base + box.h - (q.type === 'lab_bench' ? 0.0 : 0.02);
       if (q.type === 'classroom_desk' || q.type === 'desk') {
         const m = a.props?.forType(q.type)[0];
         return base + (m ? modelHeight(m) * a.props.fitFor(q.type, m) : 0.75);

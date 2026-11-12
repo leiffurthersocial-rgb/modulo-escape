@@ -6,8 +6,9 @@
  *  1. place stair flights between adjacent floors (spread apart so each floor must be crossed)
  *  2. per floor: reserve stair / shaft / landing cells, place classrooms and pillared halls,
  *     link rooms + landings (MST + loops), carve corridors with A*, dead-end spurs, assign walls/doors
- *  3. global nav graph (floors + stairs); start on the top floor far from the stairs down,
- *     exit gate on an outward ground-floor wall far along the path; enforce a minimum path
+ *  3. global nav graph (floors + stairs); start on a random floor, exit gate on a random floor
+ *     on an outward wall far along the path (over open air above the ground floor);
+ *     enforce a minimum path
  *  4. per floor: props, lights, spawn points, dressing (separate RNG sub-streams)
  * Any failed check retries with attempt+1, which keeps it deterministic.
  */
@@ -18,7 +19,6 @@ import { buildNav, bfs } from './nav.ts';
 import { placeProps, placeLights, pickSpawnPoints } from './props.ts';
 import { dressLevel } from './dressing.ts';
 import { assignKzu } from './kzu.ts';
-import { furnish } from './furnish.ts';
 import type { Building, Cell, EdgeKind, LevelData, LevelSize, Room, Side, Stair } from './types.ts';
 
 export class GenerationError extends Error {}
@@ -142,55 +142,52 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
     adj[land]!.push(top);
   }
 
-  // ── start: top floor, far from where the stairs arrive ──
-  const topF = cfg.floors - 1;
-  const arrivals = stairs.filter((s) => s.lower + 1 === topF).map((s) => topF * N + cellIndex(cfg, s.x, s.z + 2));
-  const fromArrival = arrivals.length ? bfsMulti(adj, arrivals) : bfs(adj, topF * N + firstWalkable(works[topF]!));
-  let startNode = -1;
-  for (let i = 0; i < N; i++) {
-    const node = topF * N + i;
-    const c = works[topF]!.cells[i]!;
-    if (!isWalkable(c.kind) || c.kind === 'stair' || isLanding(works[topF]!, i)) continue;
-    if (startNode < 0 || fromArrival[node]! > fromArrival[startNode]!) startNode = node;
-  }
-  if (startNode < 0) throw new GenerationError('no start');
+  // ── start and exit: each on a random floor; the exit far along the path from the start ──
+  const pick = streamRng(seed, 'startexit', attempt);
+  const startF = pick.int(0, cfg.floors - 1);
+  const exitF = pick.int(0, cfg.floors - 1);
+  const free = (f: number, i: number) => {
+    const c = works[f]!.cells[i]!;
+    return isWalkable(c.kind) && c.kind !== 'stair' && !isLanding(works[f]!, i);
+  };
+  const starts = [...Array(N).keys()].filter((i) => free(startF, i));
+  if (!starts.length) throw new GenerationError('no start');
+  const startNode = startF * N + pick.pick(starts);
   const dist = bfs(adj, startNode);
   for (let node = 0; node < adj.length; node++) {
     const f = Math.floor(node / N);
     if (isWalkable(works[f]!.cells[node % N]!.kind) && dist[node]! < 0) throw new GenerationError('building not connected');
   }
 
-  // ── exit: ground floor, far along the path, on an outward wall ──
-  const w0 = works[0]!;
-  const ground = [...Array(N).keys()].filter((i) => w0.cells[i]!.kind !== 'void' && isWalkable(w0.cells[i]!.kind) && w0.cells[i]!.kind !== 'stair' && !isLanding(w0, i));
-  ground.sort((p, q) => dist[q]! - dist[p]! || p - q);
-  const exitRng = streamRng(seed, 'exit', attempt);
-  let exit: Building['exit'] | null = null;
-  for (const ci of ground.slice(0, Math.max(3, Math.ceil(ground.length * 0.12)))) {
-    const x = ci % width;
-    const z = Math.floor(ci / width);
-    const outward = SIDES.filter((sd) => {
+  // Exit: an outward wall (out of the building, or over open air on upper floors) on its floor.
+  const wE = works[exitF]!;
+  const outward = (i: number) => {
+    const x = i % width;
+    const z = Math.floor(i / width);
+    return SIDES.filter((sd) => {
       const nx = x + DIR[sd].dx;
       const nz = z + DIR[sd].dz;
-      const outside = !inBounds(w0, nx, nz) || w0.cells[cellIndex(w0, nx, nz)]!.kind === 'void';
-      return outside && getEdge(w0, x, z, sd) === 'solid';
+      const outside = !inBounds(wE, nx, nz) || wE.cells[cellIndex(wE, nx, nz)]!.kind === 'void';
+      return outside && getEdge(wE, x, z, sd) === 'solid';
     });
-    if (outward.length) {
-      exit = { floor: 0, x, z, side: exitRng.pick(outward) };
-      break;
-    }
-  }
-  if (!exit) throw new GenerationError('no exit wall');
-  const pathLength = dist[cellIndex(w0, exit.x, exit.z)]!;
+  };
+  const exitCands = [...Array(N).keys()].filter((i) => free(exitF, i) && outward(i).length > 0);
+  exitCands.sort((p, q) => dist[exitF * N + q]! - dist[exitF * N + p]! || p - q);
+  const exitRng = streamRng(seed, 'exit', attempt);
+  const top = exitCands.slice(0, Math.max(3, Math.ceil(exitCands.length * 0.15)));
+  if (!top.length) throw new GenerationError('no exit wall');
+  const ei = exitRng.pick(top);
+  const exit: Building['exit'] = { floor: exitF, x: ei % width, z: Math.floor(ei / width), side: exitRng.pick(outward(ei)) };
+  const pathLength = dist[exitF * N + ei]!;
   if (pathLength < cfg.minPath) throw new GenerationError(`path too short (${pathLength})`);
-  setEdge(w0, exit.x, exit.z, exit.side, 'exit');
-  const distToExit = bfs(adj, cellIndex(w0, exit.x, exit.z));
+  setEdge(wE, exit.x, exit.z, exit.side, 'exit');
+  const distToExit = bfs(adj, exitF * N + ei);
 
   const sCell = startNode % N;
   const sx = sCell % width;
   const sz = Math.floor(sCell / width);
-  const facing = SIDES.find((sd) => isPassable(getEdge(works[topF]!, sx, sz, sd))) ?? 'N';
-  const start = { floor: topF, x: sx, z: sz, facing };
+  const facing = SIDES.find((sd) => isPassable(getEdge(works[startF]!, sx, sz, sd))) ?? 'N';
+  const start = { floor: startF, x: sx, z: sz, facing };
 
   // ── finish each floor ──
   const floors: LevelData[] = works.map((w, f) => {
@@ -210,8 +207,8 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
       edgesZ: w.edgesZ,
       rooms: w.rooms,
       pillars: hallPillars(w),
-      start: f === topF ? { x: sx, z: sz, facing } : { x: -1, z: -1, facing: 'N' },
-      exit: f === 0 ? { x: exit.x, z: exit.z, side: exit.side } : { x: -1, z: -1, side: 'N' },
+      start: f === startF ? { x: sx, z: sz, facing } : { x: -1, z: -1, facing: 'N' },
+      exit: f === exitF ? { x: exit.x, z: exit.z, side: exit.side } : { x: -1, z: -1, side: 'N' },
       props: [],
       lights: [],
       spawnPoints: [],
@@ -229,11 +226,10 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
       },
     };
     const sub = (name: string) => streamRng(seed, `${name}:${f}`, attempt);
-    level.wings = assignKzu(level, sub('kzu'));
+    assignKzu(level);
     level.props = placeProps(level, sub('props'));
-    furnish(level, level.props, sub('furnish'));
     level.lights = placeLights(level, sub('lights'));
-    const anchor = f === topF ? cellIndex(level, sx, sz) : firstLanding(w);
+    const anchor = f === startF ? cellIndex(level, sx, sz) : firstLanding(w);
     level.spawnPoints = pickSpawnPoints(level, sub('spawns'), anchor);
     level.dressing = dressLevel(level, attempt);
     return level;
@@ -265,22 +261,6 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
       pathLength,
     },
   };
-}
-
-function bfsMulti(adj: number[][], sources: number[]): number[] {
-  const dist = new Array<number>(adj.length).fill(-1);
-  const q = [...sources];
-  for (const s of sources) dist[s] = 0;
-  for (let h = 0; h < q.length; h++) {
-    const c = q[h]!;
-    for (const n of adj[c] ?? []) {
-      if (dist[n] === -1) {
-        dist[n] = dist[c]! + 1;
-        q.push(n);
-      }
-    }
-  }
-  return dist;
 }
 
 function firstWalkable(w: Work): number {

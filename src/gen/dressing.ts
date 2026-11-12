@@ -6,7 +6,6 @@ import { streamRng, type Rng } from '../core/rng.ts';
 import { DIR, SIDES, cellIndex, getEdge, inBounds, isWalkable } from './grid.ts';
 import { WALL_THICKNESS } from './config.ts';
 import type { LevelData, Side } from './types.ts';
-import { USE_NAME, wingAt } from './kzu.ts';
 
 /** Decal atlas tiles (4×4 grid in the main atlas). */
 export const DECAL_TILES = {
@@ -103,10 +102,7 @@ export function dressLevel(l: LevelData, attempt = 0): Dressing {
   const rng = streamRng(l.seed, 'decals', attempt);
   const flora = streamRng(l.seed, 'flora', attempt);
   const damp = computeDamp(l, streamRng(l.seed, 'damp', attempt));
-  const roomLabels = l.rooms.map((r) => {
-    if (r.label) return r.use && r.use !== 'classroom' ? `${r.label}\n${USE_NAME[r.use]}` : r.label;
-    return r.use ? USE_NAME[r.use] : '';
-  });
+  const roomLabels = l.rooms.map((r) => r.label ?? '');
   return {
     damp,
     decals: [...placeDecals(l, rng, damp), ...placeSigns(l, streamRng(l.seed, 'signs', attempt))],
@@ -202,8 +198,8 @@ function placeDecals(l: LevelData, rng: Rng, damp: number[]): DecalSlot[] {
           const nz = cz + DIR[side].dz;
           const room = inBounds(l, nx, nz) ? l.cells[cellIndex(l, nx, nz)]!.room : -1;
           if (room < 0 || room >= PLATE_TILES) continue;
-          const two = l.rooms[room]?.kind === 'hall' || (l.rooms[room]?.use ?? 'classroom') !== 'classroom';
-          push('plate', room, wallPoint(l, cx, cz, side, 1.45, 1.55), two ? 0.56 : 0.42, two ? 0.28 : 0.21, 0, cx, cz);
+          if (!l.rooms[room]?.label) continue;
+          push('plate', room, wallPoint(l, cx, cz, side, 1.45, 1.55), 0.42, 0.21, 0, cx, cz);
         }
       }
       if (c.kind === 'stair') continue;
@@ -218,97 +214,13 @@ function placeDecals(l: LevelData, rng: Rng, damp: number[]): DecalSlot[] {
   return out;
 }
 
-/**
- * German signs on the corridor walls:
- *  - AUSGANG above the exit gate
- *  - TRAKT signs where a corridor crosses into another wing
- *  - "← Mensa" / "Aula →" at junctions near the big halls
- * Signs only go on side walls (parallel to the way to go), so their arrow reads left/right.
- */
-function placeSigns(l: LevelData, rng: Rng): DecalSlot[] {
+/** The green AUSGANG sign above the exit gate. */
+function placeSigns(l: LevelData, _rng: Rng): DecalSlot[] {
   const out: DecalSlot[] = [];
-  const adj = l.nav.adj;
-  const used = new Set<string>();
-  const cxz = (i: number) => [i % l.width, Math.floor(i / l.width)] as const;
-
-  /** Put a sign on a free solid side wall of the cell (perpendicular to D); arrow tile by side. */
-  const place = (i: number, D: { dx: number; dz: number }, tiles: [number, number] | number, w: number, h: number, y: number) => {
-    const [cx, cz] = cxz(i);
-    const walls = SIDES.filter((sd) => getEdge(l, cx, cz, sd) === 'solid' && DIR[sd].dx * D.dx + DIR[sd].dz * D.dz === 0 && !used.has(`${i}:${sd}`));
-    if (!walls.length) return false;
-    const side = rng.pick(walls);
-    used.add(`${i}:${side}`);
-    const p = wallPoint(l, cx, cz, side, rng.range(-0.5, 0.5), y);
-    // Decal "right" on the wall = up × normal = (nz, 0, -nx).
-    const right = D.dx * p.nz + D.dz * -p.nx > 0;
-    const tile = typeof tiles === 'number' ? tiles : tiles[right ? 1 : 0];
-    out.push({ atlas: 'sign', tile, x: p.x, y: p.y, z: p.z, nx: p.nx, ny: 0, nz: p.nz, w, h, rot: 0, cx, cz });
-    return true;
-  };
-  const step = (a: number, b: number) => {
-    const [ax, az] = cxz(a);
-    const [bx, bz] = cxz(b);
-    return { dx: bx - ax, dz: bz - az };
-  };
-
   // Ausgang above the gate.
   if (l.exit.x >= 0) {
     const p = wallPoint(l, l.exit.x, l.exit.z, l.exit.side, 0, 3.25);
     out.push({ atlas: 'sign', tile: SIGN_TILE.ausgang, x: p.x, y: p.y, z: p.z, nx: p.nx, ny: 0, nz: p.nz, w: 0.66, h: 0.33, rot: 0, cx: l.exit.x, cz: l.exit.z });
-  }
-  // Trakt signs at wing borders.
-  const wings = l.wings ?? [];
-  if (wings.length) {
-    const wingOf = l.cells.map((_, i) => wingAt(wings, (i % l.width) + 0.5, Math.floor(i / l.width) + 0.5));
-    const seen = new Set<string>();
-    l.cells.forEach((_, i) => {
-      if (l.cells[i]!.kind !== 'corridor') return;
-      for (const n of adj[i]!) {
-        if (wingOf[n] === wingOf[i] || l.cells[n]!.kind !== 'corridor') continue;
-        const key = `${Math.min(i, n)}-${Math.max(i, n)}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        place(n, step(i, n), SIGN_TILE.trakt[wings[wingOf[n]!]!.prefix] ?? SIGN_TILE.trakt.E!, 0.8, 0.4, 2.15);
-      }
-    });
-  }
-  // Hall direction signs.
-  const halls = l.rooms.filter((r) => r.kind === 'hall' && r.use && SIGN_TILE.halls.includes(r.use));
-  if (halls.length) {
-    const best = new Array<number>(l.cells.length).fill(Infinity);
-    const toward = new Array<number>(l.cells.length).fill(-1);
-    for (const h of halls) {
-      const k = SIGN_TILE.halls.indexOf(h.use!);
-      const d = new Array<number>(l.cells.length).fill(-1);
-      const q: number[] = [];
-      l.cells.forEach((c, i) => {
-        if (c.room === h.id) {
-          d[i] = 0;
-          q.push(i);
-        }
-      });
-      for (let head = 0; head < q.length; head++) {
-        const c = q[head]!;
-        if (d[c]! >= 12) continue;
-        for (const n of adj[c]!) {
-          if (d[n] !== -1) continue;
-          d[n] = d[c]! + 1;
-          q.push(n);
-        }
-      }
-      d.forEach((v, i) => {
-        if (v > 1 && v < best[i]!) {
-          best[i] = v;
-          toward[i] = k;
-        }
-      });
-      // Direction for cells that chose this hall.
-      l.cells.forEach((c, i) => {
-        if (toward[i] !== k || best[i] !== d[i] || c.kind !== 'corridor' || adj[i]!.length < 3 || !rng.chance(0.55)) return;
-        const next = adj[i]!.find((n) => d[n] === d[i]! - 1);
-        if (next !== undefined) place(i, step(i, next), [SIGN_TILE.hallBase + k * 2, SIGN_TILE.hallBase + k * 2 + 1], 0.8, 0.4, 1.95);
-      });
-    }
   }
   return out;
 }

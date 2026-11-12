@@ -18,7 +18,7 @@ export class ExitGate {
   constructor(level: LevelData, material: THREE.Material) {
     const c = cellCenter(level, level.exit.x, level.exit.z);
     const d = DIR[level.exit.side];
-    this.position.set(c.x + (d.dx * level.cellSize) / 2, 0, c.z + (d.dz * level.cellSize) / 2);
+    this.position.set(c.x + (d.dx * level.cellSize) / 2, level.elevation, c.z + (d.dz * level.cellSize) / 2);
     this.outward.set(d.dx, 0, d.dz);
     this.object.position.copy(this.position);
     // Pieces are authored along X; side N/S edges run along X, E/W along Z.

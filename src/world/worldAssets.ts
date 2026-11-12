@@ -10,7 +10,6 @@ import type { PropType } from '../gen/types.ts';
 import type { TexTierName } from '../render/assetManifest.ts';
 import { buildFoliageAtlas } from '../render/foliageTextures.ts';
 import { buildMainAtlas, buildPlateAtlas, buildSignAtlas } from '../render/decalAtlas.ts';
-import { FURNISH_MODELS } from '../gen/furnish.ts';
 import { createSurfaceMaterial, surfaceUniforms } from '../render/surface.ts';
 import type { PbrSet, TextureLibrary } from '../render/textures.ts';
 import { buildTreeVariants, createLeafMaterial, type TreeVariant } from './flora.ts';
@@ -115,7 +114,7 @@ export class WorldAssets {
 
     opts.onProgress?.('Loading props…');
     a.props = new PropLibrary(renderer, lib.manifest);
-    const ids = [...new Set([...Object.values(PROP_MODEL_IDS).flat(), ...OUTDOOR_SHRUB_IDS, ...OUTDOOR_ROCK_IDS, ...FURNISH_MODELS])];
+    const ids = [...new Set([...Object.values(PROP_MODEL_IDS).flat(), ...OUTDOOR_SHRUB_IDS, ...OUTDOOR_ROCK_IDS])];
     if (a.textured) await a.props.load(ids, 0, (d, t) => opts.onProgress?.(`Loading props ${d}/${t}…`));
 
     a.rubble = [0, 1, 2].map((i) => rubbleGeometry(`rubble-${i}`));

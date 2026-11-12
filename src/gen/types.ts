@@ -138,7 +138,6 @@ export interface LevelStats {
 }
 
 import type { Dressing } from './dressing.ts';
-import type { Wing } from './kzu.ts';
 
 /** One storey of the building. */
 export interface LevelData {
@@ -173,8 +172,6 @@ export interface LevelData {
   stats: LevelStats;
   /** Decals, damp map, vines, roots, trees, shrubs (separate RNG streams). */
   dressing: Dressing;
-  /** KZU wings (Trakte E, 1, 2, 3, 4) on this floor. */
-  wings?: Wing[];
 }
 
 /**

@@ -17,7 +17,17 @@ import {
   type LevelData,
   type LevelSize,
 } from '../src/gen/index.ts';
-import { propBox } from '../src/gen/furnish.ts';
+
+/** World-space footprint of a prop (box furniture: w × d turned by rot; others: r). */
+function propBox(p: { x: number; z: number; r: number; rot: number; w?: number; d?: number }) {
+  if (p.w !== undefined && p.d !== undefined) {
+    const along = Math.abs(Math.cos(p.rot)) > 0.5;
+    const hw = (along ? p.w : p.d) / 2;
+    const hd = (along ? p.d : p.w) / 2;
+    return { x0: p.x - hw, z0: p.z - hd, x1: p.x + hw, z1: p.z + hd };
+  }
+  return { x0: p.x - p.r, z0: p.z - p.r, x1: p.x + p.r, z1: p.z + p.r };
+}
 
 const SEEDS = Number(process.env.GEN_SEEDS ?? 1000);
 const SIZES: LevelSize[] = ['small', 'medium', 'large'];
@@ -127,8 +137,9 @@ function check(b: Building): string[] {
   const errs = b.floors.flatMap((f) => checkFloor(f).map((e) => `f${f.floor}: ${e}`));
   const N = b.width * b.height;
   if (b.floors.length !== SIZE_CONFIG[b.size].floors) errs.push('floor count');
-  if (b.start.floor !== b.floors.length - 1) errs.push('start not on top floor');
-  if (b.exit.floor !== 0) errs.push('exit not on ground floor');
+  if (b.start.floor < 0 || b.start.floor >= b.floors.length) errs.push('start floor out of range');
+  if (b.exit.floor < 0 || b.exit.floor >= b.floors.length) errs.push('exit floor out of range');
+  if (b.floors[b.exit.floor]!.exit.x !== b.exit.x) errs.push('exit not on its floor');
   const startNode = b.start.floor * N + cellIndex(b, b.start.x, b.start.z);
   const d = bfs(b.nav.adj, startNode);
   b.floors.forEach((f) =>
@@ -138,7 +149,7 @@ function check(b: Building): string[] {
   );
   if (b.stats.pathLength < SIZE_CONFIG[b.size].minPath) errs.push('path too short');
   if (b.nav.distToExit[startNode] !== b.stats.pathLength) errs.push('distToExit mismatch');
-  const f0 = b.floors[0]!;
+  const f0 = b.floors[b.exit.floor]!;
   if (getEdge(f0, b.exit.x, b.exit.z, b.exit.side) !== 'exit') errs.push('exit edge missing');
   const ox = b.exit.x + DIR[b.exit.side].dx;
   const oz = b.exit.z + DIR[b.exit.side].dz;
@@ -238,29 +249,25 @@ for (const size of SIZES) {
   });
 }
 
-describe('KZU naming', () => {
-  it('wings, room numbers and uses', () => {
+describe('KZU naming and floors', () => {
+  it('room numbers carry the floor (E, 1, 2, …); start and exit floors vary', () => {
     for (const size of SIZES) {
+      const startFloors = new Set<number>();
+      const exitFloors = new Set<number>();
       for (const seed of seedList(60, `kzu-${size}`)) {
         const b = generateBuilding(seed, size);
-        expect(b.floors.length).toBe(1);
-        const l = b.floors[0]!;
-        const prefixes = (l.wings ?? []).map((w) => w.prefix);
-        expect(new Set(prefixes).size, seed).toBe(prefixes.length);
-        const labels = l.rooms.filter((r) => r.kind === 'room').map((r) => r.label);
-        expect(labels.every((x) => !!x && /^[E1-4]\d\d$/.test(x)), seed).toBe(true);
-        expect(new Set(labels).size, seed).toBe(labels.length);
-        // Numbers within a wing run 01, 02, … without gaps, and never above 23.
-        for (const p of prefixes) {
-          const nums = labels.filter((x) => x!.startsWith(p)).map((x) => Number(x!.slice(1))).sort((a, c) => a - c);
-          nums.forEach((n, i) => expect(n).toBe(i + 1));
-          expect(nums.length).toBeLessThanOrEqual(23);
+        startFloors.add(b.start.floor);
+        exitFloors.add(b.exit.floor);
+        for (const l of b.floors) {
+          const prefix = l.floor === 0 ? 'E' : String(l.floor);
+          const labels = l.rooms.filter((r) => r.kind === 'room').map((r) => r.label);
+          expect(labels.every((x) => !!x && x.startsWith(prefix) && /^[E1-4]\d\d$/.test(x)), seed).toBe(true);
+          expect(new Set(labels).size, seed).toBe(labels.length);
+          expect(l.dressing.roomLabels.join('|')).not.toMatch(/C \d\./);
         }
-        for (const r of l.rooms) if (r.kind === 'room' || r.kind === 'hall') expect(r.use, `${seed} room ${r.id}`).toBeTruthy();
-        const halls = l.rooms.filter((r) => r.kind === 'hall').map((r) => r.use);
-        expect(halls.every((u) => ['mensa', 'aula', 'turnhalle', 'mediothek', 'pausenhalle'].includes(u!))).toBe(true);
-        expect(l.dressing.roomLabels.join('|')).not.toMatch(/C \d\./);
       }
+      expect(startFloors.size, size).toBe(SIZE_CONFIG[size].floors);
+      expect(exitFloors.size, size).toBe(SIZE_CONFIG[size].floors);
     }
   });
 });
@@ -269,9 +276,9 @@ describe('golden seeds', () => {
   // Locks layouts so later phases (props, materials, decals) can't silently change existing seeds.
   // Update deliberately with: GEN_UPDATE_GOLDEN=1 (prints new values).
   const golden: Record<string, string> = {
-    'kzu:small': '67daf568',
-    'kzu:medium': '73e78978',
-    'abc123:large': '093388c8',
+    'kzu:small': '4eca8050',
+    'kzu:medium': '0b7cf258',
+    'abc123:large': '59c9d5c3',
   };
   it('layout fingerprints are stable', () => {
     for (const key of Object.keys(golden)) {

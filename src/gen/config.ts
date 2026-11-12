@@ -16,11 +16,11 @@ export interface SizeConfig {
 }
 
 export const SIZE_CONFIG: Record<LevelSize, SizeConfig> = {
-  // One big floor of the KZU (no stairs). Lots of loops (circuits to shake off the monster), few
-  // dead ends, several landmark halls (Mensa, Aula, Turnhalle, Mediothek, Pausenhalle).
-  small: { width: 22, height: 22, rooms: [14, 18], halls: [2, 2], loopChance: 0.4, deadEnds: [0, 2], minPath: 26, floors: 1, stairsPerLevel: [0, 0] },
-  medium: { width: 30, height: 30, rooms: [26, 32], halls: [3, 4], loopChance: 0.42, deadEnds: [1, 3], minPath: 40, floors: 1, stairsPerLevel: [0, 0] },
-  large: { width: 38, height: 38, rooms: [42, 50], halls: [4, 5], loopChance: 0.45, deadEnds: [2, 4], minPath: 56, floors: 1, stairsPerLevel: [0, 0] },
+  // Several floors joined by stairs; you start on a random floor, the exit is on a random floor.
+  // Lots of loops (circuits to shake off the monster), few dead ends, a hall on most floors.
+  small: { width: 16, height: 16, rooms: [8, 11], halls: [1, 1], loopChance: 0.4, deadEnds: [0, 1], minPath: 26, floors: 2, stairsPerLevel: [1, 2] },
+  medium: { width: 20, height: 20, rooms: [11, 14], halls: [1, 2], loopChance: 0.42, deadEnds: [0, 2], minPath: 40, floors: 3, stairsPerLevel: [1, 2] },
+  large: { width: 24, height: 24, rooms: [14, 18], halls: [1, 2], loopChance: 0.45, deadEnds: [1, 2], minPath: 55, floors: 4, stairsPerLevel: [1, 2] },
 };
 
 export const CELL_SIZE = 4;
