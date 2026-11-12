@@ -25,7 +25,14 @@ export const CHUNK_CELLS = 6;
 interface Chunk {
   key: string;
   group: THREE.Group;
+  /** Furniture (drawn within FURNITURE_DIST) and small things (within DETAIL_DIST). */
+  furniture: THREE.Group;
+  detail: THREE.Group;
 }
+
+/** Props are only drawn this close (m): it's dark beyond, and it saves most of the triangles. */
+export const FURNITURE_DIST = 30;
+export const DETAIL_DIST = 16;
 
 export interface ChunkOptions {
   /** 0..1 fraction of decals kept. */
@@ -112,7 +119,10 @@ export class ChunkManager {
       const [x, z] = key.split(',').map(Number) as [number, number];
       const dx = Math.max(x * S - wx, 0, wx - (x + 1) * S);
       const dz = Math.max(z * S - wz, 0, wz - (z + 1) * S);
-      ch.group.visible = dx * dx + dz * dz < vd2;
+      const d2 = dx * dx + dz * dz;
+      ch.group.visible = d2 < vd2;
+      ch.furniture.visible = d2 < Math.min(vd2, FURNITURE_DIST * FURNITURE_DIST);
+      ch.detail.visible = d2 < Math.min(vd2, DETAIL_DIST * DETAIL_DIST);
     }
   }
 
@@ -196,22 +206,26 @@ export class ChunkManager {
     }
 
     // ── Props ──
-    this.buildProps(key, group);
+    const furniture = new THREE.Group();
+    const detail = new THREE.Group();
+    group.add(furniture, detail);
+    this.buildProps(key, furniture, detail);
 
     this.root.add(group);
-    this.chunks.set(key, { key, group });
+    this.chunks.set(key, { key, group, furniture, detail });
     bus.emit('chunk:loaded', { key });
   }
 
-  private buildProps(key: string, group: THREE.Group) {
+  private buildProps(key: string, group: THREE.Group, detailGroup: THREE.Group) {
     const a = this.assets;
     const S = this.level.cellSize;
     // Bucket instances by (geometry, material) so each pair is one draw call.
-    const buckets = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material; items: { m: THREE.Matrix4; propIndex: number; fit: number }[]; shadow: boolean }>();
+    const buckets = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material; items: { m: THREE.Matrix4; propIndex: number; fit: number }[]; shadow: boolean; detail: boolean }>();
+    let detail = false;
     const add = (geo: THREE.BufferGeometry, mat: THREE.Material, m: THREE.Matrix4, propIndex: number, fit: number, shadow = false) => {
-      const k = `${geo.uuid}|${mat.uuid}`;
+      const k = `${geo.uuid}|${mat.uuid}|${detail ? 'd' : 'f'}`;
       let b = buckets.get(k);
-      if (!b) buckets.set(k, (b = { geo, mat, items: [], shadow }));
+      if (!b) buckets.set(k, (b = { geo, mat, items: [], shadow: shadow && !detail, detail }));
       b.items.push({ m: m.clone(), propIndex, fit });
     };
     const scaleM = new THREE.Matrix4();
@@ -235,6 +249,8 @@ export class ChunkManager {
     for (const { p: p0, i } of this.propsByChunk.get(key) ?? []) {
       if (p0.type === 'vegetation' && hash01(i * 1.618) > this.opts.vegetation) continue;
       const support = p0.on !== undefined ? props[p0.on] : undefined;
+      // Small things (on tables, non-solid models, monitors) only up close.
+      detail = !!support || (p0.type === 'model' && !p0.solid) || p0.type === 'monitor';
       const p = support ? { ...p0, y: topOf(support) } : p0;
       const base = this.dynamicMatrix(i) ?? propMatrix(p, S);
       const models = a.props?.forType(p.type) ?? [];
@@ -287,7 +303,7 @@ export class ChunkManager {
       im.receiveShadow = true;
       im.computeBoundingSphere();
       im.userData.chunk = key;
-      group.add(im);
+      (b.detail ? detailGroup : group).add(im);
     }
   }
 
@@ -301,11 +317,11 @@ export class ChunkManager {
       if (keep.length) this.dynamicSlots.set(i, keep);
       else this.dynamicSlots.delete(i);
     }
-    for (const o of ch.group.children) {
+    ch.group.traverse((o) => {
       // Chunk-owned geometry is disposed; shared prop geometry and all materials are kept.
       if (o instanceof THREE.InstancedMesh) o.dispose();
       else if (o instanceof THREE.Mesh) o.geometry.dispose();
-    }
+    });
     this.root.remove(ch.group);
     this.chunks.delete(key);
     bus.emit('chunk:unloaded', { key });

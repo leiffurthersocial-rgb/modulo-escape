@@ -1,9 +1,9 @@
 # Modulo: Escape
 
 A first-person horror game in the browser. It's night, and you're trapped inside an abandoned,
-procedurally generated building of the KZU school: several floors of raw-concrete corridors,
-classrooms and stairwells. Flickering fluorescent tubes light the way. Find the exit gate on the
-ground floor before Robin finds you.
+procedurally generated floor of the KZU school: raw-concrete corridors, classrooms, labs, the
+Mensa, the Aula, the Turnhalle. Flickering fluorescent tubes light the way. Find the exit gate
+before Robin finds you.
 
 Three.js + Rapier + Vite + TypeScript. Runs on desktop and iPad (touch controls, battery-saver preset).
 
@@ -25,14 +25,23 @@ Then open the URL it prints.
 
 **Controls:** WASD to move · Shift to sprint (stamina bar) · C/Z to crouch · F for the flashlight ·
 Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, materials). Touch controls
-turn on automatically on touch-only devices.
+(joystick, Run, Duck, Light) are on by default; turn them off in Settings.
 
 ## The game
 
-- **Building:** seeded generator (`src/gen`) with multiple floors linked by stairwells. Corridors
-  form loops so you can circle away from the monster, with only a few deliberate dead ends.
-  Classrooms have a blackboard, a teacher's desk and rows of desks. Small rooms are offices or
-  store rooms. Only the exit opens outside, onto a moonlit night.
+- **Building:** seeded generator (`src/gen`): one big floor, up to 152 m across. Corridors form
+  loops so you can circle away from the monster, with only a few deliberate dead ends. Only the
+  exit opens outside, onto a moonlit night.
+- **KZU:**
+  - **Wings:** the floor is split into wings (Trakt E, 1, 2, 3, 4), and rooms are numbered per
+    wing (E07, 312 …).
+  - **Signs:** KZU door plates show the number and the room's function; there's a sign at each
+    wing border, "← Mensa" style signs, and "Ausgang" over the gate.
+  - **Rooms:** classrooms (board, teacher's desk, rows of desks); Chemie, Physik and Biologie labs;
+    Informatik, Musik, BG, Lehrerzimmer, Sekretariat, WCs, Hauswart and Lager.
+  - **Halls:** Mensa, Aula, Turnhalle, Mediothek and Pausenhalle, each with its own furniture.
+  - **Set dressing:** 45 CC0 models: chess sets left on desks, books, desk lamps, microscopes,
+    extinguishers and more.
 - **Robin:** the monster is a 3.1 m sculpted, skinned humanoid with `robin.png` as its face
   (`src/ai/robinBody.ts`).
   - **Senses:** it hears your footsteps (sprinting is loud, crouching is quiet) and chases you on
@@ -66,7 +75,7 @@ jump-scare image. If the new photo frames the face differently, adjust the eye p
 
 ## Credits and docs
 
-Textures, models and night skies are CC0 (Poly Haven, ambientCG); sound effects are CC0 (Kenney Impact Sounds + RPG Audio, `npm run sounds:fetch`). See `assets/LICENSES.json` and
+Textures, models (furniture and props included) and night skies are CC0 (Poly Haven, ambientCG); sound effects are CC0 (Kenney Impact Sounds + RPG Audio, `npm run sounds:fetch`). See `assets/LICENSES.json` and
 the in-game Credits. Robin's body, all animation, the screams, the HVAC drone and the reverb are generated in code.
 
 See [PLAN.md](PLAN.md) for the plan and phases, [DECISIONS.md](DECISIONS.md) for every design

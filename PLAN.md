@@ -352,9 +352,11 @@ Render scale is capped so the internal resolution stays ≤ ~3.2 MP on iPad.
   and `MonsterStub` with a dormant/patrol/investigate/chase/search state machine
   (`?monster=stub` to try it).
 
-## 11. Next: one endless floor of the KZU (planned, not started)
+## 11. One floor of the KZU (built 2026-11-12); the endless version stays an idea
 
-See [PLAN-ENDLESS.md](PLAN-ENDLESS.md): one floor; wings E/1/2/3/4 with rooms like E07 and 307
+Built: one big finite floor; wings E/1/2/3/4 with room numbers; German plates and signs; room
+uses, landmark halls, furniture and CC0 set dressing (DECISIONS 83–86). Not built, by your choice:
+the endless streamed school in [PLAN-ENDLESS.md](PLAN-ENDLESS.md) (kept as an idea): one floor; wings E/1/2/3/4 with rooms like E07 and 307
 and German signs; special rooms and landmark halls; an endless school streamed in blocks that
 always come back the same; exits that appear in unseen blocks far ahead and only move while you
 haven't seen them.

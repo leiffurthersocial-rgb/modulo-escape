@@ -21,7 +21,8 @@ test('loads a fixed seed, enters the building, no console errors', async ({ page
   await expect(page.locator('#btn-enter')).toBeVisible();
   await page.screenshot({ path: `docs/screenshots/${info.project.name}-title.png` });
 
-  const isTouch = await page.evaluate(() => (window as any).__game.game.touch.enabled as boolean);
+  // Touch controls are on by default everywhere now; tap only where the device can.
+  const isTouch = !!info.project.use.hasTouch;
   if (isTouch) await page.tap('#btn-enter');
   else await page.click('#btn-enter');
   await page.waitForFunction(() => (window as any).__game.game.state === 'playing');

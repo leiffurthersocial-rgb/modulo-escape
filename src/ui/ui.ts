@@ -86,8 +86,7 @@ export class UI {
     bus.on('exit:opened', () => this.toast('The gate grinds open…'));
     bus.on('quality:autoLowered', ({ to }) => this.toast(`Running slow: graphics lowered to ${to}`, 3000));
     bus.on('perf:suggest', ({ reason }) => this.suggestBattery(reason));
-    if (game.touch.enabled && game.input.pointerLockSupported === false) this.toast('Touch controls enabled (change in Settings)', 3500);
-    else if (game.touch.enabled) this.toast('Touch device detected: touch controls on (change in Settings)', 3500);
+    if (game.touch.enabled) this.toast('Touch controls on (turn off in Settings)', 3000);
   }
 
   private screens(): HTMLElement[] {

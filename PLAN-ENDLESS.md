@@ -1,6 +1,7 @@
 # Plan: one endless floor of the KZU (not implemented yet)
 
-Status: **plan only, 2026-11-12.** Nothing in here is built yet.
+Status: **an idea only, not to be built (your decision, 2026-11-12).** Single-floor KZU parts of it
+(wings, room numbers, German signs, room uses, halls, set dressing) were built on the normal finite map.
 
 **What you asked for:**
 - One floor instead of several, and much bigger.
