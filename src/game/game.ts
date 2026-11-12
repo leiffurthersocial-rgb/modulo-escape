@@ -50,6 +50,9 @@ export interface GameHooks {
   onDebugMenu?(): void;
 }
 
+/** Monster states that count as being after you. */
+const HUNTING = new Set<string>(['chase', 'charge', 'roar', 'stare']);
+
 export class Game {
   readonly scene: THREE.Scene;
   readonly renderer: THREE.WebGLRenderer;
@@ -272,6 +275,29 @@ export class Game {
     }
   }
   private monsters: { m: Monster; wakeAt: number; active: boolean }[] = [];
+  /**
+   * One monster at a time is the hunter: it stalks you (appears near you, drifts to your area);
+   * the others roam elsewhere. The role moves on every 60–110 s, to whoever's awake (never twice
+   * in a row when there's a choice), so encounters vary instead of everyone converging at once.
+   */
+  private hunterId = '';
+  private hunterUntil = 0;
+  private hunterRng = Math.random;
+  private pickHunter() {
+    const awake = this.monsters.filter((x) => x.active && x.m.state !== 'dormant');
+    if (!awake.length) return;
+    const busy = awake.find((x) => HUNTING.has(x.m.state));
+    if (busy) {
+      // Whoever is on you right now keeps the role until they lose you.
+      this.hunterId = busy.m.id;
+      this.hunterUntil = this.time + 20;
+      return;
+    }
+    const others = awake.filter((x) => x.m.id !== this.hunterId);
+    const pool = others.length ? others : awake;
+    this.hunterId = pool[Math.floor(this.hunterRng() * pool.length)]!.m.id;
+    this.hunterUntil = this.time + 60 + this.hunterRng() * 50;
+  }
   /** Debug mode (unlocked by pressing pause three times): cheats and monster controls. */
   readonly debug = { invisible: false, noCatch: false, freeze: false };
   /** Debug: the monsters, for the panel. */
@@ -547,7 +573,11 @@ export class Game {
     this.gate.update(dt);
     this.director.update(dt);
     this.senses.update(dt);
+    if (this.time > this.hunterUntil || !this.monsters.some((x) => x.m.id === this.hunterId && x.active && x.m.state !== 'dormant')) this.pickHunter();
     let tension = 0;
+    let threat = Infinity;
+    let tx = 0;
+    let tz = 0;
     for (const { m, wakeAt, active } of this.monsters) {
       if (!active) continue;
       if (m.state === 'dormant' && this.time > wakeAt) m.wake();
@@ -555,10 +585,18 @@ export class Game {
       const sameFloor = m.floor === this.player.floor;
       const d = m.position.distanceTo(this.player.feet);
       const near = sameFloor ? Math.max(0, 1 - d / 22) * 0.6 : 0;
-      const hunted = m.state === 'chase' || m.state === 'charge' || m.state === 'roar';
+      if (sameFloor && d < threat) {
+        threat = d;
+        tx = m.position.x;
+        tz = m.position.z;
+      }
+      const hunted = HUNTING.has(m.state);
       tension = Math.max(tension, hunted ? 1 : m.state === 'investigate' ? Math.max(near, 0.4) : near);
     }
     if (this.monsters.length) this.audio.setTension(tension);
+    this.director.threat = { dist: threat, x: tx, z: tz, floor: this.player.floor };
+    this.director.playerPos.x = this.player.feet.x;
+    this.director.playerPos.z = this.player.feet.z;
     if (this.monsters.length && !this.debug.freeze) {
       const ctx = this.entityContext();
       for (const e of this.monsters) if (e.active) e.m.update(dt, ctx);
@@ -580,10 +618,13 @@ export class Game {
         sprinting: p.sprinting,
         flashlightOn: p.flashlightOn,
         invisible: this.debug.invisible,
+        moving: p.realSpeed > 0.5,
         forward: p.camera.getWorldDirection(this.viewDir),
         // Half the narrower view angle, a little inside the screen edge.
         viewCos: Math.cos(THREE.MathUtils.degToRad(p.camera.fov * 0.5) * Math.min(1, p.camera.aspect) * 0.95),
       },
+      isHunter: (id) => id === this.hunterId,
+      othersHunting: (id) => this.monsters.some((x) => x.active && x.m.id !== id && HUNTING.has(x.m.state)),
       catchPlayer: (by) => {
         if (this.state !== 'playing' || this.debug.noCatch) return;
         bus.emit('player:caught', { by });
@@ -640,7 +681,7 @@ export class Game {
     this.env.hemi.groundColor.copy(ind.hemiGround).lerp(out.hemiGround, sky);
     this.scene.environmentIntensity = THREE.MathUtils.lerp(ind.envIntensity * 0.5 * INDOOR_ENV_COMP, out.envIntensity, sky);
     // Eye adaptation: dark interiors open the "iris"; the night outside keeps it open.
-    const target = THREE.MathUtils.lerp(1.35, 1.5, sky);
+    const target = THREE.MathUtils.lerp(1.18, 1.5, sky);
     this.adapt += (target - this.adapt) * Math.min(1, dt * 1.5);
     if (dt === 0) this.adapt = target;
     this.renderer.toneMappingExposure = ind.exposure * this.adapt * (this.scare.active ? Math.max(0.0001, this.scare.exposure) : 1);

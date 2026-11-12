@@ -22,12 +22,15 @@ export interface LightState {
   level: number;
   /** Fixture is dead (never lights). */
   dead: boolean;
+  /** 0..1: glowing red (a monster is close). */
+  red: number;
 }
 
-const BASE_INTENSITY = 7.5;
+const BASE_INTENSITY = 6.2;
 /** How far (in walkable cells) a tube can be from you and still get a real light. */
 const REACH = 5;
 const COLOR = 0xe4ecff;
+const RED = new THREE.Color(0xff1a0a);
 
 export class LightRegistry {
   readonly states: LightState[] = [];
@@ -59,6 +62,7 @@ export class LightRegistry {
           pos: new THREE.Vector3((slot.cx + 0.5) * S, level.elevation + b.storeyHeight - 0.05, (slot.cz + 0.5) * S),
           level: 1,
           dead: slot.decay > 0.9,
+          red: 0,
         });
       }
     }
@@ -68,7 +72,7 @@ export class LightRegistry {
       this.byNode.set(st.node, list);
     });
     const geo = new THREE.BoxGeometry(1.3, 0.07, 0.22);
-    this.fixtureMat = new THREE.MeshStandardMaterial({ color: 0x6c6c66, emissive: 0xffffff, emissiveIntensity: 1.4, roughness: 0.6 });
+    this.fixtureMat = new THREE.MeshStandardMaterial({ color: 0x6c6c66, emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.6 });
     this.fixtures = new THREE.InstancedMesh(geo, this.fixtureMat, Math.max(1, this.states.length));
     const m = new THREE.Matrix4();
     this.states.forEach((s, i) => {
@@ -151,10 +155,15 @@ export class LightRegistry {
     this.pool.forEach((light, k) => {
       const i = this.assigned[k]!;
       this.fade[k] = Math.min(1, this.fade[k]! + dt * 3.5);
-      light.intensity = i >= 0 ? BASE_INTENSITY * this.states[i]!.level * this.fade[k]! : 0;
+      const s = i >= 0 ? this.states[i]! : null;
+      light.intensity = s ? BASE_INTENSITY * s.level * this.fade[k]! * (1 + 0.4 * s.red) : 0;
+      light.color.setHex(COLOR);
+      if (s && s.red > 0) light.color.lerp(RED, s.red);
     });
     this.states.forEach((s, i) => {
-      if (!s.dead) this.fixtures.setColorAt(i, this.color.setScalar(0.08 + 0.92 * s.level));
+      if (s.dead) return;
+      const v = 0.08 + 0.92 * s.level;
+      this.fixtures.setColorAt(i, this.color.setRGB(v, v * (1 - 0.9 * s.red), v * (1 - 0.9 * s.red)));
     });
     if (this.fixtures.instanceColor) this.fixtures.instanceColor.needsUpdate = true;
   }

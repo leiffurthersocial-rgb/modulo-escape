@@ -52,15 +52,20 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
   - **Getting caught:** ends in a jump scare.
 - **Leo** (wakes after ~18 s): a hulking, heavily muscled brute with his own sculpt, bare-chested: V-shaped torso, abs, a hump of
   muscle, a small head, arms as long as he is tall with huge fists, short bowed legs and ragged shorts. He walks on his knuckles like a gorilla and gallops on all fours when
-  he charges. He hears best of all three. When he spots you he rears up, roars and pounds his
-  chest, then charges in a straight line much faster than you can run, but he can barely steer:
-  dodge round a corner and he slams into the wall and staggers, clutching his head, for a couple
-  of seconds. Up close he hammers both fists down. You feel his stomps (camera shake) before you
+  he charges. He hears best of all three. Spotting you from afar he creeps at you, staring; run or let him
+  close and he rears up, roars and pounds his chest, then charges in a straight line much faster than you can run, but he can barely steer:
+  dodge round a corner and he slams into the wall and staggers, clutching his head. Then he
+  slams the floor (the lights stutter) and listens: keep walking and he knows exactly where you
+  are; stand still or crouch and he has to search. As the hunter he sometimes waits for you in a
+  doorway and lunges without a roar. Up close he hammers both fists down. You feel his stomps (camera shake) before you
   see him.
 - **Jovan** (wakes after ~30 s): so tall (≈ 4.8 m, gaunt, black hollow eyes, in a ripped black shirt) that he walks
   stooped with his palms pressed flat against the ceiling, hand over hand. He sees furthest, and he only moves while you're not looking at him: keep him on
   screen and he freezes; look away (or look back with Q) and he comes, fast and almost silent.
   You hear his head dragging along the ceiling, and lights stutter around him.
+- **Taking turns:** only one monster hunts you at a time; the others roam elsewhere, and one
+  that spots you while you're already being chased just watches you, then backs off. When a
+  monster is close, lights near you flicker red.
 - **Faces:** each monster wears its photo (`robin.png`, `leo.png`, `jovan.png`); Leo's and Jovan's
   are made from the photos in `assets/leo/` and `assets/jovan/` by `python3 scripts/robin/make_faces.py`
   (aligned to robin.png's eye positions and cut out). A `<name>_scream.png` (Leo has one) replaces

@@ -20,6 +20,8 @@ export interface PlayerView {
   viewCos: number;
   /** Debug: monsters can't see or hear you. */
   invisible: boolean;
+  /** Walking or running (not standing still). */
+  moving: boolean;
 }
 
 export interface EntityContext {
@@ -30,6 +32,10 @@ export interface EntityContext {
   time: number;
   /** Ends the run (state 'caught'). */
   catchPlayer(by: string): void;
+  /** The one monster currently allowed to stalk you (the others roam elsewhere). */
+  isHunter(id: string): boolean;
+  /** Is another monster already after you (chasing, charging, staring you down)? */
+  othersHunting(id: string): boolean;
 }
 
 export interface Entity {

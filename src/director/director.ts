@@ -20,6 +20,11 @@ export class AmbienceDirector {
   private offs: (() => void)[] = [];
   /** Global tension 0..1; the horror layer will raise it. Unused in Phase 1. */
   tension = 0;
+  /** Nearest monster to you on your floor (set by the game each frame); Infinity = none. */
+  threat = { dist: Infinity, x: 0, z: 0, floor: 0 };
+  private reds = new Map<number, number>();
+  /** Your position (for the red flicker). */
+  readonly playerPos = { x: 0, z: 0 };
 
   constructor(scene: THREE.Scene, b: Building, poolSize = 4) {
     this.lights = new LightRegistry(scene, b, poolSize);
@@ -31,6 +36,13 @@ export class AmbienceDirector {
         this.lights.assignNear(e.floor * b.width * b.height + e.z * b.width + e.x, (e.x + 0.5) * S, e.floor * b.floorStep + 1.6, (e.z + 0.5) * S);
       }),
       bus.on('light:flicker', (e) => this.flickers.set(e.id, { until: this.time + e.ms / 1000, phase: this.rng.next() * 10 })),
+      // Leo's floor slam: every light around him stutters (some go out for a moment).
+      bus.on('monster:pound', (e) => {
+        this.lights.states.forEach((s, i) => {
+          if (s.dead || s.floor !== e.floor || Math.hypot(s.pos.x - e.x, s.pos.z - e.z) > 14) return;
+          this.flickers.set(i, { until: this.time + 0.4 + this.rng.next() * 1.2, phase: this.rng.next() * 10 });
+        });
+      }),
       // Lights stutter around Jovan.
       bus.on('monster:presence', (e) => {
         if (e.species !== 'jovan') return;
@@ -58,12 +70,39 @@ export class AmbienceDirector {
         if (burst) lv *= Math.sin(t * 55 + i) > 0 ? 1 : 0.05;
         if (w > 0.7 && Math.sin(t * 0.11 + i * 5.1) > 0.93) lv = 0.03;
       }
+      const red = this.reds.get(i);
+      if (red !== undefined) {
+        if (t > red) {
+          this.reds.delete(i);
+          s.red = 0;
+        } else {
+          // A red stutter: the tube buzzes red and blinks.
+          s.red = 1;
+          lv *= Math.sin(t * 47 + i) > -0.3 ? 0.85 : 0.1;
+        }
+      }
       const f = this.flickers.get(i);
       if (f) {
         if (t > f.until) this.flickers.delete(i);
         else lv *= Math.sin((t + f.phase) * 60) > 0 ? 1 : 0.05;
       }
       s.level = lv;
+    }
+    // A monster really near: now and then a light close to you flickers red.
+    const th = this.threat;
+    if (th.dist < 11 && this.rng.next() < dt * 0.9 * (1 - th.dist / 11)) {
+      let best = -1;
+      let bd = Infinity;
+      for (const [i, s] of this.lights.states.entries()) {
+        if (s.dead || s.floor !== th.floor || this.reds.has(i)) continue;
+        // Between you and it, roughly: near either.
+        const d = Math.min(Math.hypot(s.pos.x - th.x, s.pos.z - th.z), Math.hypot(s.pos.x - this.playerPos.x, s.pos.z - this.playerPos.z)) + this.rng.next() * 3;
+        if (d < bd) {
+          bd = d;
+          best = i;
+        }
+      }
+      if (best >= 0 && bd < 9) this.reds.set(best, t + 0.5 + this.rng.next() * 1.3);
     }
     // Occasional random flicker event (ambience now; the horror layer will drive these).
     if (this.rng.next() < dt * 0.015 && this.lights.states.length) {

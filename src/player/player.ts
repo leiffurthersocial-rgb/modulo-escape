@@ -90,7 +90,7 @@ export class Player {
   private flashShadows = false;
 
   setFlashlight(on: boolean) {
-    this.flashlight.intensity = on ? 38 : 0;
+    this.flashlight.intensity = on ? 44 : 0;
     // Toggling visible/castShadow would recompile every shader; instead just stop re-rendering
     // the shadow map while the light is off (a castShadow light renders its pass even at 0).
     this.flashlight.shadow.autoUpdate = on;
