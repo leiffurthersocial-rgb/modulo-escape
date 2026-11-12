@@ -24,9 +24,34 @@ export interface Room {
   z: number;
   w: number;
   h: number;
-  /** stair/shaft/landing are reserved by the building-level stair placement. */
-  kind: 'room' | 'hall' | 'stair' | 'shaft' | 'landing';
+  /** landing = a corridor portal on a block border; court = an open-air courtyard (void). */
+  kind: 'room' | 'hall' | 'stair' | 'shaft' | 'landing' | 'court';
+  /** What the room is used for (endless KZU). */
+  use?: RoomUse;
+  /** Room number like "E07" / "312" (rooms only). */
+  label?: string;
 }
+
+/** Room functions in the KZU. Halls are landmarks; the rest are rooms off the corridors. */
+export type RoomUse =
+  | 'classroom'
+  | 'chemie'
+  | 'physik'
+  | 'biologie'
+  | 'informatik'
+  | 'musik'
+  | 'bg'
+  | 'lehrerzimmer'
+  | 'sekretariat'
+  | 'wc_damen'
+  | 'wc_herren'
+  | 'hauswart'
+  | 'lager'
+  | 'mensa'
+  | 'aula'
+  | 'turnhalle'
+  | 'pausenhalle'
+  | 'mediothek';
 
 export type PropType =
   | 'rubble'
@@ -86,6 +111,7 @@ export interface LevelStats {
 }
 
 import type { Dressing } from './dressing.ts';
+import type { Wing } from './kzu.ts';
 
 /** One storey of the building. */
 export interface LevelData {
@@ -120,6 +146,8 @@ export interface LevelData {
   stats: LevelStats;
   /** Decals, damp map, vines, roots, trees, shrubs (separate RNG streams). */
   dressing: Dressing;
+  /** KZU wings (Trakte E, 1, 2, 3, 4) on this floor. */
+  wings?: Wing[];
 }
 
 /**

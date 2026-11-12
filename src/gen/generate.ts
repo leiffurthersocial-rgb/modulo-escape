@@ -17,6 +17,7 @@ import { DIR, OPPOSITE, SIDES, cellIndex, getEdge, inBounds, isPassable, isWalka
 import { buildNav, bfs } from './nav.ts';
 import { placeProps, placeLights, pickSpawnPoints } from './props.ts';
 import { dressLevel } from './dressing.ts';
+import { assignKzu } from './kzu.ts';
 import type { Building, Cell, EdgeKind, LevelData, LevelSize, Room, Side, Stair } from './types.ts';
 
 export class GenerationError extends Error {}
@@ -227,6 +228,7 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
       },
     };
     const sub = (name: string) => streamRng(seed, `${name}:${f}`, attempt);
+    level.wings = assignKzu(level, sub('kzu'));
     level.props = placeProps(level, sub('props'));
     level.lights = placeLights(level, sub('lights'));
     const anchor = f === topF ? cellIndex(level, sx, sz) : firstLanding(w);
@@ -437,8 +439,9 @@ function placeRooms(w: Work, cfg: SizeConfig, rng: Rng) {
       let rw: number;
       let rh: number;
       if (kind === 'hall') {
-        rw = rng.int(3, Math.min(6, Math.floor(w.width / 3)));
-        rh = rng.int(3, Math.min(5, Math.floor(w.height / 3)));
+        // Landmark halls: Mensa, Aula, Turnhalle… 16–32 m across.
+        rw = rng.int(4, Math.min(8, Math.floor(w.width / 3)));
+        rh = rng.int(4, Math.min(6, Math.floor(w.height / 3)));
       } else {
         // Classrooms are 8×8 m to 12×12 m (2–3 cells); some small store rooms / offices.
         const small = rng.chance(0.25);

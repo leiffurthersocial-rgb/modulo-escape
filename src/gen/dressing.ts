@@ -6,6 +6,7 @@ import { streamRng, type Rng } from '../core/rng.ts';
 import { DIR, SIDES, cellIndex, getEdge, inBounds, isWalkable } from './grid.ts';
 import { WALL_THICKNESS } from './config.ts';
 import type { LevelData, Side } from './types.ts';
+import { USE_NAME } from './kzu.ts';
 
 /** Decal atlas tiles (4×4 grid in the main atlas). */
 export const DECAL_TILES = {
@@ -82,17 +83,22 @@ export interface Dressing {
   roots: RootSlot[];
   trees: FloraSlot[];
   shrubs: FloraSlot[];
-  /** Room number labels, by room id ("C 1.07"). */
+  /** Door plate text by room id: "E07", "E12\nChemie", "Mensa" ('' = no plate). */
   roomLabels: string[];
 }
 
 const T = WALL_THICKNESS / 2;
+/** Door plates in the plate atlas (16 × 8). */
+export const PLATE_TILES = 128;
 
 export function dressLevel(l: LevelData, attempt = 0): Dressing {
   const rng = streamRng(l.seed, 'decals', attempt);
   const flora = streamRng(l.seed, 'flora', attempt);
   const damp = computeDamp(l, streamRng(l.seed, 'damp', attempt));
-  const roomLabels = l.rooms.map((_, i) => `C ${l.floor + 1}.${String(1 + i).padStart(2, '0')}`);
+  const roomLabels = l.rooms.map((r) => {
+    if (r.label) return r.use && r.use !== 'classroom' ? `${r.label}\n${USE_NAME[r.use]}` : r.label;
+    return r.use ? USE_NAME[r.use] : '';
+  });
   return {
     damp,
     decals: placeDecals(l, rng, damp),
@@ -187,8 +193,9 @@ function placeDecals(l: LevelData, rng: Rng, damp: number[]): DecalSlot[] {
           const nx = cx + DIR[side].dx;
           const nz = cz + DIR[side].dz;
           const room = inBounds(l, nx, nz) ? l.cells[cellIndex(l, nx, nz)]!.room : -1;
-          if (room < 0) continue;
-          push('plate', room % 32, wallPoint(l, cx, cz, side, 1.45, 1.55), 0.42, 0.21, 0, cx, cz);
+          if (room < 0 || room >= PLATE_TILES) continue;
+          const two = l.rooms[room]?.kind === 'hall' || (l.rooms[room]?.use ?? 'classroom') !== 'classroom';
+          push('plate', room, wallPoint(l, cx, cz, side, 1.45, 1.55), two ? 0.56 : 0.42, two ? 0.28 : 0.21, 0, cx, cz);
         }
       }
       if (c.kind === 'stair') continue;

@@ -198,6 +198,7 @@ for (const size of SIZES) {
       let halls = 0;
       let stubs = 0;
       let floors = 0;
+      let walkable = 0;
       for (const seed of seedList(100, `mix-${size}`)) {
         const b = generateBuilding(seed, size);
         const s = b.stats;
@@ -206,6 +207,7 @@ for (const size of SIZES) {
         halls += s.halls;
         for (const l of b.floors) {
           floors++;
+          walkable += l.stats.walkable;
           const nav = buildNav(l);
           // Actual corridor tips that lead nowhere (landings are excluded: stairs continue there).
           stubs += l.cells.filter((c, i) => c.kind === 'corridor' && (c.room < 0 || l.rooms[c.room]?.kind !== 'landing') && nav.adj[i]!.length <= 1).length;
@@ -213,7 +215,7 @@ for (const size of SIZES) {
       }
       // Gameplay: many loops to circle the monster, only a handful of deliberate spurs.
       expect(loops / floors).toBeGreaterThan(1);
-      expect(stubs / floors).toBeLessThanOrEqual(2.5);
+      expect((stubs / walkable) * 100).toBeLessThanOrEqual(1.5);
       expect(deadEnds).toBeLessThanOrEqual(stubs + floors);
       if (size !== 'small') expect(halls).toBeGreaterThan(80);
       expect(generateBuilding(`stairs-${size}`, size).stairs.length).toBeGreaterThanOrEqual(SIZE_CONFIG[size].floors - 1);
@@ -221,13 +223,40 @@ for (const size of SIZES) {
   });
 }
 
+describe('KZU naming', () => {
+  it('wings, room numbers and uses', () => {
+    for (const size of SIZES) {
+      for (const seed of seedList(60, `kzu-${size}`)) {
+        const b = generateBuilding(seed, size);
+        expect(b.floors.length).toBe(1);
+        const l = b.floors[0]!;
+        const prefixes = (l.wings ?? []).map((w) => w.prefix);
+        expect(new Set(prefixes).size, seed).toBe(prefixes.length);
+        const labels = l.rooms.filter((r) => r.kind === 'room').map((r) => r.label);
+        expect(labels.every((x) => !!x && /^[E1-4]\d\d$/.test(x)), seed).toBe(true);
+        expect(new Set(labels).size, seed).toBe(labels.length);
+        // Numbers within a wing run 01, 02, … without gaps, and never above 23.
+        for (const p of prefixes) {
+          const nums = labels.filter((x) => x!.startsWith(p)).map((x) => Number(x!.slice(1))).sort((a, c) => a - c);
+          nums.forEach((n, i) => expect(n).toBe(i + 1));
+          expect(nums.length).toBeLessThanOrEqual(23);
+        }
+        for (const r of l.rooms) if (r.kind === 'room' || r.kind === 'hall') expect(r.use, `${seed} room ${r.id}`).toBeTruthy();
+        const halls = l.rooms.filter((r) => r.kind === 'hall').map((r) => r.use);
+        expect(halls.every((u) => ['mensa', 'aula', 'turnhalle', 'mediothek', 'pausenhalle'].includes(u!))).toBe(true);
+        expect(l.dressing.roomLabels.join('|')).not.toMatch(/C \d\./);
+      }
+    }
+  });
+});
+
 describe('golden seeds', () => {
   // Locks layouts so later phases (props, materials, decals) can't silently change existing seeds.
   // Update deliberately with: GEN_UPDATE_GOLDEN=1 (prints new values).
   const golden: Record<string, string> = {
-    'kzu:small': 'b34829e8',
-    'kzu:medium': '49360045',
-    'abc123:large': '6d7015e9',
+    'kzu:small': '67daf568',
+    'kzu:medium': '73e78978',
+    'abc123:large': '093388c8',
   };
   it('layout fingerprints are stable', () => {
     for (const key of Object.keys(golden)) {

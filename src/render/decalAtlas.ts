@@ -1,7 +1,7 @@
 /**
  * Procedural decal atlases, painted on a 2D canvas at startup (no download):
  * main atlas 4×4 tiles: cracks, stains, water streaks, KZU stencils, graffiti, moss, floor stain.
- * plate atlas 8×4 tiles: enamel room plates "KZU · C 1.07".
+ * plate atlas 16×8 tiles: enamel KZU door plates ("E07", "E12 · Chemie", "Mensa").
  */
 import * as THREE from 'three';
 import { Rng } from '../core/rng.ts';
@@ -108,7 +108,7 @@ function graffiti(ctx: Ctx, s: number, r: Rng) {
   ctx.font = `italic 900 ${s * 0.32}px "Arial Black", Impact, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const word = r.pick(['KZU', 'WING C', 'EXIT?', 'C14', 'LOST']);
+  const word = r.pick(['KZU', 'LAUF', 'AUSGANG?', 'HILFE', 'ROBIN']);
   ctx.lineWidth = s * 0.05;
   ctx.strokeStyle = `hsla(${hues[1]},60%,15%,0.9)`;
   ctx.strokeText(word, 0, 0);
@@ -151,8 +151,8 @@ export function buildMainAtlas(tile = 256): THREE.CanvasTexture {
     (c, s) => streak(c, s, r),
     (c, s) => streak(c, s, r),
     (c, s) => streak(c, s, r),
-    (c, s) => stencil(c, s, r, 'KZU', 'TRAKT C · WING C'),
-    (c, s) => stencil(c, s, r, 'C', 'KZU · ZUTRITT VERBOTEN'),
+    (c, s) => stencil(c, s, r, 'KZU', 'KANTONSSCHULE ZÜRCHER UNTERLAND'),
+    (c, s) => stencil(c, s, r, '!', 'KZU · ZUTRITT VERBOTEN'),
     (c, s) => graffiti(c, s, r),
     (c, s) => graffiti(c, s, r),
     (c, s) => moss(c, s, r),
@@ -171,14 +171,25 @@ export function buildMainAtlas(tile = 256): THREE.CanvasTexture {
   return toTexture(canvas);
 }
 
+/** KZU door plates, 16 × 8 tiles: a number ("E07"), number + function ("E12" / "Chemie"), or a hall name. */
 export function buildPlateAtlas(labels: string[], w = 256): THREE.CanvasTexture {
   const h = w / 2;
-  const [canvas, ctx] = makeCanvas(w * 8, h * 4);
-  const r = new Rng('kzu-plates-v1');
-  for (let i = 0; i < 32; i++) {
-    const x = (i % 8) * w;
-    const y = Math.floor(i / 8) * h;
-    const label = labels[i] ?? `C 1.${String(i + 1).padStart(2, '0')}`;
+  const [canvas, ctx] = makeCanvas(w * 16, h * 8);
+  const r = new Rng('kzu-plates-v2');
+  const fit = (text: string, max: number, px: number, weight: number) => {
+    let size = px;
+    ctx.font = `${weight} ${size}px Arial, sans-serif`;
+    while (size > 8 && ctx.measureText(text).width > max) {
+      size -= 2;
+      ctx.font = `${weight} ${size}px Arial, sans-serif`;
+    }
+  };
+  for (let i = 0; i < 128; i++) {
+    const label = labels[i] ?? '';
+    if (!label) continue;
+    const x = (i % 16) * w;
+    const y = Math.floor(i / 16) * h;
+    const [main, sub] = label.split('\n') as [string, string | undefined];
     ctx.save();
     ctx.translate(x, y);
     // Enamel plate: off-white with a dark border, chipped and rust-stained.
@@ -188,12 +199,19 @@ export function buildPlateAtlas(labels: string[], w = 256): THREE.CanvasTexture 
     ctx.lineWidth = 5;
     ctx.strokeRect(10, 10, w - 20, h - 20);
     ctx.fillStyle = '#1f2b3a';
-    ctx.font = `700 ${h * 0.2}px Arial, sans-serif`;
+    ctx.font = `700 ${h * 0.16}px Arial, sans-serif`;
     ctx.textAlign = 'left';
-    ctx.fillText('KZU', 22, h * 0.36);
-    ctx.font = `900 ${h * 0.42}px Arial, sans-serif`;
+    ctx.fillText('KZU', 22, h * 0.3);
     ctx.textAlign = 'center';
-    ctx.fillText(label, w / 2, h * 0.78);
+    if (sub) {
+      fit(main, w - 60, h * 0.36, 900);
+      ctx.fillText(main, w / 2, h * 0.6);
+      fit(sub, w - 40, h * 0.2, 700);
+      ctx.fillText(sub, w / 2, h * 0.84);
+    } else {
+      fit(main, w - 50, h * 0.42, 900);
+      ctx.fillText(main, w / 2, h * 0.76);
+    }
     for (let k = 0; k < 6; k++) {
       ctx.fillStyle = `rgba(${r.int(70, 110)},${r.int(40, 60)},20,${r.range(0.2, 0.5)})`;
       ctx.beginPath();

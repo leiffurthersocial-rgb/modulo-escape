@@ -453,7 +453,7 @@ function decalGeometry(list: DecalSlot[], atlas: 'main' | 'plate'): THREE.Buffer
         up.copy(u2);
       }
     }
-    const [u0, v0, u1, v1] = atlas === 'main' ? tileUv(d.tile, 4, 4) : tileUv(d.tile, 8, 4);
+    const [u0, v0, u1, v1] = atlas === 'main' ? tileUv(d.tile, 4, 4) : tileUv(d.tile, 16, 8);
     const b = pos.length / 3;
     const hw = d.w / 2;
     const hh = d.h / 2;
