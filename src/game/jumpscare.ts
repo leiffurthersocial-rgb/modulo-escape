@@ -145,10 +145,9 @@ export class JumpScare {
         const body = monster.robinBody!;
         body.scareHit = this.config.hitAt;
         body.scareT = 0;
-        // A light on his face: the scare must be seen, whatever the flashlight was doing.
-        this.light = new THREE.PointLight(0xffd8c8, 0, 4.5, 1.6);
-        this.light.position.set(0, 0.35, 0.1);
-        player.camera.add(this.light);
+        // The face light (created once in prepare(): adding a light now would recompile every
+        // shader in the scene and stutter right at the scare).
+        this.prepare(player.camera);
       }
       monster.headPosition(this.head);
     } else {
@@ -246,16 +245,23 @@ export class JumpScare {
     camera.rotateZ(this.roll);
   }
 
+  /**
+   * Create the scare's face light up front (intensity 0), so the scene's light count never changes
+   * during play — a new light would force every material to recompile (a visible hitch).
+   */
+  prepare(camera: THREE.Camera) {
+    if (this.light) return;
+    this.light = new THREE.PointLight(0xffd8c8, 0, 4.5, 1.6);
+    this.light.position.set(0, 0.35, 0.1);
+    camera.add(this.light);
+  }
+
   private finish(player: Player) {
     this.active = false;
     this.exposure = 1;
     this.fall = 0;
     this.roll = 0;
-    if (this.light) {
-      player.camera.remove(this.light);
-      this.light.dispose();
-      this.light = null;
-    }
+    if (this.light) this.light.intensity = 0;
     player.camera.fov = this.baseFov;
     player.camera.updateProjectionMatrix();
     if (this.monster?.robinBody) {

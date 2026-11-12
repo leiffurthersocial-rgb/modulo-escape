@@ -161,6 +161,7 @@ export class Game {
     this.player = new Player(this.physics, { ...s, y: startLevel.elevation }, SIDE_YAW[building.start.facing], settings.fov);
     this.player.floor = building.start.floor;
     this.scene.add(this.player.camera);
+    this.scare.prepare(this.player.camera);
     this.post = new PostFX(this.renderer, this.scene, this.player.camera);
     this.unbindResize = bindResize(this.renderer, this.player.camera, root, (w, h) => this.post.setSize(w, h));
 
