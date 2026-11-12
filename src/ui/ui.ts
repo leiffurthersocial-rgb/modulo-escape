@@ -543,7 +543,8 @@ export class UI {
   private playScareOverlay(game: Game) {
     this.scareEl?.remove();
     const c = game.scare.config;
-    const img = game.monsterImage?.url;
+    // The 3D Robin scare plays on the model; the 2D face is only for the other bodies.
+    const img = game.scare.robin ? undefined : game.monsterImage?.url;
     // Robin's face rushes the screen: main image + red/cyan offset copies for a glitchy split.
     const face = img
       ? h(
@@ -556,6 +557,8 @@ export class UI {
       : null;
     const el = h('div', { class: 'scare' }, face, h('div', { class: 'scare-flash' }), h('div', { class: 'scare-vignette' }), h('div', { class: 'scare-black' }));
     el.style.setProperty('--black-at', `${c.blackAt}s`);
+    el.style.setProperty('--hit-at', `${c.hitAt}s`);
+    el.classList.toggle('scare-3d', game.scare.robin);
     el.style.setProperty('--black-len', `${Math.max(0.1, c.duration - c.blackAt)}s`);
     this.el.append(el);
     this.scareEl = el;

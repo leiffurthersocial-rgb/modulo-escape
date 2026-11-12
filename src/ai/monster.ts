@@ -175,6 +175,11 @@ export class Monster implements Entity {
     this.current = a;
   }
 
+  /** The sculpted Robin body, if that's the body in use (the jump scare choreographs it). */
+  get robinBody(): RobinBody | null {
+    return this.robin;
+  }
+
   /** Jump scare: stand at `at` facing `look` and attack (the AI stops). */
   lunge(at: THREE.Vector3, look: THREE.Vector3) {
     this.state = 'attack';
@@ -214,7 +219,7 @@ export class Monster implements Entity {
     this.creature?.update(dt);
     this.image?.update(dt, this.eyeTarget.copy(ctx.player.eye));
     if (this.robin) {
-      this.robin.duck = this.needsDuck(ctx) ? 1 : 0;
+      this.robin.duck = this.state !== 'attack' && this.needsDuck(ctx) ? 1 : 0;
       this.robin.update(dt, this.eyeTarget.copy(ctx.player.eye));
     }
     if (this.state === 'dormant' || this.state === 'attack') return;

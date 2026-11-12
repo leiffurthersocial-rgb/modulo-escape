@@ -372,14 +372,31 @@ export class RobinBody {
     this.screamT = 0;
   }
 
+  /**
+   * Jump-scare choreography time (s), driven by the JumpScare; -1 = off.
+   *   < hitAt  wind-up: hunched low, head cocked sideways, snaps upright and stares
+   *   ≥ hitAt  lunge: arms flung wide, claws splayed, screaming with a violent head shake,
+   *            then the claws close in
+   */
+  scareT = -1;
+  static readonly SCARE_HIT = 0.42;
+
   /** `look`: world position to look at (the player's eye). */
   update(dt: number, look: THREE.Vector3 | null) {
     dt = Math.min(dt, 0.05);
     this.t += dt;
     const B = (n: string) => this.bones.get(n)!;
+    const sc = this.scareT;
+    const hit = RobinBody.SCARE_HIT;
+    if (sc >= 0) this.mode = sc < hit ? 'idle' : 'attack';
     const mode = this.mode;
-    if (mode === 'attack') this.attackT += dt;
+    if (mode === 'attack') this.attackT = sc >= 0 ? sc - hit : this.attackT + dt;
     else this.attackT = 0;
+    if (sc >= hit && sc - dt < hit) this.screamT = 0;
+    if (sc >= 0 && sc < hit) {
+      this.tiltTarget = sc < 0.3 ? 0.7 : -0.05;
+      if (sc >= 0.3 && sc - dt < 0.3) this.twitch.roll.v -= 25;
+    }
     if (this.screamT >= 0) {
       this.screamT += dt;
       if (this.screamT > 1.6) this.screamT = -1;
@@ -396,12 +413,18 @@ export class RobinBody {
       reach: mode === 'run' ? 1 : mode === 'attack' ? 1 : 0,
       spread: mode === 'attack' ? 1 : scream * 0.6,
     };
-    p.duck = expTo(p.duck, this.duck, dt, 4);
-    p.hunch = expTo(p.hunch, tgt.hunch + p.duck * 0.62, dt, 3);
-    p.lean = expTo(p.lean, tgt.lean, dt, 3);
-    p.crouch = expTo(p.crouch, tgt.crouch + p.duck * 0.38, dt, 3);
-    p.reach = expTo(p.reach, tgt.reach, dt, 4);
-    p.spread = expTo(p.spread, tgt.spread, dt, 5);
+    let rateK = 1;
+    if (sc >= 0) {
+      rateK = 6;
+      if (sc < hit) Object.assign(tgt, { hunch: 0.85, lean: 0, crouch: 0.28, reach: 0, spread: 0 });
+      else Object.assign(tgt, { hunch: 0.55, lean: 0.35, crouch: 0.1, reach: 1, spread: 1 });
+    }
+    p.duck = expTo(p.duck, this.duck, dt, 4 * rateK);
+    p.hunch = expTo(p.hunch, tgt.hunch + p.duck * 0.62, dt, 3 * rateK);
+    p.lean = expTo(p.lean, tgt.lean, dt, 3 * rateK);
+    p.crouch = expTo(p.crouch, tgt.crouch + p.duck * 0.38, dt, 3 * rateK);
+    p.reach = expTo(p.reach, tgt.reach, dt, 4 * rateK);
+    p.spread = expTo(p.spread, tgt.spread, dt, 5 * rateK);
     p.run = expTo(p.run, run, dt, 4);
 
     // ── gait ──
@@ -438,10 +461,10 @@ export class RobinBody {
       const atk = this.attackT;
       const grab = mode === 'attack' ? THREE.MathUtils.smoothstep(atk, 0.25, 0.55) : 0;
       const reachPitch = -1.25 * p.reach * (1 - p.spread * 0.2) + p.run * 0.25 * Math.sin(legPh * Math.PI * 2);
-      const pitch = spring(arm.swing, -spineFwd * 0.92 + swingT + reachPitch - grab * 0.25, dt, 1.4, 0.55);
+      const pitch = spring(arm.swing, -spineFwd * 0.92 + swingT + reachPitch - grab * 0.25, dt, 1.4 * (sc >= 0 ? 3 : 1), 0.55);
       const outT = 0.12 + p.spread * (1.0 - grab * 0.9) - this.gaitAmp * 0.08;
-      const out = spring(arm.out, outT, dt, 1.6, 0.6);
-      const elbow = spring(arm.elbow, 0.22 + this.gaitAmp * 0.12 + p.reach * (0.15 - grab * 0.2) + scream * 0.3 + p.duck * 0.2, dt, 2.2, 0.6);
+      const out = spring(arm.out, outT, dt, 1.6 * (sc >= 0 ? 3 : 1), 0.6);
+      const elbow = spring(arm.elbow, 0.22 + this.gaitAmp * 0.12 + p.reach * (0.15 - grab * 0.2) + scream * 0.3 + p.duck * 0.2, dt, 2.2 * (sc >= 0 ? 2 : 1), 0.6);
       arm.clav.quaternion.setFromEuler(new THREE.Euler(0, 0, s * (0.05 + p.spread * 0.15 + scream * 0.1)));
       arm.upper.quaternion.setFromEuler(new THREE.Euler(pitch, s * 0.15 * p.reach, s * (out - 0.35)));
       arm.fore.quaternion.setFromAxisAngle(_v.set(0.5 * s, -0.866, 0).cross(Z).normalize(), elbow).multiply(_q.setFromAxisAngle(_v2.set(0.5 * s, -0.866, 0), s * 0.6 * p.reach));
@@ -511,11 +534,11 @@ export class RobinBody {
     spring(tw.yaw, 0, dt, 3, 0.35);
     spring(tw.roll, 0, dt, 3, 0.35);
     spring(tw.pitch, 0, dt, 3, 0.35);
-    const tilt = spring(this.tilt, this.tiltTarget, dt, 0.6, 0.8);
-    const shake = scream > 0 ? scream : 0;
+    const tilt = spring(this.tilt, this.tiltTarget, dt, sc >= 0 ? 4 : 0.6, 0.8);
+    const shake = (scream > 0 ? scream : 0) * (sc >= 0 ? 1.8 : 1);
     const head = B('head');
     const neck2 = B('neck2');
-    neck2.quaternion.setFromEuler(new THREE.Euler(-p.hunch * 0.3 - scream * 0.6, 0, 0));
+    neck2.quaternion.setFromEuler(new THREE.Euler(-p.hunch * 0.3 - scream * (sc >= 0 ? -0.15 : 0.6), 0, 0));
     neck2.updateMatrixWorld(true);
     const fkWorld = neck2.getWorldQuaternion(new THREE.Quaternion());
     let want: THREE.Quaternion;
@@ -531,9 +554,9 @@ export class RobinBody {
       this.headLook.copy(want);
       this.hasLook = true;
     }
-    this.headLook.slerp(want, 1 - Math.exp(-dt * (mode === 'idle' ? 2.5 : 5)));
+    this.headLook.slerp(want, 1 - Math.exp(-dt * (sc >= 0 ? 14 : mode === 'idle' ? 2.5 : 5)));
     const extra = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(tw.pitch.x * 0.1 - scream * 0.55 + Math.sin(this.t * 41) * 0.06 * shake, tw.yaw.x * 0.1 + Math.sin(this.t * 37) * 0.08 * shake, tilt + tw.roll.x * 0.1 + Math.sin(this.t * 29) * 0.1 * shake),
+      new THREE.Euler(tw.pitch.x * 0.1 - scream * (sc >= 0 ? -0.12 : 0.55) + Math.sin(this.t * 41) * 0.06 * shake, tw.yaw.x * 0.1 + Math.sin(this.t * 37) * 0.08 * shake, tilt + tw.roll.x * 0.1 + Math.sin(this.t * 29) * 0.1 * shake),
     );
     head.quaternion.copy(fkWorld.invert()).multiply(this.headLook).multiply(extra);
   }

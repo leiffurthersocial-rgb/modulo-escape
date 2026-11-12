@@ -237,8 +237,8 @@ function distortionCurve(amount: number): Float32Array {
  * Jump-scare scream: several overlapping screams (one very high), overdriven, a sub hit and a
  * noise blast. ~2 s. Deliberately the loudest thing in the game.
  */
-export function screamSting(ctx: AudioContext, out: AudioNode) {
-  const t = ctx.currentTime;
+export function screamSting(ctx: AudioContext, out: AudioNode, at = ctx.currentTime) {
+  const t = at;
   const drive = ctx.createWaveShaper();
   drive.curve = distortionCurve(18) as Float32Array<ArrayBuffer>;
   drive.oversample = '2x';

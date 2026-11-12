@@ -199,6 +199,10 @@ button.primary:hover { background: #e7c260; }
 @keyframes scare-pulse { from { opacity: 0.55; } to { opacity: 1; } }
 @keyframes scare-black { to { opacity: 1; } }
 
+/* 3D Robin scare: silent wind-up, flash + red pulses from the hit, film grain. */
+.scare-3d .scare-flash { opacity: 0; animation: scare-flash 0.3s ease-out var(--hit-at) forwards, scare-reflash 0.34s steps(1) calc(var(--hit-at) + 0.3s) 4; }
+.scare-3d .scare-vignette { opacity: 0; animation: scare-pulse 0.17s ease-in-out var(--hit-at) infinite alternate; }
+
 /* Robin jump scare: face rush, shake, RGB split, flicker. Flashes stay ≤ 3/s (photosensitivity). */
 .scare-face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; animation: face-bg 2.2s steps(1) forwards; }
 .scare-face img { position: absolute; height: 115vh; max-width: none; object-fit: contain; transform-origin: 50% 45%; }

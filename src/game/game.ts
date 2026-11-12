@@ -470,8 +470,14 @@ export class Game {
       catchPlayer: (by) => {
         if (this.state !== 'playing') return;
         bus.emit('player:caught', { by });
+        this.scare.start(by, this.monster, this.player, (dir, max) => {
+          const from = this.player.camera.position.clone();
+          for (let d = 0.3; d <= max; d += 0.2) {
+            if (!this.senses.lineOfSight(from, from.clone().addScaledVector(dir, d + 0.6), this.player.collider)) return d;
+          }
+          return max;
+        });
         this.setState('scare');
-        this.scare.start(by, this.monster, this.player);
       },
     };
   }

@@ -36,7 +36,7 @@ export class Player {
   private vel = new THREE.Vector3();
   private vy = 0;
   private body: RAPIER.RigidBody;
-  private collider: RAPIER.Collider;
+  readonly collider: RAPIER.Collider;
   private controller: RAPIER.KinematicCharacterController;
   private eye = EYE_STAND;
   private bobPhase = 0;

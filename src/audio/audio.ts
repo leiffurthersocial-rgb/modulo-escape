@@ -35,7 +35,7 @@ export class AudioManager {
           this.startAmbience();
         }
       }),
-      bus.on('scare:start', () => this.sting()),
+      bus.on('scare:start', (e) => this.sting(e.hitAt)),
       // Your own footsteps (the same events the monster listens to): crouch soft, sprint loud.
       bus.on('noise', (n) => {
         if (n.source !== 'player' || !this.ctx || this.ctx.state !== 'running') return;
@@ -107,13 +107,13 @@ export class AudioManager {
     this.hvac?.setTension(v);
   }
 
-  sting() {
+  /** The scare: the building's hum cuts to silence, then the scream lands `hitAt` s later. */
+  sting(hitAt = 0) {
     this.ensure();
     if (!this.ctx) return;
     void this.ctx.resume();
-    screamSting(this.ctx, this.buses.get('stingers')!);
-    // The building goes quiet after the scare.
-    this.fadeAmbience(1.5);
+    this.fadeAmbience(hitAt > 0 ? 0.12 : 1.5);
+    screamSting(this.ctx, this.buses.get('stingers')!, this.ctx.currentTime + hitAt);
   }
 
   private fadeAmbience(seconds: number) {
