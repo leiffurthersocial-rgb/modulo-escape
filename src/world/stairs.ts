@@ -78,6 +78,21 @@ export function buildStairsGeometry(b: Building): THREE.BufferGeometry | null {
       const z1 = (c.b.z + 1) * S - i * tread;
       boxes.push({ min: [c.b.x * S + T, y0, z1 - tread], max: [(c.b.x + 1) * S - T, mid + riser * (i + 1), z1] });
     }
+    // The slab edge around the stairwell: walls stop at the storey height but the next floor
+    // starts a slab's thickness higher, which elsewhere the floor and ceiling slabs close. Around
+    // the stairwell hole nothing did: a slit all round, looking straight outside. Close it.
+    const yb = y0 + b.storeyHeight - 0.03;
+    const yt = y0 + b.floorStep - 0.004;
+    const xa = c.x0 * S;
+    const xb = (c.x0 + 2) * S;
+    const za = s.z * S;
+    const zb = (s.z + 2) * S;
+    boxes.push(
+      { min: [xa - T, yb, za - T], max: [xb + T, yt, za + T] },
+      { min: [xa - T, yb, zb - T], max: [xb + T, yt, zb + T] },
+      { min: [xa - T, yb, za - T], max: [xa + T, yt, zb + T] },
+      { min: [xb - T, yb, za - T], max: [xb + T, yt, zb + T] },
+    );
   }
   // Concrete stairs: some wear at the edges, a bit damp, no puddles on steps.
   return boxesToSurfaceGeometry(boxes, (_x, _y, _z, _nx, ny) => [ny > 0.5 ? 0.35 : 0.25, 0.15, 0.3, 0], 2);
