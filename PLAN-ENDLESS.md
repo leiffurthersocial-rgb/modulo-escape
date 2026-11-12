@@ -118,6 +118,65 @@ The signs are all in German:
 The KZU logo plates stay. All sign text is drawn from code into the decal atlas, so there are no
 new downloads.
 
+### 2.5 Set dressing: many more models, small things on tables
+
+Your answer: "add more models to the school, e.g. sometimes a chess board on the table". The
+school should feel lived in, then abandoned.
+
+**Surface slots:**
+- Furniture declares the surfaces things can stand on: desk tops, lab benches, shelf levels,
+  counters, window sills, the floor along walls.
+- Small props are placed on those surfaces deterministically per block, never floating and never
+  intersecting.
+- Examples:
+  - a chess set mid-game on a table
+  - books and binders on desks
+  - a clipboard and pens on the teacher's desk
+  - a mug, an apple
+  - books on Mediothek shelves
+  - microscopes on Bio benches
+  - a boombox in Musik
+
+**Little scenes:**
+- Rare, hand-made arrangements are mixed in: a chess game abandoned mid-move in the Lehrerzimmer,
+  a knocked-over chair with a backpack, a wheelchair alone in a corridor, a mop bucket with a
+  wet-floor sign, a wall clock stopped at the same time everywhere.
+- They're rare on purpose, so they stay memorable.
+
+**Corridor and wall props:**
+- fire extinguishers
+- fire-alarm buttons
+- bins
+- benches
+- potted plants (dried out)
+- wall clocks
+- pinboards
+- security cameras in corners
+
+**Models are free CC0 ones from Poly Haven, checked available:**
+
+| Where | Models |
+|---|---|
+| Classrooms | `standing_chalkboard_01`, `binder_notebook`, `clipboard`, `book_encyclopedia_set_01`, `decorative_book_set_01`, `alarm_clock_01`, `food_apple_01`, `wall_clock` |
+| Lehrerzimmer / Sekretariat | `chess_set`, `Sofa_01`, `ArmChair_01`, `CoffeeTable_01`, `metal_office_desk`, `desk_lamp_arm_01`, `drawer_cabinet`, `dartboard` |
+| Labs | `industrial_microscope`, `vintage_microscope`, `magnifying_glass_01`, `medical_box` |
+| Informatik | `circuit_board`, `metal_office_desk` (plus monitors built from code) |
+| Musik | `boombox`, `portable_cassette_player` |
+| Mediothek | `wooden_bookshelf_worn`, book sets, `side_table_01` |
+| Mensa | `dining_table`, `dining_chair_02`, `plastic_monobloc_chair_01`, `plastic_crate_01..03` |
+| Turnhalle | `football`, `dirty_football`, `american_football`, `painted_wooden_bench` |
+| Hauswart / Lager | `metal_toolbox`, `wooden_ladder`, `multi_cleaner_bottle`, `bleach_bottle`, `cardboard_box_01`, `wooden_crate_01`, `trashbag` |
+| Corridors | `korean_fire_extinguisher_01`, `fire_alarm`, `metal_trash_can`, `WetFloorSign_01`, `potted_plant_01/02/04`, `security_camera_01`, `wheelchair_01` |
+
+**Performance on the iPad:**
+- Small props use low-resolution textures (1k, or 512 px for tiny ones), shared between copies,
+  and are drawn in batches per type.
+- Small props are only drawn within ~15 m. In the dark you don't see them further away anyway.
+- There's a cap on small props per block.
+- The battery preset halves the density.
+- Small props have no physics, except a few bigger ones like the chair or the bin. They're only
+  drawn while their block is loaded, and they always come back identical.
+
 ---
 
 ## 3. Streaming, so you never notice
@@ -198,7 +257,7 @@ the gate wins.
 - Signs you have seen keep their direction until you're far away.
 
 **Tension:** Robin's stalking gets more frequent the closer you are to the exit, so the last
-100 m are the hardest.
+100 m are the hardest. Otherwise Robin stays the same however long you play.
 
 **Seeds:** a run still has a seed, and share links still work: the same seed gives the same
 endless school. By default each new run gets a random seed.
@@ -237,17 +296,17 @@ These are automated tests, part of `npm test` and the Playwright run:
 4. **Robin in the endless school:** two-level navigation, stalking in loaded blocks.
 5. **Exits:** exit-capable spots, placement and despawn rules, Notausgang signs, seen-tracking.
    Add test 5.
-6. **KZU rooms and halls:** furniture kits for labs, Informatik, Musik, BG, WCs, Lehrerzimmer, and
-   the landmark halls (Pausenhalle, Mensa, Aula, Turnhalle, Mediothek).
+6. **KZU rooms, halls and set dressing:** furniture kits for labs, Informatik, Musik, BG, WCs and
+   Lehrerzimmer; the landmark halls (Pausenhalle, Mensa, Aula, Turnhalle, Mediothek); and the
+   Poly Haven props with surface slots and little scenes (section 2.5).
 7. **QA on the iPad:** performance, battery preset, a long play session.
 
 ---
 
-## 7. Open questions (none block step 1)
+## 7. Decisions from your answers (2026-11-12)
 
-- **Photos:** if you have photos or memories of the real KZU (corridor colours, floor, lockers,
-  the Mensa, the Aula), I'll match them more closely. Right now it's raw concrete everywhere,
-  which you liked.
-- **Robin as you walk:** should Robin get stronger or faster the longer you walk (endless
-  pressure), or stay the same?
-- **Seed:** a random seed for every run, or a fixed seed of the day?
+- **Exact KZU likeness:** not important. Instead, many more models and small set dressing
+  (section 2.5).
+- **Robin:** stays the same however long you play. He doesn't ramp up over time; only the existing
+  "more frequent near the exit" rule applies.
+- **Seed:** a random seed for every run. Share links still reproduce a run.
