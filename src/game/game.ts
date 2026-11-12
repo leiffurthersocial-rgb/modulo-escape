@@ -759,14 +759,14 @@ export async function createGame(
   seed: string,
   size: LevelSize,
   hooks: GameHooks,
-  onProgress: (msg: string) => void = () => {},
+  onProgress: (msg: string, fraction?: number) => void = () => {},
   qualityOverride?: Quality,
 ): Promise<Game> {
   const quality = qualityOverride ?? resolvedQuality();
   if (import.meta.env.DEV) Object.assign(window, { THREE }); // devtools / Playwright probes
   const renderer = createRenderer(root, { ...DEFAULT_RENDER, pixelRatioCap: quality.pixelRatioCap, shadowMapSize: quality.shadowMapSize });
   renderer.domElement.style.visibility = 'hidden';
-  onProgress('Generating building…');
+  onProgress('Generating building…', 0.03);
   const [, building, lib] = await Promise.all([initPhysics(), loadBuilding(seed, size), new TextureLibrary(renderer, quality.textureTier).init()]);
   lib.anisotropy = quality.anisotropy;
   const labels = building.floors.flatMap((f) => f.dressing.roomLabels);
@@ -774,32 +774,43 @@ export async function createGame(
     tier: quality.textureTier,
     decalRes: quality.textureTier === '512' ? 128 : quality.textureTier === '1k' ? 256 : 512,
     config: loadMaterialPicks(),
-    onProgress,
+    // World assets report steps in words; map them onto the bar (≈ 10 % … 55 %).
+    onProgress: (msg) => {
+      const props = /(\d+)\/(\d+)/.exec(msg);
+      const f = props ? 0.32 + 0.23 * (Number(props[1]) / Math.max(1, Number(props[2]))) : msg.startsWith('Painting') ? 0.25 : msg.startsWith('Loading props') ? 0.32 : 0.12;
+      onProgress(msg, f);
+    },
   });
   const scene = new THREE.Scene();
   const env = new Atmosphere(scene, building.floors[0]!, renderer, quality.shadowMapSize);
   env.setGroundSet(assets.sets.get('moss_ground') ?? null);
-  onProgress('Lighting the sky…');
+  onProgress('Lighting the sky…', 0.58);
   await env.loadHdris(lib.manifest, quality.hdriRes);
   env.setMood(settings.graphics.mood);
-  onProgress('Waking something up…');
+  onProgress('Waking something up…', 0.7);
   // Default body is procedural; ?monster=model uses the skinned GLB instead.
   const monsterModel = new URLSearchParams(location.search).get('monster') === 'model' ? await loadMonsterModel(renderer, lib.manifest) : null;
   const monsterImage = await loadMonsterImage();
   // Robin's sculpted body (?monster=billboard keeps the old floating image).
   // Sculpted bodies: Robin (with his photo), Leo and Jovan (their photos once uploaded, else
   // faceless). ?monster=billboard keeps the old floating image.
+  let woken = 0;
   const sculpted = !monsterModel && new URLSearchParams(location.search).get('monster') !== 'billboard';
   const bodies = sculpted
     ? (
         await Promise.all(
-          (['robin', 'leo', 'jovan'] as Species[]).map(async (sp) => (sp === 'robin' && !monsterImage ? null : loadBody(sp, sp === 'robin' ? monsterImage : await loadMonsterImage(sp)))),
+          (['robin', 'leo', 'jovan'] as Species[]).map(async (sp) => {
+            const body = sp === 'robin' && !monsterImage ? null : await loadBody(sp, sp === 'robin' ? monsterImage : await loadMonsterImage(sp));
+            onProgress('Waking something up…', 0.7 + 0.05 * ++woken);
+            return body;
+          }),
         )
       ).filter((t): t is RobinTemplate => !!t)
     : [];
   const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel, monsterImage, bodies);
-  onProgress('Compiling shaders…');
+  onProgress('Compiling shaders…', 0.88);
   await renderer.compileAsync(game.scene, game.player.camera).catch(() => {});
+  onProgress('Ready', 1);
   renderer.domElement.style.visibility = '';
   return game;
 }

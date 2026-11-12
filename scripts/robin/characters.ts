@@ -23,6 +23,8 @@ export interface Character {
   /** Clothing: the T-shirt, and trousers ('long' to the shins, 'short' above the knee). */
   shirt: boolean;
   pants: 'long' | 'short';
+  /** Torn shirt: holes, claw-slash rips, ragged hem and tattered sleeves. */
+  ripped?: boolean;
   /** Hoodie (long sleeves, ribbed hem, hood bunched at the back, front pocket), jeans, sneakers. */
   hoodie?: boolean;
   /** Replace Robin's head with one sculpted to match this face (heads.ts). */
@@ -48,26 +50,27 @@ export const CHARACTERS: Record<CharacterName, Character> = {
    */
   jovan: {
     name: 'jovan',
+    // ≈ 4.4 m: folded under the 3.6 m ceiling. Gaunt; a ripped black shirt; torn black trousers; barefoot.
     shirt: true,
+    ripped: true,
     pants: 'long',
-    hoodie: true,
     face: JOVAN_FACE,
     bones: {
-      hips: { len: 1.1, thick: [1.1, 1.0, 1.05] },
-      spine1: { len: 1.2, thick: [1.12, 1, 1.08] },
-      spine2: { len: 1.2, thick: [1.14, 1, 1.1] },
-      chest: { len: 1.12, thick: [1.16, 1, 1.12] },
-      neck1: { len: 0.72, thick: 1.18 },
-      neck2: { len: 0.72, thick: 1.15 },
+      hips: { len: 1.15, thick: [1.0, 1.0, 0.95] },
+      spine1: { len: 1.3, thick: [0.95, 1, 0.92] },
+      spine2: { len: 1.3, thick: [0.97, 1, 0.94] },
+      chest: { len: 1.2, thick: [1.05, 1, 0.96] },
+      neck1: { len: 1.15, thick: 1.0 },
+      neck2: { len: 1.15, thick: 1.0 },
       head: { len: 1, thick: 0.97 },
-      ...side(['clavicle'], { len: 1.18, thick: 1.0 }),
-      ...side(['upperarm'], { len: 1.32, thick: 1.1 }),
-      ...side(['forearm'], { len: 1.34, thick: 1.08 }),
-      ...side(['hand'], { len: 1.3, thick: 1.3 }),
-      ...fingers({ len: 1.3, thick: 1.3 }),
-      ...side(['thigh'], { len: 1.32, thick: 1.22 }),
-      ...side(['shin'], { len: 1.34, thick: 1.2 }),
-      ...side(['foot'], { len: 1.15, thick: 1.0 }),
+      ...side(['clavicle'], { len: 1.25, thick: 1.0 }),
+      ...side(['upperarm'], { len: 1.55, thick: 0.95 }),
+      ...side(['forearm'], { len: 1.6, thick: 0.92 }),
+      ...side(['hand'], { len: 1.4, thick: 1.1 }),
+      ...fingers({ len: 1.8, thick: 0.95 }),
+      ...side(['thigh'], { len: 1.6, thick: 1.0 }),
+      ...side(['shin'], { len: 1.6, thick: 0.98 }),
+      ...side(['foot'], { len: 1.2, thick: 1.0 }),
     },
   },
 };

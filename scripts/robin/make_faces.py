@@ -66,7 +66,7 @@ for name, f in FACES.items():
     else:
         # Long face: everything below the eyes stretched down.
         below = np.clip((y - mid[1]) / D, 0, None)
-        wy = np.where(y > mid[1], mid[1] + (y - mid[1]) / (1 + 0.16 * np.minimum(below, 1.2)), wy)
+        wy = np.where(y > mid[1], mid[1] + (y - mid[1]) / (1 + 0.26 * np.minimum(below, 1.2)), wy)
     z = a * (wx + 1j * wy) + b
     rgba, inside = sample(img, z.real, z.imag)
     rgb, cut = rgba[..., :3], rgba[..., 3] / 255.0
@@ -78,6 +78,13 @@ for name, f in FACES.items():
         dark = np.maximum(dark, np.exp(-(dx * dx + dy * dy)))
     amt = 0.42 if f['kind'] == 'jovan' else 0.3
     rgb = rgb * (1 - amt * dark[..., None] * np.array([0.9, 1.0, 0.95]))
+    if f['kind'] == 'jovan':
+        # Pitch-black, hollow eyes, with dark streaks running down from them.
+        for ex, ey in (D1, D2):
+            r2 = ((x - ex) / (0.2 * D)) ** 2 + ((y - ey) / (0.15 * D)) ** 2
+            rgb = rgb * (1 - 0.94 * np.exp(-r2 ** 1.5))[..., None]
+            streak = np.exp(-(((x - ex - 0.02 * D * np.sin((y - ey) / D * 5)) / (0.045 * D)) ** 2)) * smoothstep(ey + 0.08 * D, ey + 0.25 * D, y) * (1 - smoothstep(ey + 0.7 * D, ey + 1.15 * D, y))
+            rgb = rgb * (1 - 0.7 * streak)[..., None] + np.array([12, 2, 2]) * (0.7 * streak)[..., None]
 
     if name == 'leo_scream':
         # The open mouth becomes a dark, deep throat; teeth and lips stay at the rim.

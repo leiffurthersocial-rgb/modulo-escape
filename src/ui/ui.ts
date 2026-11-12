@@ -70,15 +70,38 @@ export class UI {
     this.loadingScreen = h(
       'div',
       { class: 'screen' },
-      h('div', { class: 'panel' }, h('h1', {}, 'Modulo: Escape', h('small', {}, 'KZU · Wing C · condemned')), h('p', { id: 'loading-text' }, 'Generating building…')),
+      h(
+        'div',
+        { class: 'panel' },
+        h('h1', {}, 'Modulo: Escape', h('small', {}, 'KZU · Wing C · condemned')),
+        h('div', { class: 'loadbar', role: 'progressbar' }, this.loadFill),
+        h('div', { class: 'loadrow' }, h('p', { id: 'loading-text' }, 'Generating building…'), this.loadPct),
+      ),
     );
+    // Between steps the bar creeps on (never looks stuck), but never past the next step.
+    const tick = () => {
+      if (this.loadingScreen.hidden) return;
+      this.loadShown += (Math.min(this.loadTarget + 0.07, 0.99) - this.loadShown) * 0.012;
+      this.loadShown = Math.max(this.loadShown, this.loadTarget * 0.999);
+      this.loadFill.style.transform = `scaleX(${this.loadShown.toFixed(4)})`;
+      this.loadPct.textContent = `${Math.floor(this.loadShown * 100)}%`;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
     this.el.append(this.loadingScreen, this.toastEl);
     root.appendChild(this.el);
   }
 
-  setLoadingText(t: string) {
+  private loadFill = h('div', { class: 'loadbar-fill' });
+  private loadPct = h('span', { class: 'val' }, '0%');
+  private loadTarget = 0;
+  private loadShown = 0;
+
+  /** Loading screen: the current step, and how far along (0..1) if known. */
+  setLoadingText(t: string, fraction?: number) {
     const el = this.loadingScreen.querySelector('#loading-text');
     if (el) el.textContent = t;
+    if (fraction !== undefined) this.loadTarget = Math.max(this.loadTarget, Math.min(1, fraction));
   }
 
   attach(game: Game) {

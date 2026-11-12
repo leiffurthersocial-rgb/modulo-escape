@@ -207,6 +207,29 @@ function regionAt(px: number, py: number, pz: number, q: P): Region {
     }
     if (b.startsWith('thigh') || b.startsWith('shin') || b.startsWith('foot') || b.startsWith('toes')) return 'pants';
   }
+  if (CH.ripped) {
+    const b = q.src.bone;
+    // Tattered sleeves down to mid-forearm.
+    if (b.startsWith('upperarm')) return fbm(x * 9, y * 9, z * 9, 3) > 0.2 ? 'skin' : 'shirt';
+    if (b.startsWith('forearm')) {
+      const a = bonePos.get(b)!;
+      const c = childOf.get(b)!;
+      const t = ((x - a[0]) * (c[0] - a[0]) + (y - a[1]) * (c[1] - a[1]) + (z - a[2]) * (c[2] - a[2])) / ((c[0] - a[0]) ** 2 + (c[1] - a[1]) ** 2 + (c[2] - a[2]) ** 2);
+      return t < 0.45 + 0.2 * fbm(x * 20, y * 20, z * 20, 2) && fbm(x * 9 + 4, y * 9, z * 9, 3) < 0.2 ? 'shirt' : 'skin';
+    }
+    const torso = b === 'chest' || b === 'spine2' || b === 'spine1' || b.startsWith('clavicle');
+    // Long enough to reach the trousers, with a ragged, torn hem.
+    const shirtHere = r === 'shirt' || (torso && y > 1.71 + 0.07 * fbm(x * 9, 0, z * 9, 2) && y < 2.5);
+    if (shirtHere) {
+      // Holes, and three claw slashes diagonally across the chest.
+      if (fbm(x * 6 + 11, y * 6, z * 6 + 3, 3) > 0.17) return 'skin';
+      if (z > 0.02) {
+        const u = x * 0.75 + (y - 2.2);
+        for (const o of [-0.09, 0, 0.09]) if (Math.abs(u - o + 0.012 * noise(x * 40, y * 40, 1)) < 0.014 && Math.abs(x) < 0.15) return 'skin';
+      }
+      return 'shirt';
+    }
+  }
   if (r === 'shirt' && !CH.shirt) return 'skin';
   if (r === 'pants' && CH.pants === 'short' && q.src.bone.startsWith('thigh')) {
     const a = bonePos.get(q.src.bone)!;
@@ -616,7 +639,7 @@ await io.write(OUT, doc);
   const top = Math.max(...P.map((q) => q.max[1])) - 0.02;
   const meta = RT.meta ? { character: CHAR, ...RT.meta, hipsY: bones.find((b) => b.name === 'hips')!.pos[1], height: top, shirt: CH.shirt } : {
     character: CHAR,
-    hemY: CH.hoodie ? -10 : RT.hemY,
+    hemY: CH.hoodie || CH.ripped ? -10 : RT.hemY,
     shoeY: CH.hoodie ? bones.find((b) => b.name === 'footL')!.pos[1] + 0.06 : -1,
     eyeY: head[1] + (eyeY0 - headO[1]) * headThick,
     eyeHalf: 0.043 * HEAD_SCALE * headThick,

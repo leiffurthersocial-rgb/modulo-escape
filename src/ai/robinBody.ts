@@ -45,6 +45,10 @@ export interface BodyStyle {
   print: boolean;
   /** A mouth that opens (Leo): mouth line and jaw drop, in eye distances below the eyes. */
   jaw?: { mouth: number; drop: number };
+  /** Most the body may fold to keep the head under the ceiling (Robin 1; Jovan folds far more). */
+  maxStoop?: number;
+  /** Head tilt and twitch strength (Jovan's head lolls and snaps sideways). */
+  headTilt?: number;
   /** Fixed hair colour (when the photo's hair is hard to sample). */
   hairColor?: number;
   /** Where to read the hair colour in the aligned photo (x0, y0, x1, y1 px). */
@@ -56,7 +60,7 @@ export interface BodyStyle {
 export const BODY_STYLES: Record<Species, BodyStyle> = {
   robin: { idleHunch: 0.45, walkHunch: 0.55, runHunch: 0.35, runLean: 0.55, walkStride: 1.55, runStride: 2.5, armSwing: 0.38, armOut: 0.12, footLift: 0.14, tint: 0x8a9096, tintAmount: 0, headroom: 3.45, shirtColor: 0xc8c5bd, pantsColor: 0x4a4c54, print: true, gait: 'biped', hairBox: [150, 180, 250, 230] },
   leo: { idleHunch: 1.0, walkHunch: 1.05, runHunch: 1.15, runLean: 0.5, walkStride: 2.0, runStride: 3.6, armSwing: 0.5, armOut: 0.2, footLift: 0.12, tint: 0x9a8478, tintAmount: 0, headroom: 3.45, shirtColor: 0x66777c, pantsColor: 0x4a443c, print: false, gait: 'knuckle', hairBox: [165, 212, 225, 232], jaw: { mouth: -1.12, drop: 0.85 } },
-  jovan: { idleHunch: 0.2, walkHunch: 0.25, runHunch: 0.3, runLean: 0.3, walkStride: 2.3, runStride: 3.4, armSwing: 0.22, armOut: 0.05, footLift: 0.12, tint: 0xa9b3ba, tintAmount: 0.45, headroom: 3.5, shirtColor: 0x2a2a2e, pantsColor: 0x242428, print: false, gait: 'ceiling', hairBox: [165, 272, 225, 300], hairColor: 0x3a2a20 },
+  jovan: { idleHunch: 0.35, walkHunch: 0.4, runHunch: 0.45, runLean: 0.3, walkStride: 2.8, runStride: 4.0, armSwing: 0.22, armOut: 0.05, footLift: 0.16, tint: 0x8a97a2, tintAmount: 0.65, headroom: 3.5, maxStoop: 2.6, headTilt: 1.9, shirtColor: 0x26262b, pantsColor: 0x1d1d21, print: false, gait: 'ceiling', hairBox: [165, 272, 225, 300], hairColor: 0x3a2a20 },
 };
 
 /** Measured on the sculpt (public/assets/monster/<name>_body.json). */
@@ -75,7 +79,7 @@ export interface BodyMeta {
   shoeY?: number;
 }
 
-export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=7`;
+export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=9`;
 export const ROBIN_BODY_URL = bodyUrl('robin');
 
 /** Photo layout (pixels in robin.png): eye centres, and where the shirt collar sits. */
@@ -106,7 +110,7 @@ export async function loadBody(species: Species, photo: MonsterImage | null): Pr
   try {
     const [gltf, meta] = await Promise.all([
       new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(bodyUrl(species)),
-      fetch(`/assets/monster/${species}_body.json?v=7`).then((r) => r.json() as Promise<BodyMeta>),
+      fetch(`/assets/monster/${species}_body.json?v=9`).then((r) => r.json() as Promise<BodyMeta>),
     ]);
     let mesh: THREE.SkinnedMesh | null = null;
     gltf.scene.traverse((o) => {
@@ -435,7 +439,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         totalEmissiveRadiance += vec3(0.55, 0.62, 0.75) * rim * 0.07;`,
       );
   };
-  mat.customProgramCacheKey = () => 'robin-v10';
+  mat.customProgramCacheKey = () => 'robin-v11';
   return mat;
 }
 
@@ -695,7 +699,7 @@ export class RobinBody {
     const limit = THREE.MathUtils.lerp(st.headroom, 2.5, p.duck);
     // (Integral control on the measured head height, applied directly — no smoothing lag, so it
     // settles instead of overshooting.)
-    if (this.lastTop > 0 && sc < 0) this.stoop = THREE.MathUtils.clamp(this.stoop + (this.lastTop - limit) * realDt * 2.5, 0, 1);
+    if (this.lastTop > 0 && sc < 0) this.stoop = THREE.MathUtils.clamp(this.stoop + (this.lastTop - limit) * realDt * 2.5, 0, st.maxStoop ?? 1);
     if (sc >= 0) this.stoop = expTo(this.stoop, 0, realDt, 2);
     p.hunch = expTo(p.hunch, tgt.hunch, dt, 3 * rateK);
     p.lean = expTo(p.lean, tgt.lean, dt, 3 * rateK);
@@ -826,7 +830,13 @@ export class RobinBody {
       this.twitch.yaw.v += (Math.random() - 0.5) * 18 * k;
       this.twitch.roll.v += (Math.random() - 0.5) * 22 * k;
       this.twitch.pitch.v += (Math.random() - 0.5) * 10 * k;
-      if (Math.random() < 0.35) this.tiltTarget = (Math.random() - 0.3) * 0.7;
+      const ht = this.style.headTilt ?? 1;
+      if (Math.random() < 0.35 * ht) this.tiltTarget = (Math.random() - 0.3) * 0.7 * ht;
+      if (ht > 1) {
+        // Jovan: violent snaps of the head now and then.
+        this.twitch.roll.v += (Math.random() - 0.5) * 30 * (ht - 1);
+        this.twitch.yaw.v += (Math.random() - 0.5) * 16 * (ht - 1);
+      }
     }
     const tw = this.twitch;
     spring(tw.yaw, 0, realDt, 3, 0.35);
