@@ -351,3 +351,10 @@ Render scale is capped so the internal resolution stays ≤ ~3.2 MP on iPad.
   footsteps: crouch 2 m, walk 7 m, sprint 16 m), `caught` game state, spawn points per floor,
   and `MonsterStub` with a dormant/patrol/investigate/chase/search state machine
   (`?monster=stub` to try it).
+
+## 11. Next: one endless floor of the KZU (planned, not started)
+
+See [PLAN-ENDLESS.md](PLAN-ENDLESS.md): one floor; wings E/1/2/3/4 with rooms like E07 and 307
+and German signs; special rooms and landmark halls; an endless school streamed in blocks that
+always come back the same; exits that appear in unseen blocks far ahead and only move while you
+haven't seen them.
