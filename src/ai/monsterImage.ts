@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 
-const found = import.meta.glob(['/robin.png', '/**/robin.png', '/**/Robin.png', '/**/leo.png', '/**/Leo.png', '/**/jovan.png', '/**/Jovan.png', '!**/node_modules/**', '!**/dist/**'], {
+const found = import.meta.glob(['/robin.png', '/**/robin.png', '/**/Robin.png', '/**/leo.png', '/**/Leo.png', '/**/jovan.png', '/**/Jovan.png', '/**/*_scream.png', '!**/node_modules/**', '!**/dist/**'], {
   eager: true,
   query: '?url',
   import: 'default',

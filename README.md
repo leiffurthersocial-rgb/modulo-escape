@@ -62,8 +62,11 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
   stooped with his palms pressed flat against the ceiling, hand over hand. He sees furthest, and he only moves while you're not looking at him: keep him on
   screen and he freezes; look away (or look back with Q) and he comes, fast and almost silent.
   You hear his head dragging along the ceiling, and lights stutter around him.
-- **Faces:** each monster uses its photo if one is in the repo (`robin.png`, `leo.png`,
-  `jovan.png`); Leo and Jovan are faceless (hollow eyes and mouth) until theirs are added.
+- **Faces:** each monster wears its photo (`robin.png`, `leo.png`, `jovan.png`); Leo's and Jovan's
+  are made from the photos in `assets/leo/` and `assets/jovan/` by `python3 scripts/robin/make_faces.py`
+  (aligned to robin.png's eye positions and cut out). A `<name>_scream.png` (Leo has one) replaces
+  the face during that monster's jump scare. Without a photo a monster is faceless (hollow eyes
+  and mouth).
   `?monsters=robin,leo` picks which ones spawn.
 - **Sound:** procedural HVAC drone that tightens as the monster gets close, your footsteps, and
   positional monster steps and screams. No audio files.
