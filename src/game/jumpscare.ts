@@ -83,7 +83,7 @@ export class JumpScare {
   private head = new THREE.Vector3();
   private startYaw = 0;
   private startPitch = 0;
-  private monster: Monster | null = null;
+  monster: Monster | null = null;
   private fwd = new THREE.Vector3();
   private baseFov = 70;
   private flashOn = false;

@@ -247,6 +247,9 @@ export class Player {
   }
 
   /** Interpolate camera between physics states. alpha ∈ [0,1]. */
+  /** Camera shake (decays): Leo's stomps, impacts. */
+  shake = 0;
+
   /** Horizontal speed boost while climbing a ramp (makes up for the slope). */
   private climbBoost = 1;
   /** Horizontal speed actually moved last step (m/s). */
@@ -278,7 +281,9 @@ export class Player {
     const cos = Math.cos(this.yaw);
     const sin = Math.sin(this.yaw);
     this.camera.position.set(x + cos * bobX, y + this.eye + bobY, z - sin * bobX);
-    this.camera.rotation.set(this.pitch, this.yaw + Math.PI * back, roll);
+    this.shake *= Math.exp(-dt * 7);
+    const sh = this.shake;
+    this.camera.rotation.set(this.pitch + (Math.random() - 0.5) * sh, this.yaw + Math.PI * back + (Math.random() - 0.5) * sh, roll + (Math.random() - 0.5) * sh * 0.6);
     // Sprint widens the FOV a touch.
     const fovTarget = settings.fov + (this.sprinting ? 6 : 0);
     if (Math.abs(this.camera.fov - fovTarget) > 0.01) {

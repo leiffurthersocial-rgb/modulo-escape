@@ -31,6 +31,14 @@ export class AmbienceDirector {
         this.lights.assignNear(e.floor * b.width * b.height + e.z * b.width + e.x, (e.x + 0.5) * S, e.floor * b.floorStep + 1.6, (e.z + 0.5) * S);
       }),
       bus.on('light:flicker', (e) => this.flickers.set(e.id, { until: this.time + e.ms / 1000, phase: this.rng.next() * 10 })),
+      // Lights stutter around Jovan.
+      bus.on('monster:presence', (e) => {
+        if (e.species !== 'jovan') return;
+        this.lights.states.forEach((s, i) => {
+          if (s.dead || Math.abs(s.pos.x - e.x) > 8 || Math.abs(s.pos.z - e.z) > 8 || Math.abs(s.floor - e.floor) > 0) return;
+          if (this.rng.next() < 0.35) this.flickers.set(i, { until: this.time + 0.2 + this.rng.next() * 0.5, phase: this.rng.next() * 10 });
+        });
+      }),
     );
   }
 

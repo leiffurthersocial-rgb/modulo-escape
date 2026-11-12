@@ -5,14 +5,20 @@
  */
 import * as THREE from 'three';
 
-const found = import.meta.glob(['/robin.png', '/**/robin.png', '/**/Robin.png', '!**/node_modules/**', '!**/dist/**'], {
+const found = import.meta.glob(['/robin.png', '/**/robin.png', '/**/Robin.png', '/**/leo.png', '/**/Leo.png', '/**/jovan.png', '/**/Jovan.png', '!**/node_modules/**', '!**/dist/**'], {
   eager: true,
   query: '?url',
   import: 'default',
 }) as Record<string, string>;
 
+/** URL of `<name>.png` (any folder, any capitalisation of the first letter), or null. */
+export function imageUrl(name: string): string | null {
+  const hit = Object.entries(found).find(([path]) => path.toLowerCase().endsWith(`/${name}.png`));
+  return hit?.[1] ?? null;
+}
+
 /** URL of robin.png if one is in the repo, else null. */
-export const ROBIN_URL: string | null = Object.values(found)[0] ?? null;
+export const ROBIN_URL: string | null = imageUrl('robin');
 
 export interface MonsterImage {
   url: string;
@@ -21,16 +27,17 @@ export interface MonsterImage {
   aspect: number;
 }
 
-export async function loadMonsterImage(): Promise<MonsterImage | null> {
-  if (!ROBIN_URL) return null;
+export async function loadMonsterImage(name = 'robin'): Promise<MonsterImage | null> {
+  const url = imageUrl(name);
+  if (!url) return null;
   try {
-    const texture = await new THREE.TextureLoader().loadAsync(ROBIN_URL);
+    const texture = await new THREE.TextureLoader().loadAsync(url);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 4;
     const img = texture.image as { width: number; height: number };
-    return { url: ROBIN_URL, texture, aspect: img.width / Math.max(1, img.height) };
+    return { url, texture, aspect: img.width / Math.max(1, img.height) };
   } catch (e) {
-    console.warn('robin.png failed to load', e);
+    console.warn(`${name}.png failed to load`, e);
     return null;
   }
 }

@@ -50,6 +50,18 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
     stalks back, appearing a few rooms away out of your sight.
   - **Movement:** it ducks under doors and screams when it's near.
   - **Getting caught:** ends in a jump scare.
+- **Leo** (wakes after ~18 s): a huge, hulking brute (no shirt, short trousers, enormous arms).
+  He hears best of all three. When he spots you he roars, then charges in a straight line much
+  faster than you can run, but he can barely steer: dodge round a corner and he slams into the
+  wall and is stunned for a couple of seconds. You feel his stomps (camera shake) before you see
+  him.
+- **Jovan** (wakes after ~30 s): so tall (3.8 m) that he walks bent over with his head scraping
+  the ceiling. He sees furthest, and he only moves while you're not looking at him: keep him on
+  screen and he freezes; look away (or look back with Q) and he comes, fast and almost silent.
+  You hear his head dragging along the ceiling, and lights stutter around him.
+- **Faces:** each monster uses its photo if one is in the repo (`robin.png`, `leo.png`,
+  `jovan.png`); Leo and Jovan are faceless (hollow eyes and mouth) until theirs are added.
+  `?monsters=robin,leo` picks which ones spawn.
 - **Sound:** procedural HVAC drone that tightens as the monster gets close, your footsteps, and
   positional monster steps and screams. No audio files.
 - **Settings:** graphics presets, material comparison (Settings → Materials), monster on/off,
@@ -59,10 +71,10 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
 
 | URL / command | What |
 | --- | --- |
-| `/robin/` | Robin viewer: orbit the model, switch idle / walk / run / attack / scream / duck |
+| `/robin/` | Monster viewer: orbit the model, switch idle / walk / run / attack / scream / duck; `?who=leo` / `?who=jovan`, `?ceiling=1` |
 | `/lab/` | Texture lab: compare material candidates |
 | `/bench/` | Benchmark: fixed seed and camera path, frame times per preset |
-| `npm run robin:build` | Re-sculpt Robin's body (`scripts/robin/anatomy.ts`) → `public/assets/monster/robin_body.glb` (~1 min) |
+| `npm run robin:build` | Re-sculpt Robin, Leo and Jovan (`scripts/robin/anatomy.ts` + `characters.ts`) → `public/assets/monster/*_body.glb` (~5 min) |
 | `npm run gen:dump -- --seed kzu --size medium` | Print a generated building as ASCII floor plans |
 | `npm run assets:fetch` / `assets:process` | Download CC0 assets and convert them to KTX2 / meshopt (see SETUP.md) |
 | `npm test` | Generator tests (1000 seeds × 3 sizes, loops / dead ends, golden layouts) |

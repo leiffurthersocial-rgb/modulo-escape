@@ -7,7 +7,7 @@
 import { bus } from '../core/events.ts';
 import { settings } from '../game/settings.ts';
 import { HvacAmbience } from './hvac.ts';
-import { creatureBreath, creatureClicks, creatureScream, creatureScreech, creatureStep, earBreath, heartbeat, playerStep, screamSting, setListener, shriekSting, sink } from './creatureSounds.ts';
+import { ceilingScrape, creatureBreath, creatureClicks, creatureGrowl, creatureRoar, creatureScream, creatureScreech, creatureStep, earBreath, heartbeat, playerStep, screamSting, setListener, shriekSting, sink, wallThud } from './creatureSounds.ts';
 import { createReverb, SampleBank } from './samples.ts';
 
 export type AudioBus = 'ambience' | 'sfx' | 'music' | 'stingers';
@@ -51,10 +51,12 @@ export class AudioManager {
         this.atMonster(e, (ctx, out, o) => {
           const sm = this.samples;
           if (!sm?.ready) return creatureStep(ctx, out, o, e.loud);
-          // Heavy bare foot: a slowed fleshy slap on concrete, plus the low body thump.
+          // Heavy bare foot: a slowed fleshy slap on concrete, plus the low body thump (Leo: a
+          // much heavier, deeper stomp; Jovan: barely a whisper).
           const d = sink(ctx, out, o);
-          sm.play('flesh_heavy', d, { gain: 0.9 * e.loud, rate: 0.7 });
-          sm.play('step_concrete', d, { gain: 0.7 * e.loud, rate: 0.62, at: ctx.currentTime + 0.012 });
+          const heavy = e.loud > 1.3;
+          sm.play('flesh_heavy', d, { gain: Math.min(1.6, 0.9 * e.loud), rate: heavy ? 0.45 : 0.7 });
+          sm.play(heavy ? 'punch_heavy' : 'step_concrete', d, { gain: Math.min(1.4, 0.7 * e.loud), rate: heavy ? 0.4 : 0.62, at: ctx.currentTime + 0.012 });
           creatureStep(ctx, out, { ...o, gain: o.gain * 0.45 }, e.loud);
         }),
       ),
@@ -67,7 +69,15 @@ export class AudioManager {
               ? creatureClicks(ctx, out, o)
               : e.kind === 'scream'
                 ? creatureScream(ctx, out, { ...o, gain: o.gain * 1.6 })
-                : creatureScreech(ctx, out, { ...o, gain: o.gain * 1.4 }),
+                : e.kind === 'roar'
+                  ? creatureRoar(ctx, out, o)
+                  : e.kind === 'growl'
+                    ? creatureGrowl(ctx, out, o)
+                    : e.kind === 'scrape'
+                      ? ceilingScrape(ctx, out, o)
+                      : e.kind === 'thud'
+                        ? wallThud(ctx, out, o)
+                        : creatureScreech(ctx, out, { ...o, gain: o.gain * 1.4 }),
         ),
       ),
       bus.on('level:won', () => this.fadeAmbience(4)),

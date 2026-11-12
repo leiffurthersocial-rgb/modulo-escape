@@ -15,6 +15,9 @@ export interface PlayerView {
   crouching: boolean;
   sprinting: boolean;
   flashlightOn: boolean;
+  /** Where the camera looks, and cos of half the view cone (for "is he looking at me"). */
+  forward: THREE.Vector3;
+  viewCos: number;
 }
 
 export interface EntityContext {

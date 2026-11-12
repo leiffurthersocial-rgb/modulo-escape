@@ -3,24 +3,31 @@
  * meshopt simplification → per-vertex SDF normals, baked AO, cloth/hair/nail masks and skin
  * weights → skinned GLB (public/assets/monster/robin_body.glb).
  *
- *   npm run robin:build
+ *   npm run robin:build            (all three monsters)
+ *   npx tsx scripts/robin/build-robin.ts leo
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { EXTMeshoptCompression } from '@gltf-transform/extensions';
 import { reorder } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import { buildAnatomy, CLOTH, HEAD_PIVOT, HEAD_SCALE, type Prim, type Region, type V3 } from './anatomy.ts';
+import { buildCharacter, CHARACTERS, type CharacterName } from './characters.ts';
 
 const H = Number(process.env.ROBIN_RES ?? 0.0035);
 const TARGET_TRIS = Number(process.env.ROBIN_TRIS ?? 70000);
-const OUT = 'public/assets/monster/robin_body.glb';
+const CHAR = (process.argv[2] ?? 'robin') as CharacterName;
+const CH = CHARACTERS[CHAR];
+if (!CH) throw new Error(`unknown character ${CHAR}`);
+const OUT = `public/assets/monster/${CHAR}_body.glb`;
 
-const { bones, prims } = buildAnatomy();
+const { bones, prims, toOrig, girth } = buildCharacter(CH);
 const boneIndex = new Map(bones.map((b, i) => [b.name, i]));
-const bonePos = new Map(bones.map((b) => [b.name, b.pos]));
+// Cloth rules, hairline and noise are evaluated in Robin's (authored) space.
+const orig = buildAnatomy();
+const bonePos = new Map(orig.bones.map((b) => [b.name, b.pos]));
 const childOf = new Map<string, V3>();
-for (const b of bones) if (b.parent && !childOf.has(b.parent)) childOf.set(b.parent, b.pos);
+for (const b of orig.bones) if (b.parent && !childOf.has(b.parent)) childOf.set(b.parent, b.pos);
 console.log(`${bones.length} bones, ${prims.length} primitives, grid ${H * 1000} mm`);
 
 // ── noise ──
@@ -86,8 +93,11 @@ interface P {
   max: V3;
   region: Region | undefined;
   bone: number;
+  /** Map a point back to Robin's space, and the bone's girth scale. */
+  back: (p: V3) => V3;
+  girth: number;
 }
-const P: P[] = prims.map((p) => {
+const P: P[] = prims.map((p, pi) => {
   const kind = p.kind === 'cone' ? 0 : p.kind === 'ell' ? 1 : 2;
   let m = [1, 0, 0, 0, 1, 0, 0, 0, 1];
   let ext: V3;
@@ -110,7 +120,7 @@ const P: P[] = prims.map((p) => {
   const pad = p.k + 0.02;
   const min: V3 = kind > 0 ? [p.a[0] - ext[0] - pad, p.a[1] - ext[1] - pad, p.a[2] - ext[2] - pad] : [Math.min(p.a[0] - p.ra, p.b[0] - p.rb) - pad, Math.min(p.a[1] - p.ra, p.b[1] - p.rb) - pad, Math.min(p.a[2] - p.ra, p.b[2] - p.rb) - pad];
   const max: V3 = kind > 0 ? [p.a[0] + ext[0] + pad, p.a[1] + ext[1] + pad, p.a[2] + ext[2] + pad] : [Math.max(p.a[0] + p.ra, p.b[0] + p.rb) + pad, Math.max(p.a[1] + p.ra, p.b[1] + p.rb) + pad, Math.max(p.a[2] + p.ra, p.b[2] + p.rb) + pad];
-  return { src: p, kind, ax: p.a[0], ay: p.a[1], az: p.a[2], bx: p.b[0], by: p.b[1], bz: p.b[2], ra: p.ra, rb: p.rb, m, r: p.r ?? [0, 0, 0], k: p.k, sub: !!p.sub, min, max, region: p.region, bone: boneIndex.get(p.bone)! };
+  return { src: p, kind, ax: p.a[0], ay: p.a[1], az: p.a[2], bx: p.b[0], by: p.b[1], bz: p.b[2], ra: p.ra, rb: p.rb, m, r: p.r ?? [0, 0, 0], k: p.k, sub: !!p.sub, min, max, region: p.region, bone: boneIndex.get(p.bone)!, back: toOrig[pi]!, girth: girth[pi]! };
 });
 
 function primDist(q: P, x: number, y: number, z: number): number {
@@ -147,7 +157,8 @@ function primDist(q: P, x: number, y: number, z: number): number {
     // Hair: clip below the hairline (fringe at the front, nape at the back), messy clumps.
     // Work in the unscaled head space the hairline was authored in.
     const S = HEAD_SCALE;
-    const ux = HEAD_PIVOT[0] + (x - HEAD_PIVOT[0]) / S, uy = HEAD_PIVOT[1] + (y - HEAD_PIVOT[1]) / S, uz = HEAD_PIVOT[2] + (z - HEAD_PIVOT[2]) / S;
+    const [ox, oy, oz] = q.back([x, y, z]);
+    const ux = HEAD_PIVOT[0] + (ox - HEAD_PIVOT[0]) / S, uy = HEAD_PIVOT[1] + (oy - HEAD_PIVOT[1]) / S, uz = HEAD_PIVOT[2] + (oz - HEAD_PIVOT[2]) / S;
     const front = smooth(-0.06, 0.08, uz);
     const line = 2.9 + 0.135 * front + 0.015 * noise(ux * 40, 0, uz * 40);
     d = Math.max(d, (line - uy) * S);
@@ -163,9 +174,23 @@ const smin = (a: number, b: number, k: number) => {
 const smax = (a: number, b: number, k: number) => -smin(-a, -b, k);
 
 /** Cloth/hair/nail region for a point given its dominant primitive. */
-function regionAt(x: number, y: number, z: number, q: P): Region {
+function regionAt(px: number, py: number, pz: number, q: P): Region {
   if (q.region) return q.region;
-  const b = q.src.bone;
+  const [x, y, z] = q.back([px, py, pz]);
+  const r = clothRule(x, y, z, q.src.bone);
+  if (r === 'shirt' && !CH.shirt) return 'skin';
+  if (r === 'pants' && CH.pants === 'short' && q.src.bone.startsWith('thigh')) {
+    const a = bonePos.get(q.src.bone)!;
+    const c = childOf.get(q.src.bone)!;
+    const t = ((x - a[0]) * (c[0] - a[0]) + (y - a[1]) * (c[1] - a[1]) + (z - a[2]) * (c[2] - a[2])) / ((c[0] - a[0]) ** 2 + (c[1] - a[1]) ** 2 + (c[2] - a[2]) ** 2);
+    return t < 0.55 + 0.08 * fbm(x * 25, y * 9, z * 25, 2) ? 'pants' : 'skin';
+  }
+  if (r === 'pants' && CH.pants === 'short' && q.src.bone.startsWith('shin')) return 'skin';
+  return r;
+}
+
+/** Robin's clothing rules (in his space). */
+function clothRule(x: number, y: number, z: number, b: string): Region {
   const along = (bn: string) => {
     const a = bonePos.get(bn)!;
     const c = childOf.get(bn)!;
@@ -233,7 +258,10 @@ function field(x: number, y: number, z: number, list: P[]): number {
       }
     }
   }
-  if (best && d < 0.03) d += displace(x, y, z, regionAt(x, y, z, best));
+  if (best && d < 0.03) {
+    const [ox, oy, oz] = best.back([x, y, z]);
+    d += displace(ox, oy, oz, regionAt(x, y, z, best)) * Math.min(1.8, best.girth);
+  }
   return d;
 }
 
@@ -500,7 +528,8 @@ const doc = new Document();
 const buffer = doc.createBuffer();
 const nodes = new Map<string, ReturnType<Document['createNode']>>();
 for (const b of bones) {
-  const parent = b.parent ? bonePos.get(b.parent)! : ([0, 0, 0] as V3);
+  // Joint offsets from THIS body's skeleton (bonePos holds Robin's, for the cloth rules).
+  const parent = b.parent ? bones.find((x) => x.name === b.parent)!.pos : ([0, 0, 0] as V3);
   const node = doc.createNode(b.name).setTranslation([b.pos[0] - parent[0], b.pos[1] - parent[1], b.pos[2] - parent[2]]);
   nodes.set(b.name, node);
   if (b.parent) nodes.get(b.parent)!.addChild(node);
@@ -531,5 +560,31 @@ doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({
 mkdirSync('public/assets/monster', { recursive: true });
 const io = new NodeIO().registerExtensions([EXTMeshoptCompression]).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 await io.write(OUT, doc);
+// Where the face photo and the shirt print map on this body (read by the game's material).
+{
+  const head = bones.find((b) => b.name === 'head')!.pos;
+  const headO = orig.bones.find((b) => b.name === 'head')!.pos;
+  const chest = bones.find((b) => b.name === 'chest')!.pos;
+  const chestO = orig.bones.find((b) => b.name === 'chest')!.pos;
+  const hs = CH.bones.head?.thick ?? 1;
+  const headThick = typeof hs === 'number' ? hs : hs[0];
+  const cs = CH.bones.chest?.thick ?? 1;
+  const chestThick = typeof cs === 'number' ? cs : cs[0];
+  const eyeY0 = 2.84 + (2.957 - 2.84) * HEAD_SCALE;
+  const top = Math.max(...P.map((q) => q.max[1])) - 0.02;
+  const meta = {
+    character: CHAR,
+    eyeY: head[1] + (eyeY0 - headO[1]) * headThick,
+    eyeHalf: 0.043 * HEAD_SCALE * headThick,
+    eyeZ: head[2],
+    collarY: chest[1] + (2.49 - chestO[1]),
+    shirtHalfWidth: 0.3 * chestThick,
+    hipsY: bones.find((b) => b.name === 'hips')!.pos[1],
+    height: top,
+    shirt: CH.shirt,
+  };
+  writeFileSync(`public/assets/monster/${CHAR}_body.json`, JSON.stringify(meta, null, 1) + '\n');
+  console.log(JSON.stringify(meta));
+}
 const { statSync } = await import('node:fs');
 console.log(`wrote ${OUT}: ${(statSync(OUT).size / 1024 / 1024).toFixed(2)} MB, ${NV} verts, ${outIdx.length / 3} tris, ${bones.length} bones`);

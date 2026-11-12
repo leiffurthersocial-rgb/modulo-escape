@@ -25,10 +25,10 @@ import type { Entity, EntityContext } from './entities.ts';
 import type { MonsterModel } from './monsterModel.ts';
 import { Creature, type CreatureMode } from './creature.ts';
 import { ImageBody, type MonsterImage } from './monsterImage.ts';
-import { RobinBody, type RobinTemplate } from './robinBody.ts';
+import { RobinBody, type RobinTemplate, type Species } from './robinBody.ts';
 import { getEdge } from '../gen/grid.ts';
 
-export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search' | 'attack';
+export type MonsterState = 'dormant' | 'patrol' | 'investigate' | 'chase' | 'search' | 'attack' | 'roar' | 'charge' | 'stunned';
 
 export interface MonsterTuning {
   walkSpeed: number;
@@ -44,8 +44,10 @@ export interface MonsterTuning {
   searchTime: number;
   /** Seconds between drifts towards the player's area while patrolling. */
   driftEvery: number;
-  /** Seconds without an encounter before it slips round, out of sight, to a few rooms from you. */
+  /** Seconds without an encounter before it slips round, out of sight, to a few rooms from you (0 = never). */
   stalkAfter: number;
+  /** Hearing multiplier on footstep radii. */
+  ears: number;
 }
 
 export const DEFAULT_TUNING: MonsterTuning = {
@@ -59,10 +61,31 @@ export const DEFAULT_TUNING: MonsterTuning = {
   searchTime: 7,
   driftEvery: 9,
   stalkAfter: 14,
+  ears: 1,
+};
+
+/**
+ * Three monsters, three ways to die:
+ *  robin — the hunter: screams near you, chases, keeps reappearing near you.
+ *  leo   — the brute: half-blind, sharp ears, stomps you can hear (and feel) from far away; when he
+ *          sees you he ROARS, then charges in a straight line faster than you can sprint and can
+ *          barely turn — dodge round a corner; if he hits a wall he's stunned for a few seconds.
+ *  jovan — the watcher: so tall his head drags along the ceiling; almost silent; he only moves
+ *          while you are NOT looking at him — then fast. Lights flicker around him. Long reach.
+ */
+export const SPECIES_TUNING: Record<Species, MonsterTuning> = {
+  robin: DEFAULT_TUNING,
+  leo: { walkSpeed: 0.95, chaseSpeed: 6.4, chaseRamp: 0, sightRange: 10, fov: 0.85, catchDistance: 1.6, memory: 1, searchTime: 9, driftEvery: 16, stalkAfter: 0, ears: 1.6 },
+  jovan: { walkSpeed: 0.9, chaseSpeed: 4.6, chaseRamp: 0, sightRange: 22, fov: 1.25, catchDistance: 1.9, memory: 4, searchTime: 10, driftEvery: 14, stalkAfter: 26, ears: 1 },
 };
 
 export class Monster implements Entity {
-  readonly id = 'monster';
+  readonly id: string;
+  readonly species: Species;
+  /** Jovan: you're looking at him right now (he freezes). */
+  watched = false;
+  private chargeDir = new THREE.Vector3();
+  private presenceT = 0;
   readonly object = new THREE.Group();
   position = new THREE.Vector3();
   floor = 0;
@@ -75,6 +98,7 @@ export class Monster implements Entity {
   private heading = new THREE.Vector3(0, 0, 1);
   private rng: Rng;
   private tmp = new THREE.Vector3();
+  private tmp2 = new THREE.Vector3();
   private time = 0;
   private nextDrift: number;
   private nextVocal = 3;
@@ -97,12 +121,16 @@ export class Monster implements Entity {
     img: MonsterImage | null = null,
     robinTpl: RobinTemplate | null = null,
   ) {
-    this.rng = streamRng(seed, 'monster');
-    this.nextDrift = tuning.driftEvery;
+    this.species = robinTpl?.species ?? 'robin';
+    this.id = this.species === 'robin' ? 'monster' : `monster-${this.species}`;
+    if (tuning === DEFAULT_TUNING) this.tuning = SPECIES_TUNING[this.species];
+    this.rng = streamRng(seed, this.species === 'robin' ? 'monster' : `monster:${this.species}`);
+    this.nextDrift = this.tuning.driftEvery;
     this.position.copy(spawn);
     if (kind === 'robin' && robinTpl) {
       const r = new RobinBody(robinTpl);
-      r.onStep = (foot, loud) => bus.emit('monster:step', { x: foot.x, y: foot.y, z: foot.z, floor: this.floor, loud });
+      const stepLoud = this.species === 'leo' ? 1.7 : this.species === 'jovan' ? 0.15 : 1;
+      r.onStep = (foot, loud) => bus.emit('monster:step', { x: foot.x, y: foot.y, z: foot.z, floor: this.floor, loud: loud * stepLoud, species: this.species });
       this.object.add(r.object);
       this.robin = r;
     } else if (kind === 'image' && img) {
@@ -206,7 +234,13 @@ export class Monster implements Entity {
   }
 
   private setState(s: MonsterState) {
-    if (s === 'chase' && this.state !== 'chase') bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind: 'screech' });
+    const at = { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor };
+    if (s === 'chase' && this.state !== 'chase' && this.species === 'robin') bus.emit('monster:vocal', { ...at, kind: 'screech' });
+    if (s === 'roar') {
+      bus.emit('monster:vocal', { ...at, kind: 'roar' });
+      this.robin?.scream();
+    }
+    if (s === 'stunned') bus.emit('monster:vocal', { ...at, kind: 'thud' });
     this.state = s;
     this.stateTime = 0;
     this.path = [];
@@ -236,13 +270,31 @@ export class Monster implements Entity {
     const inCone = toPlayer.clone().setY(0).normalize().dot(this.heading) > Math.cos(this.tuning.fov) || dist < 3;
     const range = this.tuning.sightRange * (player.flashlightOn ? 1.4 : 1) * (player.crouching ? 0.65 : 1);
     const sees = sameFloor && dist < range && inCone && ctx.senses.lineOfSight(eye, player.eye);
+    const leo = this.species === 'leo';
+    const jovan = this.species === 'jovan';
+    const busy = this.state === 'roar' || this.state === 'charge' || this.state === 'stunned';
+    if (jovan) {
+      // You're looking at him: he freezes (and twitches). Look away and he comes.
+      const chest = this.tmp2.copy(this.position).setY(this.position.y + 2.2);
+      const dir = chest.clone().sub(player.eye);
+      const d = dir.length();
+      this.watched = sameFloor && d < 30 && dir.normalize().dot(player.forward) > player.viewCos && ctx.senses.lineOfSight(chest, player.eye);
+      if (this.robin) this.robin.frozen = this.watched;
+      this.presenceT -= dt;
+      if (this.presenceT < 0) {
+        this.presenceT = 0.5;
+        bus.emit('monster:presence', { x: this.position.x, y: this.position.y, z: this.position.z, floor: this.floor, species: this.species });
+      }
+    }
     if (sees) {
       this.lastSeen = this.time;
       this.lastEncounter = this.time;
       this.lastKnown.copy(player.position);
-      if (this.state !== 'chase') this.setState('chase');
-    } else if (this.state !== 'chase') {
-      const heard = ctx.senses.hear(this.position, this.floor);
+      if (leo) {
+        if (!busy) this.setState('roar');
+      } else if (this.state !== 'chase') this.setState('chase');
+    } else if (this.state !== 'chase' && !busy) {
+      const heard = ctx.senses.hear(this.position, this.floor, 2, this.tuning.ears);
       if (heard && (this.state !== 'investigate' || heard.pos.distanceTo(this.lastKnown) > 2)) {
         this.lastKnown.copy(heard.pos);
         if (this.state !== 'investigate') this.setState('investigate');
@@ -250,8 +302,20 @@ export class Monster implements Entity {
       }
     }
 
+    // ── Jovan, watched: frozen in place ──
+    if (jovan && this.watched) {
+      this.setPose('idle');
+      if (this.robin) this.robin.speed = 0;
+      return;
+    }
+    // ── Leo: roar, charge, stunned ──
+    if (leo && busy) {
+      this.leoBusy(dt, ctx, flat, sameFloor);
+      return;
+    }
+
     // ── stalking: it never stays away for long ──
-    if ((this.state === 'patrol' || this.state === 'search') && this.time - this.lastEncounter > this.tuning.stalkAfter && this.stalk(ctx, me)) return;
+    if (this.tuning.stalkAfter > 0 && (this.state === 'patrol' || this.state === 'search') && this.time - this.lastEncounter > this.tuning.stalkAfter && this.stalk(ctx, me)) return;
 
     // ── behaviour ──
     let speed = this.tuning.walkSpeed;
@@ -301,10 +365,78 @@ export class Monster implements Entity {
     } else this.setPose('idle');
     if (this.creature) this.creature.speed = speed;
     if (this.robin) this.robin.speed = moving ? speed : 0;
-    this.vocalize(dt, flat, sameFloor);
+    this.vocalize(dt, flat, sameFloor, moving);
 
     if (direct) this.moveTowards(player.position, speed, dt);
     else this.follow(ctx, dt, speed);
+  }
+
+  /** Leo's roar (stand and bellow), charge (straight line, barely turns) and stun (hit a wall). */
+  private leoBusy(dt: number, ctx: EntityContext, flat: number, sameFloor: boolean) {
+    const player = ctx.player;
+    const toP = this.tmp2.copy(player.position).sub(this.position).setY(0);
+    if (this.state === 'roar') {
+      this.setPose('attack');
+      if (this.robin) this.robin.speed = 0;
+      if (toP.lengthSq() > 0.01) this.face(toP.clone().normalize(), dt);
+      if (this.stateTime > 1.15) {
+        this.chargeDir.copy(toP.lengthSq() > 0.01 ? toP.normalize() : this.heading);
+        this.setState('charge');
+      }
+      return;
+    }
+    if (this.state === 'stunned') {
+      this.setPose('idle');
+      if (this.robin) this.robin.speed = 0;
+      if (this.stateTime > 2.4) this.setState('search');
+      return;
+    }
+    // Charge: steer only a little towards you (≤ 0.55 rad/s); walls stop him cold.
+    if (toP.lengthSq() > 0.01) {
+      const want = toP.normalize();
+      const ang = Math.atan2(this.chargeDir.x * want.z - this.chargeDir.z * want.x, this.chargeDir.dot(want));
+      const turn = THREE.MathUtils.clamp(ang, -0.55 * dt, 0.55 * dt);
+      this.chargeDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), -turn).normalize();
+    }
+    const speed = this.tuning.chaseSpeed;
+    this.setPose('run');
+    if (this.robin) this.robin.speed = speed;
+    const next = this.position.clone().addScaledVector(this.chargeDir, speed * dt);
+    if (this.blocked(ctx, this.position, next)) {
+      this.lastKnown.copy(player.position);
+      this.setState('stunned');
+      return;
+    }
+    this.position.copy(next);
+    this.face(this.chargeDir, dt);
+    if (sameFloor && flat < this.tuning.catchDistance) ctx.catchPlayer(this.id);
+    if (this.stateTime > 3.2) {
+      this.lastKnown.copy(player.position);
+      this.setState('search');
+    }
+  }
+
+  /** Would moving from a to b cross a wall (or leave the walkable floor)? */
+  private blocked(ctx: EntityContext, a: THREE.Vector3, b: THREE.Vector3): boolean {
+    const l = ctx.building.floors[this.floor];
+    if (!l) return true;
+    const S = l.cellSize;
+    // Keep a body's width off the walls: test a point a little ahead.
+    const ahead = b.clone().addScaledVector(this.chargeDir, 0.6);
+    const ax = Math.floor(a.x / S);
+    const az = Math.floor(a.z / S);
+    const bx = Math.floor(ahead.x / S);
+    const bz = Math.floor(ahead.z / S);
+    if (bx < 0 || bz < 0 || bx >= l.width || bz >= l.height) return true;
+    const walk = (x: number, z: number) => {
+      const k = l.cells[z * l.width + x]!.kind;
+      return k !== 'void' && k !== 'shaft' && k !== 'stair';
+    };
+    if (!walk(bx, bz)) return true;
+    const pass = (e: string) => e === 'open' || e === 'door' || e === 'broken';
+    if (bx !== ax && !pass(getEdge(l, ax, az, bx > ax ? 'E' : 'W'))) return true;
+    if (bz !== az && !pass(getEdge(l, bx !== ax ? bx : ax, az, bz > az ? 'S' : 'N'))) return true;
+    return false;
   }
 
   /**
@@ -353,7 +485,26 @@ export class Monster implements Entity {
    */
   private wasNear = false;
 
-  private vocalize(dt: number, flat: number, sameFloor: boolean) {
+  private vocalize(dt: number, flat: number, sameFloor: boolean, moving = false) {
+    const at = { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor };
+    if (this.species === 'jovan') {
+      // Almost silent: his head dragging along the ceiling while he moves, now and then a click.
+      this.nextVocal -= dt;
+      if (this.nextVocal > 0) return;
+      this.nextVocal = 1.8 + this.rng.next() * 2.2;
+      if (moving) bus.emit('monster:vocal', { ...at, y: this.position.y + 3.4, kind: 'scrape' });
+      else if (this.rng.next() < 0.4) bus.emit('monster:vocal', { ...at, kind: 'click' });
+      return;
+    }
+    if (this.species === 'leo') {
+      // Heavy breathing far off; a growl that rattles the walls when he's close.
+      this.nextVocal -= dt;
+      if (this.nextVocal > 0) return;
+      const close = sameFloor && flat < 14;
+      this.nextVocal = close ? 2.2 + this.rng.next() * 2.5 : 3.5 + this.rng.next() * 3;
+      if (close || this.rng.next() < 0.5) bus.emit('monster:vocal', { ...at, kind: close ? 'growl' : 'breath' });
+      return;
+    }
     const near = sameFloor && flat < 12;
     // Coming close: scream soon, don't wait for the idle timer.
     if (near && !this.wasNear) this.nextVocal = Math.min(this.nextVocal, 0.4);

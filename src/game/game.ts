@@ -41,7 +41,7 @@ import { EntityManager, type EntityContext } from '../ai/entities.ts';
 import { Monster } from '../ai/monster.ts';
 import { loadMonsterModel, type MonsterModel } from '../ai/monsterModel.ts';
 import { loadMonsterImage, type MonsterImage } from '../ai/monsterImage.ts';
-import { loadRobinBody, type RobinTemplate } from '../ai/robinBody.ts';
+import { loadBody, type RobinTemplate, type Species } from '../ai/robinBody.ts';
 
 export type GameState = 'ready' | 'playing' | 'paused' | 'won' | 'scare' | 'caught';
 
@@ -81,6 +81,7 @@ export class Game {
   private tmpQ = new THREE.Quaternion();
   private tmpV = new THREE.Vector3();
   private tmpS = new THREE.Vector3(1, 1, 1);
+  private viewDir = new THREE.Vector3();
   private tmpM2 = new THREE.Matrix4();
   private tmpM3 = new THREE.Matrix4();
   private unbindResize: () => void;
@@ -112,7 +113,8 @@ export class Game {
     private monsterModel: MonsterModel | null = null,
     /** Robin (robin.png) if present: the monster's body and the face of the jump scare. */
     readonly monsterImage: MonsterImage | null = null,
-    private robinBody: RobinTemplate | null = null,
+    /** Sculpted monster bodies that loaded (Robin, Leo, Jovan). */
+    private bodies: RobinTemplate[] = [],
   ) {
     this.scene = scene;
     this.renderer = renderer;
@@ -208,6 +210,19 @@ export class Game {
         if (key === 'mood') this.setMood(settings.graphics.mood);
       }),
     );
+    // Leo's stomps: you feel them before you see him.
+    this.offs.push(
+      bus.on('monster:step', (e) => {
+        if (e.loud < 1.3 || e.floor !== this.player.floor) return;
+        const d = Math.hypot(e.x - this.player.feet.x, e.z - this.player.feet.z);
+        if (d < 16) this.player.shake = Math.max(this.player.shake, 0.022 * (1 - d / 16));
+      }),
+      bus.on('monster:vocal', (e) => {
+        if (e.kind !== 'thud' && e.kind !== 'roar') return;
+        const d = Math.hypot(e.x - this.player.feet.x, e.z - this.player.feet.z);
+        if (d < 18) this.player.shake = Math.max(this.player.shake, 0.035 * (1 - d / 18));
+      }),
+    );
     document.addEventListener('visibilitychange', this.onVisibility);
     // iPadOS may drop the WebGL context under memory pressure: rebuild the same seed.
     renderer.domElement.addEventListener('webglcontextlost', (e) => {
@@ -224,29 +239,43 @@ export class Game {
   }
 
   /**
-   * The monster spawns on the start floor, as far from the player as the nav graph allows, and
-   * wakes after 6 s. Settings → Monster turns it off (exploring); ?monster=off/on overrides.
+   * The monsters (Robin, Leo, Jovan — whichever bodies loaded) spawn far from you and from each
+   * other, Robin on your floor, the others anywhere; they wake one after another (6 s, 18 s,
+   * 30 s). Settings → Monster turns them all off; ?monster=off/on, ?monsters=robin,leo overrides.
    */
   private maybeSpawnMonster() {
-    const q = new URLSearchParams(location.search).get('monster');
+    const params = new URLSearchParams(location.search);
+    const q = params.get('monster');
     if (q === 'off' || (q !== 'on' && q !== 'model' && !settings.monster)) return;
     const b = this.building;
     const startNode = b.start.floor * this.nav.N + cellIndex(b, b.start.x, b.start.z);
     const dist = bfsFrom(b.nav.adj, startNode);
-    const cands = this.director.spawnPoints
-      .map((p) => p.floor * this.nav.N + cellIndex(b, p.x, p.z))
-      .filter((n) => Math.floor(n / this.nav.N) === b.start.floor && (dist[n] ?? -1) > 0);
-    const node = cands.sort((x, y) => dist[y]! - dist[x]!)[0] ?? dist.indexOf(Math.max(...dist));
-    if (node < 0) return;
-    const kind = this.monsterModel ? 'model' : this.robinBody ? 'robin' : this.monsterImage ? 'image' : 'creature';
-    const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, kind, this.monsterImage, this.robinBody);
-    this.entities.add(m);
-    this.monsterWakeAt = 6;
-    this.monster = m;
+    const allowed = params.get('monsters')?.split(',');
+    const species: { tpl: RobinTemplate | null; wake: number; sameFloor: boolean }[] = this.bodies.length
+      ? this.bodies.filter((t) => !allowed || allowed.includes(t.species)).map((t) => ({ tpl: t, wake: t.species === 'robin' ? 6 : t.species === 'leo' ? 18 : 30, sameFloor: t.species === 'robin' }))
+      : [{ tpl: null, wake: 6, sameFloor: true }];
+    const taken: number[] = [];
+    for (const sp of species) {
+      // Far from you and at least 6 cells from the monsters already placed.
+      const cands = this.director.spawnPoints
+        .map((p) => p.floor * this.nav.N + cellIndex(b, p.x, p.z))
+        .filter((n) => (dist[n] ?? -1) > 0 && (!sp.sameFloor || Math.floor(n / this.nav.N) === b.start.floor))
+        .filter((n) => taken.every((t) => this.nav.nodePos(t).distanceTo(this.nav.nodePos(n)) > 24));
+      const node = cands.sort((x, y) => dist[y]! - dist[x]!)[Math.min(taken.length, Math.max(0, cands.length - 1))] ?? dist.indexOf(Math.max(...dist));
+      if (node < 0) continue;
+      taken.push(node);
+      const kind = this.monsterModel ? 'model' : sp.tpl ? 'robin' : this.monsterImage ? 'image' : 'creature';
+      const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, kind, this.monsterImage, sp.tpl);
+      this.entities.add(m);
+      this.monsters.push({ m, wakeAt: sp.wake });
+    }
   }
-  private monster: Monster | null = null;
+  private monsters: { m: Monster; wakeAt: number }[] = [];
+  /** Robin (the first monster), for code that only knows one. */
+  get monster(): Monster | null {
+    return this.monsters[0]?.m ?? null;
+  }
   readonly scare = new JumpScare();
-  private monsterWakeAt = Infinity;
 
   private computeNearStairs() {
     const b = this.building;
@@ -412,7 +441,9 @@ export class Game {
     if (this.state === 'scare') {
       this.player.lookBackHeld = false;
       // Only the scare runs: monster animation + camera; then the caught screen.
-      for (const e of this.entities.entities.values()) e.update(dt, this.entityContext());
+      // Only the monster that caught you moves; the others hold still (and cost nothing).
+      const who = this.scare.monster;
+      if (who) who.update(dt, this.entityContext());
       if (this.scare.update(dt, this.player)) this.setState('caught');
       return;
     }
@@ -449,15 +480,17 @@ export class Game {
     this.gate.update(dt);
     this.director.update(dt);
     this.senses.update(dt);
-    if (this.monster && this.monster.state === 'dormant' && this.time > this.monsterWakeAt) this.monster.wake();
-    if (this.monster) {
-      // Tension for the ambience: chase = 1, otherwise rises as it gets close on the same floor.
-      const m = this.monster;
+    let tension = 0;
+    for (const { m, wakeAt } of this.monsters) {
+      if (m.state === 'dormant' && this.time > wakeAt) m.wake();
+      // Tension for the ambience: hunted = 1, otherwise rises as one gets close on your floor.
       const sameFloor = m.floor === this.player.floor;
       const d = m.position.distanceTo(this.player.feet);
       const near = sameFloor ? Math.max(0, 1 - d / 22) * 0.6 : 0;
-      this.audio.setTension(m.state === 'chase' ? 1 : m.state === 'investigate' ? Math.max(near, 0.4) : near);
+      const hunted = m.state === 'chase' || m.state === 'charge' || m.state === 'roar';
+      tension = Math.max(tension, hunted ? 1 : m.state === 'investigate' ? Math.max(near, 0.4) : near);
     }
+    if (this.monsters.length) this.audio.setTension(tension);
     if (this.entities.entities.size) this.entities.update(dt, this.entityContext());
   }
 
@@ -475,11 +508,15 @@ export class Game {
         crouching: p.crouching,
         sprinting: p.sprinting,
         flashlightOn: p.flashlightOn,
+        forward: p.camera.getWorldDirection(this.viewDir),
+        // Half the narrower view angle, a little inside the screen edge.
+        viewCos: Math.cos(THREE.MathUtils.degToRad(p.camera.fov * 0.5) * Math.min(1, p.camera.aspect) * 0.95),
       },
       catchPlayer: (by) => {
         if (this.state !== 'playing') return;
         bus.emit('player:caught', { by });
-        this.scare.start(by, this.monster, this.player, (dir, max) => {
+        const who = this.monsters.find((x) => x.m.id === by)?.m ?? this.monster;
+        this.scare.start(by, who, this.player, (dir, max) => {
           const from = this.player.camera.position.clone();
           for (let d = 0.3; d <= max; d += 0.2) {
             if (!this.senses.lineOfSight(from, from.clone().addScaledVector(dir, d + 0.6), this.player.collider)) return d;
@@ -678,8 +715,17 @@ export async function createGame(
   const monsterModel = new URLSearchParams(location.search).get('monster') === 'model' ? await loadMonsterModel(renderer, lib.manifest) : null;
   const monsterImage = await loadMonsterImage();
   // Robin's sculpted body (?monster=billboard keeps the old floating image).
-  const robinBody = monsterImage && !monsterModel && new URLSearchParams(location.search).get('monster') !== 'billboard' ? await loadRobinBody(monsterImage) : null;
-  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel, monsterImage, robinBody);
+  // Sculpted bodies: Robin (with his photo), Leo and Jovan (their photos once uploaded, else
+  // faceless). ?monster=billboard keeps the old floating image.
+  const sculpted = !monsterModel && new URLSearchParams(location.search).get('monster') !== 'billboard';
+  const bodies = sculpted
+    ? (
+        await Promise.all(
+          (['robin', 'leo', 'jovan'] as Species[]).map(async (sp) => (sp === 'robin' && !monsterImage ? null : loadBody(sp, sp === 'robin' ? monsterImage : await loadMonsterImage(sp)))),
+        )
+      ).filter((t): t is RobinTemplate => !!t)
+    : [];
+  const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel, monsterImage, bodies);
   onProgress('Compiling shaders…');
   await renderer.compileAsync(game.scene, game.player.camera).catch(() => {});
   renderer.domElement.style.visibility = '';

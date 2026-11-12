@@ -442,6 +442,56 @@ export function screamSting(ctx: AudioContext, out: AudioNode, at = ctx.currentT
   noiseBurst(ctx, lim, t, 0.7, 'highpass', 500, 0.7, 0.55, 0.004);
 }
 
+/** Leo's roar: a huge low throat, rough and long, with a sub rumble you feel. Positional. */
+export function creatureRoar(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
+  const d = sink(ctx, out, { ...o, gain: o.gain * 1.8 });
+  const t = ctx.currentTime;
+  screamVoice(ctx, d, t, 1.25, { f0: 70, peak: 150, end: 55, gain: 0.9, rough: 38, roughDepth: 0.95, sub: 1, tract: 0.5, drive: 22, crack: 0 });
+  screamVoice(ctx, d, t + 0.05, 1.1, { f0: 160, peak: 320, end: 120, gain: 0.35, rough: 60, roughDepth: 0.8, sub: 0.6, tract: 0.7, drive: 14, crack: 0 });
+  const sub = ctx.createOscillator();
+  sub.frequency.setValueAtTime(48, t);
+  sub.frequency.linearRampToValueAtTime(34, t + 1.2);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.7, t + 0.15);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+  sub.connect(g).connect(d);
+  sub.start(t);
+  sub.stop(t + 1.35);
+}
+
+/** Leo's growl when he's close: a short, low, rattling throat. */
+export function creatureGrowl(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
+  const d = sink(ctx, out, o);
+  const t = ctx.currentTime;
+  screamVoice(ctx, d, t, 0.7 + Math.random() * 0.5, { f0: 62, peak: 95, end: 55, gain: 0.7, rough: 28 + Math.random() * 10, roughDepth: 0.95, sub: 1, tract: 0.5, drive: 12, crack: 0 });
+}
+
+/** Jovan's head dragging along the ceiling: a slow concrete scrape. */
+export function ceilingScrape(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
+  const d = sink(ctx, out, o);
+  const t = ctx.currentTime;
+  const dur = 0.9 + Math.random() * 0.8;
+  noiseBurst(ctx, d, t, dur, 'bandpass', 900 + Math.random() * 500, 2.2, 0.35, dur * 0.4);
+  noiseBurst(ctx, d, t + 0.1, dur * 0.8, 'bandpass', 2600, 4, 0.12, dur * 0.3);
+}
+
+/** Leo slamming into a wall. */
+export function wallThud(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
+  const d = sink(ctx, out, { ...o, gain: o.gain * 2 });
+  const t = ctx.currentTime;
+  const th = ctx.createOscillator();
+  th.frequency.setValueAtTime(70, t);
+  th.frequency.exponentialRampToValueAtTime(28, t + 0.4);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(1.2, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+  th.connect(g).connect(d);
+  th.start(t);
+  th.stop(t + 0.6);
+  noiseBurst(ctx, d, t, 0.4, 'lowpass', 600, 0.7, 0.8, 0.003);
+}
+
 /** Your heartbeat, speeding up: `beats` lub-dubs between `at` and `until`. */
 export function heartbeat(ctx: AudioContext, out: AudioNode, at: number, until: number) {
   let t = at;

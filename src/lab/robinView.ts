@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadMonsterImage } from '../ai/monsterImage.ts';
-import { loadRobinBody, RobinBody, type RobinMode } from '../ai/robinBody.ts';
+import { loadBody, RobinBody, type RobinMode, type Species } from '../ai/robinBody.ts';
 
 const q = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -43,10 +43,18 @@ fill.position.set(-1.5, 1.2, 2.5);
 scene.add(fill);
 
 const ui = document.getElementById('ui')!;
-const img = await loadMonsterImage();
-const tpl = await loadRobinBody(img);
+const who = (['robin', 'leo', 'jovan'].includes(q.get('who') ?? '') ? q.get('who') : 'robin') as Species;
+const img = await loadMonsterImage(who);
+const tpl = await loadBody(who, img);
+if (q.get('ceiling')) {
+  // A school ceiling at 3.6 m, to judge Jovan.
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x3a3a38, roughness: 0.9, side: THREE.DoubleSide }));
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = 3.6;
+  scene.add(ceil);
+}
 if (!tpl) {
-  ui.textContent = 'robin_body.glb missing — run npm run robin:build';
+  ui.textContent = `${who}_body.glb missing — run npm run robin:build`;
   throw new Error('no body');
 }
 const body = new RobinBody(tpl);
@@ -83,7 +91,7 @@ let last = performance.now();
 const auto = q.get('auto') !== '0';
 function frame(dt: number) {
   look.copy(camera.position);
-  body.update(dt, look);
+  if (!q.get('rest')) body.update(dt, look);
   renderer.render(scene, camera);
 }
 function loop() {
@@ -107,7 +115,7 @@ loop();
   setMode,
   /** Advance the animation deterministically and render once. */
   step(t: number, n = 30) {
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n && !q.get('rest'); i++) {
       look.copy(camera.position);
       body.update(t / n, look);
     }

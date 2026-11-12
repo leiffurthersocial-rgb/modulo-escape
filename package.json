@@ -16,7 +16,7 @@
     "assets:fetch": "NODE_USE_ENV_PROXY=1 tsx scripts/fetch-assets.ts",
     "assets:process": "NODE_USE_ENV_PROXY=1 tsx scripts/process-assets.ts",
     "postinstall": "patch-package",
-    "robin:build": "tsx scripts/robin/build-robin.ts",
+    "robin:build": "tsx scripts/robin/build-robin.ts robin && tsx scripts/robin/build-robin.ts leo && tsx scripts/robin/build-robin.ts jovan",
     "sounds:fetch": "NODE_USE_ENV_PROXY=1 tsx scripts/fetch-sounds.ts"
   },
   "dependencies": {

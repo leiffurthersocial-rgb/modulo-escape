@@ -32,13 +32,13 @@ export class Senses {
   }
 
   /** Loudest recent noise audible from `at` (within its radius, same or adjacent floor). */
-  hear(at: THREE.Vector3, floor: number, since = 2): Noise | null {
+  hear(at: THREE.Vector3, floor: number, since = 2, ears = 1): Noise | null {
     let best: Noise | null = null;
     let bestScore = 0;
     for (const n of this.noises) {
       if (this.time - n.time > since || Math.abs(n.floor - floor) > 1) continue;
       const d = n.pos.distanceTo(at);
-      const score = n.radius - d - Math.abs(n.floor - floor) * 4;
+      const score = n.radius * ears - d - Math.abs(n.floor - floor) * 4;
       if (score > bestScore) {
         bestScore = score;
         best = n;

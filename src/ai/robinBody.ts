@@ -19,7 +19,46 @@ import type { MonsterImage } from './monsterImage.ts';
 
 export type RobinMode = 'idle' | 'walk' | 'run' | 'attack';
 
-export const ROBIN_BODY_URL = '/assets/monster/robin_body.glb?v=1';
+export type Species = 'robin' | 'leo' | 'jovan';
+
+/** How a sculpted monster carries itself (all share one rig; see scripts/robin/characters.ts). */
+export interface BodyStyle {
+  idleHunch: number;
+  walkHunch: number;
+  runHunch: number;
+  runLean: number;
+  /** Metres per full gait cycle, walking / running. */
+  walkStride: number;
+  runStride: number;
+  armSwing: number;
+  /** Arms held away from the body (rad). */
+  armOut: number;
+  footLift: number;
+  /** Skin tint mixed over the photo's tone (Leo: sick green). */
+  tint: number;
+  tintAmount: number;
+  /** Highest the top of the head may go when not ducking (the ceiling is at 3.6 m). */
+  headroom: number;
+}
+
+export const BODY_STYLES: Record<Species, BodyStyle> = {
+  robin: { idleHunch: 0.45, walkHunch: 0.55, runHunch: 0.35, runLean: 0.55, walkStride: 1.55, runStride: 2.5, armSwing: 0.38, armOut: 0.12, footLift: 0.14, tint: 0x8a9096, tintAmount: 0, headroom: 3.45 },
+  leo: { idleHunch: 0.85, walkHunch: 0.9, runHunch: 0.75, runLean: 0.65, walkStride: 1.9, runStride: 3.3, armSwing: 0.62, armOut: 0.38, footLift: 0.1, tint: 0x6f8a5e, tintAmount: 0.7, headroom: 3.45 },
+  jovan: { idleHunch: 0.2, walkHunch: 0.25, runHunch: 0.2, runLean: 0.25, walkStride: 2.1, runStride: 3.1, armSwing: 0.22, armOut: 0.05, footLift: 0.12, tint: 0xb8bfc4, tintAmount: 0.3, headroom: 3.52 },
+};
+
+/** Measured on the sculpt (public/assets/monster/<name>_body.json). */
+export interface BodyMeta {
+  eyeY: number;
+  eyeHalf: number;
+  collarY: number;
+  shirtHalfWidth: number;
+  hipsY: number;
+  height: number;
+}
+
+export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=2`;
+export const ROBIN_BODY_URL = bodyUrl('robin');
 
 /** Photo layout (pixels in robin.png): eye centres, and where the shirt collar sits. */
 export const ROBIN_PHOTO = {
@@ -37,12 +76,20 @@ export const ROBIN_PHOTO = {
 export interface RobinTemplate {
   scene: THREE.Group;
   mesh: THREE.SkinnedMesh;
+  species: Species;
+  meta: BodyMeta;
 }
 
-/** Load the body and build its material (null if the GLB is missing). */
-export async function loadRobinBody(photo: MonsterImage | null): Promise<RobinTemplate | null> {
+/** Robin's body (compatibility). */
+export const loadRobinBody = (photo: MonsterImage | null) => loadBody('robin', photo);
+
+/** Load a sculpted body and build its material (null if the GLB is missing). No photo = faceless. */
+export async function loadBody(species: Species, photo: MonsterImage | null): Promise<RobinTemplate | null> {
   try {
-    const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(ROBIN_BODY_URL);
+    const [gltf, meta] = await Promise.all([
+      new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(bodyUrl(species)),
+      fetch(`/assets/monster/${species}_body.json`).then((r) => r.json() as Promise<BodyMeta>),
+    ]);
     let mesh: THREE.SkinnedMesh | null = null;
     gltf.scene.traverse((o) => {
       if ((o as THREE.SkinnedMesh).isSkinnedMesh) mesh = o as THREE.SkinnedMesh;
@@ -55,13 +102,13 @@ export async function loadRobinBody(photo: MonsterImage | null): Promise<RobinTe
     geo.setAttribute('aMask2', geo.getAttribute('uv'));
     geo.deleteAttribute('color');
     geo.deleteAttribute('uv');
-    m.material = createRobinMaterial(photo);
+    m.material = createRobinMaterial(photo, meta, BODY_STYLES[species]);
     m.castShadow = true;
     m.receiveShadow = true;
     m.frustumCulled = false;
-    return { scene: gltf.scene, mesh: m };
+    return { scene: gltf.scene, mesh: m, species, meta };
   } catch (e) {
-    console.warn('Robin body failed to load', e);
+    console.warn(`${species} body failed to load`, e);
     return null;
   }
 }
@@ -90,13 +137,12 @@ function sampleColor(img: CanvasImageSource & { width: number; height: number },
   }
 }
 
-export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStandardMaterial {
+export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta, style: BodyStyle = BODY_STYLES.robin): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0 });
   const img = photo?.texture.image as (CanvasImageSource & { width: number; height: number }) | undefined;
   const W = img?.width ?? 379;
   const Hh = img?.height ?? 658;
   const P = ROBIN_PHOTO;
-  const s = (2 * P.eyeHalf) / Math.hypot(P.eyeR[0] - P.eyeL[0], P.eyeR[1] - P.eyeL[1]);
   const ang = Math.atan2(P.eyeR[1] - P.eyeL[1], P.eyeR[0] - P.eyeL[0]);
   const skin = img ? sampleColor(img, 150, 380, 178, 405, 0xd9a58a) : new THREE.Color(0xd9a58a);
   const hair = img ? sampleColor(img, 150, 180, 250, 230, 0x5a3b28) : new THREE.Color(0x5a3b28);
@@ -105,12 +151,15 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
     uHasPhoto: { value: photo ? 1 : 0 },
     uPhotoSize: { value: new THREE.Vector2(W, Hh) },
     uFaceC: { value: new THREE.Vector2((P.eyeL[0] + P.eyeR[0]) / 2, (P.eyeL[1] + P.eyeR[1]) / 2) },
-    uFaceY: { value: P.eyeY },
-    uFaceS: { value: s },
+    uFaceY: { value: meta?.eyeY ?? P.eyeY },
+    uFaceS: { value: (2 * (meta?.eyeHalf ?? P.eyeHalf)) / Math.hypot(P.eyeR[0] - P.eyeL[0], P.eyeR[1] - P.eyeL[1]) },
     uFaceRot: { value: ang },
     uShirtC: { value: new THREE.Vector2(P.collar[0], P.collar[1]) },
-    uShirtY: { value: P.collarY },
-    uShirtS: { value: P.shirtHalfWidth / P.shirtHalfWidthPx },
+    uShirtY: { value: meta?.collarY ?? P.collarY },
+    uShirtS: { value: (meta?.shirtHalfWidth ?? P.shirtHalfWidth) / P.shirtHalfWidthPx },
+    uTint: { value: new THREE.Color(style.tint) },
+    uTintAmt: { value: style.tintAmount },
+    uEyeHalf: { value: meta?.eyeHalf ?? P.eyeHalf },
     uSkin: { value: skin },
     uHair: { value: hair },
     uGlow: { value: 0.035 },
@@ -157,6 +206,9 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
         uniform vec3 uSkin;
         uniform vec3 uHair;
         uniform float uGlow;
+        uniform vec3 uTint;
+        uniform float uTintAmt;
+        uniform float uEyeHalf;
         uniform float uWarp;
         uniform float uScareTime;
         varying vec3 vRest;
@@ -203,6 +255,7 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
           float headward = smoothstep(2.45, 2.85, p.y);
           vec3 grey = vec3(dot(uSkin, vec3(0.3, 0.55, 0.15))) * vec3(0.9, 0.95, 0.97);
           vec3 sk = mix(mix(uSkin, grey, 0.5), uSkin * 0.92, headward) * mix(0.68 + 0.4 * mott, 0.9 + 0.15 * mott, headward);
+          sk = mix(sk, uTint * (0.62 + 0.45 * mott), uTintAmt * (1.0 - 0.6 * headward));
           float vein = pow(1.0 - abs(rNoise(p * vec3(16.0, 5.0, 16.0)) * 2.0 - 1.0), 14.0);
           sk = mix(sk, vec3(0.22, 0.24, 0.36), vein * 0.4);
           sk = mix(sk, vec3(0.32, 0.18, 0.2), smoothstep(0.58, 0.8, rFbm(p * 3.1 + 4.0)) * 0.55);
@@ -264,6 +317,14 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
           face = mix(face, vec3(0.22, 0.0, 0.01), blood * min(1.0, uWarp * 1.5) * 0.85);
           face = mix(face, vec3(0.015, 0.0, 0.0), mouthHole);
           col = mix(col, face, fw);
+          if (uHasPhoto < 0.5) {
+            // No photo yet: a faceless head with hollow, sunken eyes and a black slit of a mouth.
+            vec2 q = vec2(p.x, p.y - uFaceY) / uEyeHalf;
+            float eyes = 1.0 - smoothstep(0.32, 0.5, min(length((q - vec2(1.0, 0.0)) * vec2(1.0, 1.4)), length((q - vec2(-1.0, 0.0)) * vec2(1.0, 1.4))));
+            float mouth = 1.0 - smoothstep(0.75, 1.0, length((q - vec2(0.0, -1.9)) / vec2(0.95, 0.16)));
+            float front = vMask2.y;
+            col = mix(col, vec3(0.012, 0.008, 0.008), max(eyes, mouth * 0.9) * front);
+          }
           col *= mix(1.0, vMask.x, 0.85);
           diffuseColor.rgb = col;
           gRough = skinM * (0.48 + 0.25 * rNoise(p * 30.0)) + shirt * 0.93 + pants * 0.9 + hairM * 0.7 + nail * 0.3;
@@ -284,7 +345,7 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
         totalEmissiveRadiance += vec3(0.55, 0.62, 0.75) * rim * 0.07;`,
       );
   };
-  mat.customProgramCacheKey = () => 'robin-v4';
+  mat.customProgramCacheKey = () => 'robin-v5';
   return mat;
 }
 
@@ -367,8 +428,21 @@ export class RobinBody {
   private attackT = 0;
   private headLook = new THREE.Quaternion();
   private hasLook = false;
+  readonly species: Species;
+  readonly style: BodyStyle;
+  /** Rest height of the hips and of the top of the head above the head bone. */
+  private hipsY: number;
+  private headTopOff = 0.36;
+  /** 0..1.2: extra stoop to keep the head under the ceiling / a door lintel (feedback). */
+  private stoop = 0;
+  private lastTop = 0;
+  /** Freeze in place (Jovan while you look at him): no gait, no breathing — only twitches. */
+  frozen = false;
 
   constructor(tpl: RobinTemplate) {
+    this.species = tpl.species ?? 'robin';
+    this.style = BODY_STYLES[this.species];
+    this.hipsY = tpl.meta?.hipsY ?? 1.55;
     this.object.add(tpl.scene);
     this.uniforms = ((tpl.mesh.material as THREE.Material).userData.uniforms as Record<string, { value: unknown }> | undefined) ?? null;
     tpl.scene.traverse((o) => {
@@ -376,6 +450,7 @@ export class RobinBody {
     });
     tpl.scene.updateMatrixWorld(true);
     const B = (n: string) => this.bones.get(n)!;
+    if (tpl.meta) this.headTopOff = tpl.meta.height - B('head').getWorldPosition(new THREE.Vector3()).y;
     const wp = (n: string) => B(n).getWorldPosition(new THREE.Vector3());
     for (const [side, s] of [
       ['L', 1],
@@ -449,6 +524,10 @@ export class RobinBody {
   /** `look`: world position to look at (the player's eye). */
   update(dt: number, look: THREE.Vector3 | null) {
     dt = Math.min(dt, 0.05);
+    const st = this.style;
+    // Frozen: the body holds still (no gait, no breath); the head still twitches and turns.
+    const realDt = dt;
+    if (this.frozen && this.scareT < 0) dt = 0;
     this.t += dt;
     const B = (n: string) => this.bones.get(n)!;
     const sc = this.scareT;
@@ -479,8 +558,8 @@ export class RobinBody {
     const p = this.post;
     const run = mode === 'run' ? 1 : 0;
     const tgt = {
-      hunch: mode === 'attack' ? 0.05 : mode === 'run' ? 0.35 : mode === 'walk' ? 0.55 : 0.45,
-      lean: run * 0.55,
+      hunch: mode === 'attack' ? 0.05 : mode === 'run' ? st.runHunch : mode === 'walk' ? st.walkHunch : st.idleHunch,
+      lean: run * st.runLean,
       crouch: mode === 'attack' ? 0.02 : mode === 'run' ? 0.16 : mode === 'walk' ? 0.08 : 0.05,
       reach: mode === 'run' ? 1 : mode === 'attack' ? 1 : 0,
       spread: mode === 'attack' ? 1 : scream * 0.6,
@@ -491,16 +570,22 @@ export class RobinBody {
       if (sc < hit) Object.assign(tgt, { hunch: 0.85, lean: 0, crouch: 0.28, reach: 0, spread: 0 });
       else Object.assign(tgt, { hunch: 0.55, lean: 0.35, crouch: 0.1, reach: 1, spread: 1 });
     }
-    p.duck = expTo(p.duck, this.duck, dt, 4 * rateK);
-    p.hunch = expTo(p.hunch, tgt.hunch + p.duck * 0.62, dt, 3 * rateK);
+    // Stoop just enough to keep the head under the ceiling (or under a door lintel when ducking).
+    p.duck = expTo(p.duck, this.duck, realDt, 4 * rateK);
+    const limit = THREE.MathUtils.lerp(st.headroom, 2.5, p.duck);
+    // (Integral control on the measured head height, applied directly — no smoothing lag, so it
+    // settles instead of overshooting.)
+    if (this.lastTop > 0 && sc < 0) this.stoop = THREE.MathUtils.clamp(this.stoop + (this.lastTop - limit) * realDt * 2.5, 0, 1);
+    if (sc >= 0) this.stoop = expTo(this.stoop, 0, realDt, 2);
+    p.hunch = expTo(p.hunch, tgt.hunch, dt, 3 * rateK);
     p.lean = expTo(p.lean, tgt.lean, dt, 3 * rateK);
-    p.crouch = expTo(p.crouch, tgt.crouch + p.duck * 0.38, dt, 3 * rateK);
+    p.crouch = expTo(p.crouch, tgt.crouch, dt, 3 * rateK);
     p.reach = expTo(p.reach, tgt.reach, dt, 4 * rateK);
     p.spread = expTo(p.spread, tgt.spread, dt, 5 * rateK);
     p.run = expTo(p.run, run, dt, 4);
 
     // ── gait ──
-    const stride = THREE.MathUtils.lerp(1.55, 2.5, p.run); // metres per full cycle
+    const stride = THREE.MathUtils.lerp(st.walkStride, st.runStride, p.run); // metres per full cycle
     const moving = this.speed > 0.05 && mode !== 'attack';
     this.gaitAmp = expTo(this.gaitAmp, moving ? 1 : 0, dt, 5);
     if (moving) this.phase = (this.phase + (dt * this.speed) / stride) % 1;
@@ -511,12 +596,12 @@ export class RobinBody {
     const hips = B('hips');
     const ph2 = this.phase * Math.PI * 4;
     const bob = this.gaitAmp * (-0.03 - 0.03 * p.run) * Math.cos(ph2);
-    hips.position.set(this.gaitAmp * 0.025 * Math.sin(this.phase * Math.PI * 2) * (1 - p.run), 1.55 - p.crouch * 0.6 + bob + Math.sin(this.t * 1.3) * 0.006, -p.lean * 0.05);
+    hips.position.set(this.gaitAmp * 0.025 * Math.sin(this.phase * Math.PI * 2) * (1 - p.run), this.hipsY - (p.crouch + this.stoop * 0.3) * 0.6 * (this.hipsY / 1.55) + bob + Math.sin(this.t * 1.3) * 0.006, -p.lean * 0.05);
     hips.quaternion.setFromEuler(new THREE.Euler(p.lean * 0.35, this.gaitAmp * 0.1 * Math.sin(this.phase * Math.PI * 2), this.gaitAmp * 0.05 * Math.cos(this.phase * Math.PI * 2)));
 
     // Spine: hunch spread over the vertebrae, counter-rotation against the hips, breathing.
     const breath = Math.sin(this.t * (1.1 + p.run * 1.5)) * (0.025 + p.run * 0.03) + scream * 0.12;
-    const hunch = p.hunch * 0.9 + p.lean * 0.45;
+    const hunch = (p.hunch + this.stoop * 0.55) * 0.9 + p.lean * 0.45;
     const counter = -this.gaitAmp * 0.12 * Math.sin(this.phase * Math.PI * 2);
     B('spine1').quaternion.setFromEuler(new THREE.Euler(hunch * 0.22, counter * 0.4, 0));
     B('spine2').quaternion.setFromEuler(new THREE.Euler(hunch * 0.33 - breath * 0.4, counter * 0.4, 0));
@@ -528,13 +613,13 @@ export class RobinBody {
     for (const arm of this.arms) {
       const s = arm.side;
       const legPh = this.phase + (s === 1 ? 0.5 : 0);
-      const swingT = this.gaitAmp * (1 - p.reach) * 0.38 * Math.sin(legPh * Math.PI * 2);
+      const swingT = this.gaitAmp * (1 - p.reach) * st.armSwing * Math.sin(legPh * Math.PI * 2);
       // Hang with gravity (undo the hunch), swing, reach forward when running/attacking.
       const atk = this.attackT;
       const grab = mode === 'attack' ? THREE.MathUtils.smoothstep(atk, 0.25, 0.55) : 0;
       const reachPitch = -1.25 * p.reach * (1 - p.spread * 0.2) + p.run * 0.25 * Math.sin(legPh * Math.PI * 2);
       const pitch = spring(arm.swing, -spineFwd * 0.92 + swingT + reachPitch - grab * 0.25, dt, 1.4 * (sc >= 0 ? 3 : 1), 0.55);
-      const outT = 0.12 + p.spread * (1.0 - grab * 0.9) - this.gaitAmp * 0.08;
+      const outT = st.armOut + p.spread * (1.0 - grab * 0.9) - this.gaitAmp * 0.08;
       const out = spring(arm.out, outT, dt, 1.6 * (sc >= 0 ? 3 : 1), 0.6);
       const elbow = spring(arm.elbow, 0.22 + this.gaitAmp * 0.12 + p.reach * (0.15 - grab * 0.2) + scream * 0.3 + p.duck * 0.2, dt, 2.2 * (sc >= 0 ? 2 : 1), 0.6);
       arm.clav.quaternion.setFromEuler(new THREE.Euler(0, 0, s * (0.05 + p.spread * 0.15 + scream * 0.1)));
@@ -574,7 +659,7 @@ export class RobinBody {
       } else {
         const u = (lp - beta) / (1 - beta);
         z = THREE.MathUtils.lerp(-beta * half, beta * half, (1 - Math.cos(u * Math.PI)) / 2);
-        lift = Math.sin(u * Math.PI) * (0.14 + p.run * 0.16);
+        lift = Math.sin(u * Math.PI) * (st.footLift + p.run * 0.16);
         footPitch = (1 - u) * -0.5 + u * 0.25;
         leg.planted = false;
       }
@@ -593,7 +678,7 @@ export class RobinBody {
     }
 
     // ── head: tilt, twitch, look at the target ──
-    this.nextTwitch -= dt;
+    this.nextTwitch -= realDt;
     if (this.nextTwitch < 0) {
       this.nextTwitch = (mode === 'idle' ? 1.5 : 2.5) + Math.random() * 4;
       const k = mode === 'run' ? 0.4 : 1;
@@ -603,9 +688,9 @@ export class RobinBody {
       if (Math.random() < 0.35) this.tiltTarget = (Math.random() - 0.3) * 0.7;
     }
     const tw = this.twitch;
-    spring(tw.yaw, 0, dt, 3, 0.35);
-    spring(tw.roll, 0, dt, 3, 0.35);
-    spring(tw.pitch, 0, dt, 3, 0.35);
+    spring(tw.yaw, 0, realDt, 3, 0.35);
+    spring(tw.roll, 0, realDt, 3, 0.35);
+    spring(tw.pitch, 0, realDt, 3, 0.35);
     const tilt = spring(this.tilt, this.tiltTarget, dt, sc >= 0 ? (sc < RobinBody.SCARE_SNAP ? 1.1 : 6) : 0.6, sc >= 0 && sc < RobinBody.SCARE_SNAP ? 0.9 : 0.8);
     const shake = (scream > 0 ? scream : 0) * (sc >= 0 ? 1.8 : 1);
     const head = B('head');
@@ -626,11 +711,13 @@ export class RobinBody {
       this.headLook.copy(want);
       this.hasLook = true;
     }
-    this.headLook.slerp(want, 1 - Math.exp(-dt * (sc >= 0 ? 14 : mode === 'idle' ? 2.5 : 5)));
+    this.headLook.slerp(want, 1 - Math.exp(-realDt * (sc >= 0 ? 14 : this.frozen ? 0.8 : mode === 'idle' ? 2.5 : 5)));
     const extra = new THREE.Quaternion().setFromEuler(
       new THREE.Euler(tw.pitch.x * 0.1 - scream * (sc >= 0 ? -0.12 : 0.55) + Math.sin(this.t * 41) * 0.06 * shake, tw.yaw.x * 0.1 + Math.sin(this.t * 37) * 0.08 * shake, tilt + tw.roll.x * 0.1 + Math.sin(this.t * 29) * 0.1 * shake),
     );
     head.quaternion.copy(fkWorld.invert()).multiply(this.headLook).multiply(extra);
+    head.updateMatrixWorld(true);
+    this.lastTop = this.headTop();
   }
 
   /** Analytic two-bone IK: thigh/shin so the ankle reaches `target`; knee towards `pole`. */
@@ -659,7 +746,7 @@ export class RobinBody {
 
   /** Top of the head above the ground (for tuning / door checks). */
   headTop(): number {
-    return this.head.getWorldPosition(_v).y - this.object.position.y + 0.36;
+    return this.head.getWorldPosition(_v).y - this.object.position.y + this.headTopOff;
   }
 
   dispose() {
