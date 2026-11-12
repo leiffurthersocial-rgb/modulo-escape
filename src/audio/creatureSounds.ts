@@ -442,6 +442,84 @@ export function screamSting(ctx: AudioContext, out: AudioNode, at = ctx.currentT
   noiseBurst(ctx, lim, t, 0.7, 'highpass', 500, 0.7, 0.55, 0.004);
 }
 
+/** Your heartbeat, speeding up: `beats` lub-dubs between `at` and `until`. */
+export function heartbeat(ctx: AudioContext, out: AudioNode, at: number, until: number) {
+  let t = at;
+  let gap = 0.42;
+  while (t < until) {
+    for (const [dt, f, g] of [
+      [0, 62, 0.9],
+      [0.13, 52, 0.6],
+    ] as const) {
+      const o = ctx.createOscillator();
+      o.frequency.setValueAtTime(f, t + dt);
+      o.frequency.exponentialRampToValueAtTime(f * 0.6, t + dt + 0.12);
+      const gg = ctx.createGain();
+      gg.gain.setValueAtTime(0.0001, t + dt);
+      gg.gain.exponentialRampToValueAtTime(g, t + dt + 0.012);
+      gg.gain.exponentialRampToValueAtTime(0.0001, t + dt + 0.16);
+      o.connect(gg).connect(out);
+      o.start(t + dt);
+      o.stop(t + dt + 0.2);
+    }
+    t += gap;
+    gap = Math.max(0.24, gap * 0.82);
+  }
+}
+
+/** Wet, slow breathing right at your left ear (in total darkness). */
+export function earBreath(ctx: AudioContext, out: AudioNode, at: number, dur: number) {
+  const pan = ctx.createStereoPanner();
+  pan.pan.value = -0.85;
+  pan.connect(out);
+  // Exhale: low rasp with a wet flutter, then a short click of the tongue.
+  const n = ctx.createBufferSource();
+  n.buffer = noise(ctx);
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.setValueAtTime(1300, at);
+  bp.frequency.linearRampToValueAtTime(650, at + dur);
+  bp.Q.value = 1.2;
+  const flutter = ctx.createGain();
+  flutter.gain.value = 0.6;
+  const am = ctx.createOscillator();
+  am.frequency.value = 31;
+  const amG = ctx.createGain();
+  amG.gain.value = 0.4;
+  am.connect(amG).connect(flutter.gain);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(0.75, at + dur * 0.35);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  n.connect(bp).connect(flutter).connect(g).connect(pan);
+  n.start(at, Math.random());
+  n.stop(at + dur + 0.05);
+  am.start(at);
+  am.stop(at + dur + 0.05);
+  noiseBurst(ctx, pan, at + dur * 0.15, 0.02, 'bandpass', 3200, 4, 0.5);
+}
+
+/** The last shriek: short, piercing, with a hit — the "it's not over" scare. */
+export function shriekSting(ctx: AudioContext, out: AudioNode, at: number) {
+  const lim = ctx.createDynamicsCompressor();
+  lim.threshold.value = -8;
+  lim.ratio.value = 14;
+  lim.attack.value = 0.002;
+  lim.connect(out);
+  screamVoice(ctx, lim, at, 0.45, { f0: 1200, peak: 2900, end: 1500, gain: 1, rough: 120, roughDepth: 0.7, sub: 0.4, tract: 1.2, drive: 24, crack: 0 });
+  screamVoice(ctx, lim, at, 0.45, { f0: 160, peak: 300, end: 120, gain: 0.35, rough: 50, roughDepth: 0.9, sub: 1, tract: 0.55, drive: 26, crack: 0 });
+  noiseBurst(ctx, lim, at, 0.3, 'highpass', 600, 0.7, 0.6, 0.002);
+  const sub = ctx.createOscillator();
+  sub.frequency.setValueAtTime(75, at);
+  sub.frequency.exponentialRampToValueAtTime(30, at + 0.35);
+  const sg = ctx.createGain();
+  sg.gain.setValueAtTime(0.8, at);
+  sg.gain.exponentialRampToValueAtTime(0.0001, at + 0.45);
+  sub.connect(sg).connect(lim);
+  sub.start(at);
+  sub.stop(at + 0.5);
+}
+
 /** Your own footstep on concrete: soft scuff (crouch), step (walk), hard slap (sprint). */
 export function playerStep(ctx: AudioContext, out: AudioNode, strength: number, side: number) {
   const t = ctx.currentTime;

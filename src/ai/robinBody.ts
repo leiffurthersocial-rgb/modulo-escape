@@ -114,6 +114,9 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
     uSkin: { value: skin },
     uHair: { value: hair },
     uGlow: { value: 0.035 },
+    /** Jump scare: 0..1 face warp (mouth tears open, eyes bulge and bleed), and its clock. */
+    uWarp: { value: 0 },
+    uScareTime: { value: 0 },
   };
   mat.userData.uniforms = uniforms;
   mat.onBeforeCompile = (sh) => {
@@ -154,6 +157,8 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
         uniform vec3 uSkin;
         uniform vec3 uHair;
         uniform float uGlow;
+        uniform float uWarp;
+        uniform float uScareTime;
         varying vec3 vRest;
         varying vec3 vRestN;
         varying vec4 vMask;
@@ -215,10 +220,42 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
           vec3 na = vec3(0.32, 0.27, 0.17) * (0.6 + 0.5 * rNoise(p * 120.0));
           vec3 col = sk * skinM + sh * shirt + pa * pants + ha * hairM + na * nail;
           // Face: the photo, projected from the front, faded out towards the sides.
-          vec2 fu = faceUV(p);
+          vec2 fu0 = faceUV(p);
+          vec2 fu = fu0;
+          float mouthHole = 0.0;
+          float blood = 0.0;
+          if (uWarp > 0.001) {
+            // Work in photo pixels (y down).
+            vec2 P = vec2(fu.x * uPhotoSize.x, (1.0 - fu.y) * uPhotoSize.y);
+            vec2 M = vec2(205.0, 430.0);
+            vec2 E1 = vec2(145.0, 352.0), E2 = vec2(232.0, 345.0);
+            // Glitch wobble.
+            P.x += uWarp * sin(P.y * 0.35 + uScareTime * 47.0) * 4.0;
+            // Mouth tears open: stretch vertically around the smile, wider at the centre.
+            vec2 d = P - M;
+            float mw = exp(-pow(d.x / 70.0, 2.0));
+            P.y = M.y + d.y / (1.0 + 2.2 * uWarp * mw);
+            // Eyes bulge.
+            for (int k = 0; k < 2; k++) {
+              vec2 E = k == 0 ? E1 : E2;
+              vec2 de = P - E;
+              P = E + de * (1.0 - 0.5 * uWarp * exp(-dot(de, de) / 420.0));
+              // Blood running down from each eye.
+              float run = 60.0 + 170.0 * uWarp;
+              blood = max(blood, exp(-pow((P.x - E.x + sin(P.y * 0.08) * 3.0) / 6.0, 2.0)) * step(E.y, P.y) * (1.0 - smoothstep(E.y + run * 0.6, E.y + run, P.y)));
+            }
+            // The torn mouth is a black hole.
+            vec2 dm = (P - M) / vec2(62.0, 10.0 + 34.0 * uWarp);
+            mouthHole = uWarp * (1.0 - smoothstep(0.55, 1.0, length(dm)));
+            fu = vec2(P.x / uPhotoSize.x, 1.0 - P.y / uPhotoSize.y);
+          }
           vec4 ph = texture2D(uPhoto, fu);
-          float fw = uHasPhoto * vMask2.y * inside01(fu) * smoothstep(0.6, 0.97, ph.a) * (1.0 - smoothstep(0.19, 0.21, 1.0 - fu.y - (uFaceC.y / uPhotoSize.y)));
-          col = mix(col, ph.rgb, fw);
+          float fw = uHasPhoto * vMask2.y * inside01(fu0) * smoothstep(0.6, 0.97, ph.a) * (1.0 - smoothstep(0.19, 0.21, 1.0 - fu0.y - (uFaceC.y / uPhotoSize.y)));
+          vec3 face = ph.rgb;
+          face = mix(face, face * vec3(0.75, 0.62, 0.62), uWarp * 0.6);
+          face = mix(face, vec3(0.28, 0.0, 0.01), blood * uWarp * 0.9);
+          face = mix(face, vec3(0.015, 0.0, 0.0), mouthHole);
+          col = mix(col, face, fw);
           col *= mix(1.0, vMask.x, 0.85);
           diffuseColor.rgb = col;
           gRough = skinM * (0.48 + 0.25 * rNoise(p * 30.0)) + shirt * 0.93 + pants * 0.9 + hairM * 0.7 + nail * 0.3;
@@ -232,7 +269,7 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n        normal = bumpN(-vViewPosition, normal, gH * 0.002);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n        totalEmissiveRadiance += gEmis;');
   };
-  mat.customProgramCacheKey = () => 'robin-v1';
+  mat.customProgramCacheKey = () => 'robin-v2';
   return mat;
 }
 
@@ -318,6 +355,7 @@ export class RobinBody {
 
   constructor(tpl: RobinTemplate) {
     this.object.add(tpl.scene);
+    this.uniforms = ((tpl.mesh.material as THREE.Material).userData.uniforms as Record<string, { value: unknown }> | undefined) ?? null;
     tpl.scene.traverse((o) => {
       if ((o as THREE.Bone).isBone) this.bones.set(o.name, o as THREE.Bone);
     });
@@ -379,7 +417,19 @@ export class RobinBody {
    *            then the claws close in
    */
   scareT = -1;
-  static readonly SCARE_HIT = 0.42;
+  /** When the lunge lands (s into the scare); the JumpScare sets it. */
+  scareHit = 1.35;
+  static readonly SCARE_HIT = 1.35;
+  /** Moment the head snaps back upright (after turning upside down). */
+  static readonly SCARE_SNAP = 0.78;
+  private uniforms: Record<string, { value: unknown }> | null = null;
+
+  /** Face warp for the scare (0..1). */
+  setWarp(w: number, t: number) {
+    if (!this.uniforms) return;
+    this.uniforms.uWarp!.value = w;
+    this.uniforms.uScareTime!.value = t;
+  }
 
   /** `look`: world position to look at (the player's eye). */
   update(dt: number, look: THREE.Vector3 | null) {
@@ -387,15 +437,22 @@ export class RobinBody {
     this.t += dt;
     const B = (n: string) => this.bones.get(n)!;
     const sc = this.scareT;
-    const hit = RobinBody.SCARE_HIT;
+    const hit = this.scareHit;
     if (sc >= 0) this.mode = sc < hit ? 'idle' : 'attack';
     const mode = this.mode;
     if (mode === 'attack') this.attackT = sc >= 0 ? sc - hit : this.attackT + dt;
     else this.attackT = 0;
     if (sc >= hit && sc - dt < hit) this.screamT = 0;
     if (sc >= 0 && sc < hit) {
-      this.tiltTarget = sc < 0.3 ? 0.7 : -0.05;
-      if (sc >= 0.3 && sc - dt < 0.3) this.twitch.roll.v -= 25;
+      // The head slowly turns upside down while he stares… then snaps back.
+      const snap = RobinBody.SCARE_SNAP;
+      this.tiltTarget = sc < snap ? Math.PI * 0.97 : -0.08;
+      if (sc >= snap && sc - dt < snap) {
+        this.tilt.x = 0.15;
+        this.tilt.v = 0;
+        this.twitch.roll.v -= 30;
+        this.twitch.yaw.v += 20;
+      }
     }
     if (this.screamT >= 0) {
       this.screamT += dt;
@@ -534,7 +591,7 @@ export class RobinBody {
     spring(tw.yaw, 0, dt, 3, 0.35);
     spring(tw.roll, 0, dt, 3, 0.35);
     spring(tw.pitch, 0, dt, 3, 0.35);
-    const tilt = spring(this.tilt, this.tiltTarget, dt, sc >= 0 ? 4 : 0.6, 0.8);
+    const tilt = spring(this.tilt, this.tiltTarget, dt, sc >= 0 ? (sc < RobinBody.SCARE_SNAP ? 1.1 : 6) : 0.6, sc >= 0 && sc < RobinBody.SCARE_SNAP ? 0.9 : 0.8);
     const shake = (scream > 0 ? scream : 0) * (sc >= 0 ? 1.8 : 1);
     const head = B('head');
     const neck2 = B('neck2');

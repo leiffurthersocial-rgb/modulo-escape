@@ -497,6 +497,7 @@ export class Game {
 
   renderFrame(dt: number) {
     this.player.updateCamera(this.acc / (1 / this.stepHz), dt);
+    this.scare.applyCamera(this.player.camera);
     const cam = this.player.camera.position;
     surfaceUniforms.uTime.value += dt;
     this.env.update();
@@ -524,7 +525,7 @@ export class Game {
     const target = THREE.MathUtils.lerp(1.35, 1.5, sky);
     this.adapt += (target - this.adapt) * Math.min(1, dt * 1.5);
     if (dt === 0) this.adapt = target;
-    this.renderer.toneMappingExposure = ind.exposure * this.adapt;
+    this.renderer.toneMappingExposure = ind.exposure * this.adapt * (this.scare.active ? Math.max(0.0001, this.scare.exposure) : 1);
     // Pale damp haze at the end of long corridors (the look you liked), blue night haze outside.
     this.env.fog.color.copy(ind.fogColor).multiplyScalar(0.3).lerp(out.fogColor, sky);
     this.env.fog.density = THREE.MathUtils.lerp(0.03, out.fogDensity, sky);

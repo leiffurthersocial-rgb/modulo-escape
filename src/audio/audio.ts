@@ -7,7 +7,7 @@
 import { bus } from '../core/events.ts';
 import { settings } from '../game/settings.ts';
 import { HvacAmbience } from './hvac.ts';
-import { creatureBreath, creatureClicks, creatureScream, creatureScreech, creatureStep, playerStep, screamSting, setListener, sink } from './creatureSounds.ts';
+import { creatureBreath, creatureClicks, creatureScream, creatureScreech, creatureStep, earBreath, heartbeat, playerStep, screamSting, setListener, shriekSting, sink } from './creatureSounds.ts';
 import { createReverb, SampleBank } from './samples.ts';
 
 export type AudioBus = 'ambience' | 'sfx' | 'music' | 'stingers';
@@ -38,7 +38,7 @@ export class AudioManager {
           this.startAmbience();
         }
       }),
-      bus.on('scare:start', (e) => this.sting(e.hitAt)),
+      bus.on('scare:start', (e) => this.sting(e.hitAt, e.darkAt, e.booAt)),
       // Your own footsteps (the same events the monster listens to): crouch soft, sprint loud.
       bus.on('noise', (n) => {
         if (n.source !== 'player' || !this.ctx || this.ctx.state !== 'running') return;
@@ -136,13 +136,21 @@ export class AudioManager {
   }
 
   /** The scare: the building's hum cuts to silence, then the scream lands `hitAt` s later. */
-  sting(hitAt = 0) {
+  sting(hitAt = 0, darkAt = 0, booAt = 0) {
     this.ensure();
     if (!this.ctx) return;
     void this.ctx.resume();
     this.fadeAmbience(hitAt > 0 ? 0.12 : 1.5);
-    const at = this.ctx.currentTime + hitAt;
+    const now = this.ctx.currentTime;
+    const at = now + hitAt;
     const out = this.buses.get('stingers')!;
+    // Wind-up: your heartbeat racing; in the dark, his breath at your ear; the last shriek.
+    if (hitAt > 0.5) heartbeat(this.ctx, out, now + 0.1, now + (darkAt || hitAt) - 0.05);
+    if (darkAt > 0) earBreath(this.ctx, out, now + darkAt + 0.03, hitAt - darkAt - 0.05);
+    if (booAt > 0) {
+      shriekSting(this.ctx, out, now + booAt);
+      this.samples?.play('punch_heavy', out, { gain: 1, rate: 0.6, at: now + booAt });
+    }
     screamSting(this.ctx, out, at);
     // The body hits you: a deep, slowed punch + flesh impact under the scream.
     if (this.samples?.ready) {

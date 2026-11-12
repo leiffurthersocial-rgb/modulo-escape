@@ -16,7 +16,7 @@ export interface GameEvents {
   'monster:step': { x: number; y: number; z: number; floor: number; loud: number };
   'monster:vocal': { x: number; y: number; z: number; floor: number; kind: 'breath' | 'click' | 'screech' | 'scream' };
   /** Jump scare begins (input frozen, camera on the monster) / ends (→ caught screen). */
-  'scare:start': { by: string; /** Seconds until the hit (scream / flash). */ hitAt: number; /** 3D Robin choreography (no 2D face). */ robin: boolean };
+  'scare:start': { by: string; /** Seconds until the hit (scream / flash). */ hitAt: number; /** 3D Robin choreography (no 2D face). */ robin: boolean; /** Robin: darkness starts (breath at your ear). */ darkAt: number; /** Robin: the last face in the black (0 = none). */ booAt: number };
   'scare:end': { by: string };
   'player:stamina': { value: number; exhausted: boolean };
   'player:flashlight': { on: boolean };

@@ -555,11 +555,27 @@ export class UI {
           h('img', { src: img, className: 'f-main', alt: '' }),
         )
       : null;
-    const el = h('div', { class: 'scare' }, face, h('div', { class: 'scare-flash' }), h('div', { class: 'scare-vignette' }), h('div', { class: 'scare-black' }));
+    const black = h('div', { class: 'scare-black' });
+    const el = h('div', { class: 'scare' }, face, h('div', { class: 'scare-flash' }), h('div', { class: 'scare-vignette' }), black);
     el.style.setProperty('--black-at', `${c.blackAt}s`);
+    el.style.setProperty('--black-len', `${Math.max(0.1, c.duration - c.blackAt)}s`);
     el.style.setProperty('--hit-at', `${c.hitAt}s`);
     el.classList.toggle('scare-3d', game.scare.robin);
-    el.style.setProperty('--black-len', `${Math.max(0.1, c.duration - c.blackAt)}s`);
+    if (game.scare.robin) {
+      // Cut to black… then it opens for the last face… then black again.
+      const at = (sec: number, fn: () => void) => window.setTimeout(fn, sec * 1000);
+      at(c.blackAt, () => (black.style.opacity = '1'));
+      if (c.booAt > 0) {
+        at(c.booAt, () => {
+          black.style.opacity = '0';
+          el.classList.add('scare-boo');
+        });
+        at(c.booAt + c.booTime, () => {
+          black.style.opacity = '1';
+          el.classList.remove('scare-boo');
+        });
+      }
+    }
     this.el.append(el);
     this.scareEl = el;
   }

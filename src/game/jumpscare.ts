@@ -1,19 +1,24 @@
 /**
  * Jump scare when the monster catches the player. Two versions:
  *
- * Robin (3D body) — a short choreography played on the model itself:
- *   0.00  input frozen; camera whips to Robin standing ~2 m away, hunched low, head cocked; the
- *         building's hum cuts to dead silence; flashlight stutters out
- *   0.30  the head snaps upright and stares at you
- *   0.42  HIT: Robin lunges into your face (0.16 s), arms flung wide, claws splayed; the scream
- *         lands on the same frame; camera punch (FOV kick + heavy shake), flash
- *   0.6–  his face fills the screen, head shaking while he screams, claws close in from the sides;
- *         red pulses ≤ 3/s (photosensitivity), slow zoom in
- *   2.15  cut to black → 2.6 caught screen
+ * Robin (3D body), ~4.4 s:
+ *   0.00  input frozen; the camera whips round to where he is: Robin ~2 m away in the dark,
+ *         hunched; the building's hum dies; your heartbeat starts, faster and faster
+ *   0.0–  his head slowly turns upside down while he stares at you (flashlight stuttering)
+ *   0.78  the head SNAPS back upright
+ *   1.00  every light dies: total darkness; wet breathing right at your ear; he moves
+ *   1.35  HIT: light back on — he's already in your face, face tearing open (mouth a black hole,
+ *         eyes bulging and bleeding, glitching), arms flung wide; the scream; FOV kick, shake
+ *   2.55  he drives you to the floor: the camera falls backwards and rolls, he follows you down
+ *   3.20  cut to black, silence…
+ *   3.85  …one last shriek: his ruined face, right at the lens, for a split second
+ *   4.40  caught screen
+ *   Flashes stay ≤ 3 per second (photosensitivity).
  *
  * Other bodies — the original: monster snapped in front, camera turn, shake, overlay face.
  *
- * 'scare:start' carries `hitAt` so audio (scream) and UI (flash) land on the lunge.
+ * 'scare:start' carries the timeline so audio (heartbeat, breath, scream, shriek) and the UI
+ * (flash, black, last face) land on the right frames.
  */
 import * as THREE from 'three';
 import { bus } from '../core/events.ts';
@@ -35,27 +40,44 @@ export interface JumpScareConfig {
   standOff: number;
   hitAt: number;
   lungeTime: number;
+  /** Robin: total darkness from darkAt to hitAt. */
+  darkAt: number;
+  /** Robin: knocked to the floor between fallAt and fallAt + fallTime. */
+  fallAt: number;
+  fallTime: number;
+  /** Robin: the last face, in the black. 0 = none. */
+  booAt: number;
+  booTime: number;
 }
 
 export const JUMPSCARE: JumpScareConfig = {
-  duration: 2.6,
-  blackAt: 2.15,
-  faceDistance: 0.5,
-  shake: 0.1,
-  turnTime: 0.12,
+  duration: 4.4,
+  blackAt: 3.2,
+  faceDistance: 0.46,
+  shake: 0.12,
+  turnTime: 0.16,
   standOff: 2.3,
   hitAt: RobinBody.SCARE_HIT,
-  lungeTime: 0.16,
+  lungeTime: 0.12,
+  darkAt: 1.0,
+  fallAt: 2.55,
+  fallTime: 0.5,
+  booAt: 3.85,
+  booTime: 0.26,
 };
 
 /** The older, image-based scare (other bodies). */
-const SIMPLE: Partial<JumpScareConfig> = { duration: 2.2, blackAt: 1.7, faceDistance: 0.85, shake: 0.08, hitAt: 0 };
+const SIMPLE: Partial<JumpScareConfig> = { duration: 2.2, blackAt: 1.7, faceDistance: 0.85, shake: 0.08, hitAt: 0, booAt: 0 };
+
+const ease = (x: number) => x * x * (3 - 2 * x);
 
 export class JumpScare {
   active = false;
   /** True while the 3D Robin choreography runs (the UI hides the 2D face). */
   robin = false;
   config: JumpScareConfig = JUMPSCARE;
+  /** Exposure multiplier the game applies (0 = total darkness). */
+  exposure = 1;
   private t = 0;
   private by = '';
   private head = new THREE.Vector3();
@@ -68,6 +90,8 @@ export class JumpScare {
   private light: THREE.PointLight | null = null;
   private sink = 0;
   private standOff = 2.3;
+  private fall = 0;
+  private roll = 0;
 
   constructor(readonly base: JumpScareConfig = JUMPSCARE) {}
 
@@ -84,16 +108,19 @@ export class JumpScare {
     this.baseFov = player.camera.fov;
     this.flashOn = player.flashlightOn;
     this.sink = 0;
+    this.fall = 0;
+    this.roll = 0;
+    this.exposure = 1;
     const eye = player.camera.position;
-    // Face the monster if it's roughly in front, else spin round to where it came from.
     this.fwd.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
     if (monster) {
       let dist = this.robin ? this.config.standOff : this.config.faceDistance;
       if (this.robin && free) {
-        // Stage him where there's room: your view first, then where he came from, then around you.
+        // Stage him where he came from if there's room (the camera whips round to him), else in
+        // your view, else anywhere around you with space.
         const view = this.fwd.clone();
         const toM = monster.position.clone().sub(eye).setY(0).normalize();
-        const cands = [view, toM, ...[0.5, -0.5, 1, -1, 1.6, -1.6, Math.PI].map((a) => view.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), a))];
+        const cands = [toM, view, ...[0.5, -0.5, 1, -1, 1.6, -1.6, Math.PI].map((a) => view.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), a))];
         let best = view;
         let bestFree = -1;
         for (const d of cands) {
@@ -115,9 +142,11 @@ export class JumpScare {
       const at = new THREE.Vector3(eye.x + this.fwd.x * dist, player.feet.y, eye.z + this.fwd.z * dist);
       monster.lunge(at, eye);
       if (this.robin) {
-        monster.robinBody!.scareT = 0;
+        const body = monster.robinBody!;
+        body.scareHit = this.config.hitAt;
+        body.scareT = 0;
         // A light on his face: the scare must be seen, whatever the flashlight was doing.
-        this.light = new THREE.PointLight(0xffe2cc, 0, 4.5, 1.6);
+        this.light = new THREE.PointLight(0xffd8c8, 0, 4.5, 1.6);
         this.light.position.set(0, 0.35, 0.1);
         player.camera.add(this.light);
       }
@@ -125,7 +154,8 @@ export class JumpScare {
     } else {
       this.head.copy(eye).add(new THREE.Vector3(-Math.sin(player.yaw), 0.3, -Math.cos(player.yaw)));
     }
-    bus.emit('scare:start', { by, hitAt: this.config.hitAt, robin: this.robin });
+    const c = this.config;
+    bus.emit('scare:start', { by, hitAt: c.hitAt, robin: this.robin, darkAt: this.robin ? c.darkAt : 0, booAt: this.robin ? c.booAt : 0 });
   }
 
   /** Advance; drives the player's view. Returns true when finished. */
@@ -141,16 +171,27 @@ export class JumpScare {
       const m = this.monster;
       const body = m.robinBody!;
       body.scareT = t;
-      // Distance: stand-off, then the lunge (ease-in, accelerating at you), then creep closer.
-      const lt = THREE.MathUtils.clamp((t - c.hitAt) / c.lungeTime, 0, 1);
-      const dist = t < c.hitAt ? this.standOff : THREE.MathUtils.lerp(this.standOff, c.faceDistance, lt * lt) - Math.max(0, t - c.hitAt - c.lungeTime) * 0.05;
-      // Place the root so the HEAD ends at `dist` in front of the eye and, after the hit, at eye height.
+      const dark = t >= c.darkAt && t < c.hitAt;
+      const boo = c.booAt > 0 && t >= c.booAt && t < c.booAt + c.booTime;
+      const black = t >= c.blackAt && !boo;
+      // Knocked to the floor.
+      const ft = THREE.MathUtils.clamp((t - c.fallAt) / c.fallTime, 0, 1);
+      this.fall = ease(ft);
+      this.roll = this.fall * 0.55 + (boo ? 0.25 : 0);
+      // Distance: stand-off; in the dark he crosses the gap; then creeps closer; at the very end,
+      // right at the lens.
+      const crossed = THREE.MathUtils.clamp((t - c.darkAt - 0.12) / 0.15, 0, 1);
+      let dist = t < c.darkAt ? this.standOff : THREE.MathUtils.lerp(this.standOff, c.faceDistance, ease(crossed));
+      if (t > c.hitAt) dist -= Math.min(0.12, (t - c.hitAt) * 0.06);
+      if (boo) dist = 0.24;
+      // Face height: level with your eyes; looming over you once you're down.
+      const above = this.fall * 0.5;
       m.headPosition(this.head);
       const hx = this.head.x - m.object.position.x;
       const hz = this.head.z - m.object.position.z;
-      const lat = this.fwd.x * hx + this.fwd.z * hz; // head ahead of the root along the view
-      const wantSink = t < c.hitAt ? 0 : Math.max(0, this.head.y + 0.1 + this.sink - eye.y); // his eyes level with yours
-      this.sink += (wantSink - this.sink) * Math.min(1, dt * (t < c.hitAt + c.lungeTime ? 30 : 8));
+      const lat = this.fwd.x * hx + this.fwd.z * hz;
+      const wantSink = t < c.darkAt ? 0 : Math.max(0, this.head.y + 0.1 + this.sink - (eye.y + above));
+      this.sink += (wantSink - this.sink) * Math.min(1, dt * (dark || boo ? 60 : 10));
       const root = new THREE.Vector3(eye.x + this.fwd.x * (dist - lat), player.feet.y - this.sink, eye.z + this.fwd.z * (dist - lat));
       m.position.copy(root);
       m.object.position.copy(root);
@@ -158,19 +199,24 @@ export class JumpScare {
       m.headPosition(this.head);
       this.head.y += 0.1; // aim at his eyes
 
-      // Light and flashlight: stutter out in the wind-up, blaze at the hit, then throb.
-      const flicker = t > 0.16 && t < 0.3 ? (Math.floor(t * 40) % 2 === 0 ? 0 : 1) : 1;
-      if (this.flashOn) player.flashlight.intensity = 38 * flicker * (t < c.hitAt ? 0.7 : 0.45);
+      // Face warp: tears open from the hit on, full at the end.
+      const warp = t < c.hitAt ? 0 : Math.min(1, 0.35 + (t - c.hitAt) * 0.6);
+      body.setWarp(boo ? 1 : warp, t);
+
+      // Lights: stuttering flashlight in the wind-up, black in the dark, blazing after.
+      const flicker = (t > 0.16 && t < 0.3) || (t > 0.62 && t < 0.7) ? (Math.floor(t * 40) % 2 === 0 ? 0 : 1) : 1;
+      if (this.flashOn) player.flashlight.intensity = dark ? 0 : 38 * flicker * (t < c.hitAt ? 0.7 : 0.45);
       if (this.light) {
-        const base = t < c.hitAt ? 0.5 * flicker : 1.5 * (0.65 + 0.35 * Math.sin(t * 18.85)); // 3 Hz throb
-        this.light.intensity = base;
+        this.light.color.setHex(boo ? 0xff6050 : 0xffd8c8);
+        this.light.intensity = dark ? 0 : boo ? 3 : t < c.hitAt ? 0.5 * flicker : 1.1 * (0.65 + 0.35 * Math.sin(t * 18.85)); // 3 Hz throb
       }
-      // Camera: FOV kick on the hit, then a slow push in.
-      const kick = t < c.hitAt ? 0 : Math.exp(-(t - c.hitAt) * 9) * 16;
+      this.exposure = dark || black ? 0.0 : 1;
+      // Camera: FOV kick on the hit and the last face, then a slow push in.
+      const kick = (t < c.hitAt ? 0 : Math.exp(-(t - c.hitAt) * 9) * 18) + (boo ? 22 * Math.exp(-(t - c.booAt) * 14) : 0);
       const push = Math.max(0, t - c.hitAt) * 4;
       player.camera.fov = this.baseFov + kick - push;
       player.camera.updateProjectionMatrix();
-      shake = t < c.hitAt ? 0.006 : c.shake * Math.max(0.35, Math.exp(-(t - c.hitAt) * 2.2));
+      shake = t < c.hitAt ? 0.006 : boo ? 0.2 : c.shake * Math.max(0.35, Math.exp(-(t - c.hitAt) * 2.2)) + (ft > 0 && ft < 1 ? 0.08 : 0);
     } else {
       shake = c.shake * Math.max(0, 1 - t / c.duration);
     }
@@ -180,12 +226,12 @@ export class JumpScare {
     const yaw = Math.atan2(-d.x, -d.z);
     const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
     const k = Math.min(1, t / c.turnTime);
-    const ease = 1 - (1 - k) ** 3;
+    const e = 1 - (1 - k) ** 3;
     let dy = yaw - this.startYaw;
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
-    player.yaw = this.startYaw + dy * ease + (Math.random() - 0.5) * shake;
-    player.pitch = this.startPitch + (pitch - this.startPitch) * ease + (Math.random() - 0.5) * shake;
+    player.yaw = this.startYaw + dy * e + (Math.random() - 0.5) * shake;
+    player.pitch = this.startPitch + (pitch - this.startPitch) * e + (Math.random() - 0.5) * shake;
     if (t >= c.duration) {
       this.finish(player);
       return true;
@@ -193,8 +239,18 @@ export class JumpScare {
     return false;
   }
 
+  /** After the player's camera update each frame: knocked to the floor (drop + roll). */
+  applyCamera(camera: THREE.Camera) {
+    if (!this.active || !this.robin) return;
+    camera.position.y -= this.fall * 1.25;
+    camera.rotateZ(this.roll);
+  }
+
   private finish(player: Player) {
     this.active = false;
+    this.exposure = 1;
+    this.fall = 0;
+    this.roll = 0;
     if (this.light) {
       player.camera.remove(this.light);
       this.light.dispose();
@@ -202,7 +258,10 @@ export class JumpScare {
     }
     player.camera.fov = this.baseFov;
     player.camera.updateProjectionMatrix();
-    if (this.monster?.robinBody) this.monster.robinBody.scareT = -1;
+    if (this.monster?.robinBody) {
+      this.monster.robinBody.scareT = -1;
+      this.monster.robinBody.setWarp(0, 0);
+    }
     bus.emit('scare:end', { by: this.by });
   }
 }
