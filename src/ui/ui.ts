@@ -55,6 +55,16 @@ export class UI {
   private toastEl = h('div', { class: 'toast', style: 'opacity:0' });
   private game: Game | null = null;
   private settingsReturn: HTMLElement | null = null;
+  /** Debug mode: unlocked by pressing pause three times within 3 s (remembered on this device). */
+  private debugUnlocked = (() => {
+    try {
+      return localStorage.getItem('modulo.debug') === '1';
+    } catch {
+      return false;
+    }
+  })();
+  private pausePresses: number[] = [];
+  private debugBtn!: HTMLButtonElement;
 
   constructor(private root: HTMLElement) {
     this.loadingScreen = h(
@@ -87,6 +97,30 @@ export class UI {
     bus.on('quality:autoLowered', ({ to }) => this.toast(`Running slow: graphics lowered to ${to}`, 3000));
     bus.on('perf:suggest', ({ reason }) => this.suggestBattery(reason));
     if (game.touch.enabled) this.toast('Touch controls on (turn off in Settings)', 3000);
+    // Esc while paused counts as a pause press too (desktop: Esc, Esc, Esc).
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && (game.state === 'paused' || game.state === 'playing')) this.pausePress();
+    });
+  }
+
+  /** Pause pressed (button, Esc or the "Paused" title): three within 3 s unlock debug mode. */
+  private pausePress() {
+    const now = performance.now();
+    this.pausePresses = this.pausePresses.filter((t) => now - t < 3000);
+    this.pausePresses.push(now);
+    if (this.pausePresses.length < 3) return;
+    this.pausePresses = [];
+    if (!this.debugUnlocked) {
+      this.debugUnlocked = true;
+      try {
+        localStorage.setItem('modulo.debug', '1');
+      } catch {
+        /* private mode: unlocked for this session only */
+      }
+      this.toast('Debug mode unlocked');
+    }
+    this.debugBtn.hidden = false;
+    if (this.game?.state === 'paused') this.openSettings(this.pauseScreen, 'Debug');
   }
 
   private screens(): HTMLElement[] {
@@ -103,6 +137,8 @@ export class UI {
       this.show(null);
     } else if (state === 'paused') {
       this.show(this.pauseScreen);
+      // (Esc presses are counted by the key listener; this catches the button and auto-pause.)
+      if (!this.escapeJustPressed()) this.pausePress();
     } else if (state === 'won') {
       this.buildWin(game, true);
       this.show(this.winScreen);
@@ -226,14 +262,23 @@ export class UI {
     );
   }
 
+  private lastEsc = 0;
+  private escapeJustPressed() {
+    return performance.now() - this.lastEsc < 250;
+  }
+
   private buildPause(game: Game): HTMLElement {
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.code === 'Escape') this.lastEsc = performance.now();
+    }, { capture: true });
+    this.debugBtn = h('button', { hidden: !this.debugUnlocked, onclick: () => this.openSettings(this.pauseScreen, 'Debug') }, 'Debug');
     return h(
       'div',
       { class: 'screen', hidden: true },
       h(
         'div',
         { class: 'panel' },
-        h('h2', {}, 'Paused'),
+        h('h2', { onclick: () => this.pausePress(), style: 'user-select:none' }, 'Paused'),
         this.seedBox(game),
         h('div', { class: 'row' }, h('button', { class: 'primary', id: 'btn-resume', onclick: () => void this.play(game) }, 'Resume')),
         h(
@@ -241,6 +286,7 @@ export class UI {
           { class: 'row' },
           h('button', { onclick: () => this.openSettings(this.pauseScreen) }, 'Settings'),
           h('button', { onclick: () => gotoSeed(game.level.seed, game.level.size) }, 'Restart'),
+          this.debugBtn,
         ),
         this.sizePicker(game),
         h('div', { class: 'row' }, h('button', { onclick: () => this.newSeed(game) }, 'New random seed'), h('button', { onclick: () => this.show(this.creditsScreen) }, 'Credits')),
@@ -292,10 +338,90 @@ export class UI {
     this.show(g.state === 'paused' ? this.pauseScreen : g.state === 'won' ? this.winScreen : this.titleScreen);
   }
 
-  private openSettings(from: HTMLElement) {
+  private openSettings(from: HTMLElement, tab?: string) {
     this.settingsReturn = from;
     this.settingsScreen.replaceWith((this.settingsScreen = this.buildSettings()));
     this.show(this.settingsScreen);
+    if (tab) [...this.settingsScreen.querySelectorAll<HTMLButtonElement>('.tabs button')].find((b) => b.textContent === tab)?.click();
+  }
+
+  /** Debug tab: cheats, the monsters (on/off, wake, bring to me, scare me), teleport to the exit. */
+  private buildDebug(): HTMLElement {
+    const game = this.game;
+    const wrap = h('div', { style: 'display:flex;flex-direction:column;gap:10px' });
+    if (!game) return wrap;
+    const resume = () => {
+      if (game.state === 'paused') void this.play(game);
+    };
+    const tick = (label: string, key: keyof Game['debug']) => {
+      const input = h('input', { type: 'checkbox', checked: game.debug[key], style: 'width:22px;height:22px;accent-color:var(--accent)' });
+      input.addEventListener('change', () => (game.debug[key] = input.checked));
+      return [h('label', {}, label), h('div', { class: 'row', style: 'flex-wrap:nowrap' }, input)];
+    };
+    const list = h('div', { style: 'display:flex;flex-direction:column;gap:8px' });
+    const render = () => {
+      list.replaceChildren();
+      for (const m of game.debugMonsters) {
+        const on = h('input', { type: 'checkbox', checked: m.active, title: 'Active', style: 'width:22px;height:22px;accent-color:var(--accent)' });
+        on.addEventListener('change', () => {
+          game.debugSetActive(m.id, on.checked);
+          render();
+        });
+        const name = m.species[0]!.toUpperCase() + m.species.slice(1);
+        list.append(
+          h(
+            'div',
+            { class: 'row', style: 'align-items:center;gap:8px' },
+            on,
+            h('b', { style: 'min-width:54px' }, name),
+            h('span', { class: 'val', style: 'min-width:120px' }, `${m.active ? m.state : 'off'}${Number.isFinite(m.dist) ? ` · ${m.dist.toFixed(0)} m` : ' · other floor'}`),
+            h('button', { onclick: () => (game.debugSpawnNear(m.id), resume()) }, 'Bring to me'),
+            h('button', { onclick: () => (game.debugWake(m.id, m.state === 'dormant'), render()) }, m.state === 'dormant' ? 'Wake' : 'Sleep'),
+            h('button', {
+              onclick: () => {
+                game.debugSetActive(m.id, true);
+                const go = () => game.debugScare(m.id);
+                if (game.state === 'paused') void this.play(game).then(go);
+                else go();
+              },
+            }, 'Scare me'),
+          ),
+        );
+      }
+    };
+    render();
+    const timer = setInterval(() => (wrap.isConnected ? !wrap.hidden && render() : clearInterval(timer)), 1000);
+    wrap.append(
+      h(
+        'div',
+        { class: 'field' },
+        ...tick('Invisible (monsters can’t see or hear you)', 'invisible'),
+        ...tick('Can’t be caught', 'noCatch'),
+        ...tick('Freeze all monsters', 'freeze'),
+      ),
+      h('h3', {}, 'Monsters'),
+      list,
+      h(
+        'div',
+        { class: 'row' },
+        h('button', { onclick: () => (game.debugToExit(), resume()) }, 'Teleport to the exit'),
+        h('button', { onclick: () => this.toggleDebugMenu() }, 'Mood & materials (F4)'),
+        h('button', {
+          onclick: () => {
+            this.debugUnlocked = false;
+            this.debugBtn.hidden = true;
+            try {
+              localStorage.removeItem('modulo.debug');
+            } catch {
+              /* ignore */
+            }
+            this.openSettings(this.settingsReturn ?? this.pauseScreen);
+          },
+        }, 'Hide debug mode'),
+      ),
+      h('p', {}, 'Unlocked by pressing pause three times. Cheats last until you reload.'),
+    );
+    return wrap;
   }
 
   private buildSettings(): HTMLElement {
@@ -382,6 +508,11 @@ export class UI {
     );
     materials.hidden = true;
     const panes: [string, HTMLElement][] = [['General', general], ['Graphics', graphics], ['Materials', materials], ['Keys', controls]];
+    if (this.debugUnlocked && this.game) {
+      const dbg = this.buildDebug();
+      dbg.hidden = true;
+      panes.push(['Debug', dbg]);
+    }
     const tabs = panes.map(([label], i) => {
       const b = h('button', { class: i === 0 ? 'active' : '' }, label);
       b.onclick = () => {
@@ -401,10 +532,7 @@ export class UI {
         { class: 'panel' },
         h('h2', {}, 'Settings'),
         h('div', { class: 'tabs' }, ...tabs),
-        general,
-        graphics,
-        materials,
-        controls,
+        ...panes.map(([, p]) => p),
         h(
           'div',
           { class: 'row' },

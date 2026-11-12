@@ -7,6 +7,7 @@
  * and ragged shorts.
  */
 import type { BoneDef, Prim, Region, V3 } from './anatomy.ts';
+import { buildFaceHead, LEO_FACE } from './heads.ts';
 
 /** Overall scale of the sculpt below. */
 export const LEO_SCALE = 1.08;
@@ -93,22 +94,10 @@ export function buildLeoAnatomy() {
   ell('chest', [0, 2.04, -0.12], [0.3, 0.16, 0.18], 0.05);
   carve('chest', [0, 1.7, -0.33], [0.03, 0.3, 0.04], 0.05);
   carve('spine1', [0, 1.35, 0.235], [0.012, 0.25, 0.03], 0.02); // linea alba
-  cone('neck1', [0, 1.98, -0.04], 0.17, [0, 2.24, 0.08], 0.14, 0.06);
-  cone('neck2', [0, 2.22, 0.1], 0.14, [0, 2.36, 0.17], 0.12, 0.05);
-  // Head: low skull, heavy brow, wide jaw, broad flat nose, small ears.
-  ell('head', [0, 2.5, 0.13], [0.135, 0.15, 0.15], 0.04);
-  cone('head', [-0.09, 2.535, 0.255], 0.036, [0.09, 2.535, 0.255], 0.036, 0.03);
-  cone('head', [0, 2.42, 0.12], 0.12, [0, 2.37, 0.22], 0.085, 0.05);
-  sphere('head', [0, 2.355, 0.25], 0.045, 0.03);
-  for (const s of [1, -1]) {
-    sphere('head', [s * 0.075, 2.45, 0.22], 0.05, 0.04);
-    sphere('head', [s * 0.1, 2.4, 0.14], 0.05, 0.04);
-    carve('head', [s * EYE_HALF, EYE_Y, 0.278], [0.03, 0.022, 0.02], 0.02);
-    ell('head', [s * 0.135, 2.48, 0.12], [0.015, 0.035, 0.025], 0.015);
-    sphere('head', [s * 0.022, 2.452, 0.3], 0.016, 0.012);
-  }
-  cone('head', [0, 2.505, 0.272], 0.017, [0, 2.455, 0.3], 0.028, 0.02);
-  ell('head', [0, 2.405, 0.268], [0.048, 0.015, 0.017], 0.02);
+  cone('neck1', [0, 1.98, -0.05], 0.17, [0, 2.24, 0.02], 0.135, 0.06);
+  cone('neck2', [0, 2.22, 0.03], 0.13, [0, 2.38, 0.09], 0.1, 0.05);
+  // Head: sculpted to match Leo's photo (heads.ts), eyes at EYE_Y.
+  buildFaceHead(LEO_FACE, [0, EYE_Y, 0.27], 2 * EYE_HALF, prims);
 
   // ── arms: boulder shoulders, huge forearms, fists ──
   for (const [s, side] of [
@@ -267,6 +256,7 @@ export function buildLeoAnatomy() {
     q.rb *= S;
     q.k *= S;
     if (q.r) q.r = sc(q.r);
+    if (q.clip) q.clip = { ...q.clip, origin: sc(q.clip.origin), D: q.clip.D * S };
   }
 
   /** The shirt is burst, ripped and sleeveless; ragged shorts. (Rules in unscaled space.) */
@@ -286,6 +276,6 @@ export function buildLeoAnatomy() {
     if (b.startsWith('thigh')) return h.along(b, p0) < 0.48 + 0.1 * h.fbm(x * 18, y * 7, z * 18, 2) ? 'pants' : 'skin';
     return 'skin';
   };
-  const meta = { eyeY: EYE_Y * S, eyeHalf: EYE_HALF * S, eyeZ: 0.15 * S, collarY: 2.0 * S, shirtHalfWidth: 0.5 * S, hemY: HEM_Y * S };
+  const meta = { eyeY: EYE_Y * S, eyeHalf: EYE_HALF * S, eyeZ: 0.27 * S, collarY: 2.0 * S, shirtHalfWidth: 0.5 * S, hemY: HEM_Y * S };
   return { bones, prims, cloth, meta };
 }

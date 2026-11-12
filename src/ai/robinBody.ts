@@ -43,6 +43,10 @@ export interface BodyStyle {
   pantsColor: number;
   /** The photo printed on the shirt (Robin's T-shirt). */
   print: boolean;
+  /** A mouth that opens (Leo): mouth line and jaw drop, in eye distances below the eyes. */
+  jaw?: { mouth: number; drop: number };
+  /** Fixed hair colour (when the photo's hair is hard to sample). */
+  hairColor?: number;
   /** Where to read the hair colour in the aligned photo (x0, y0, x1, y1 px). */
   hairBox: [number, number, number, number];
   /** How the arms work while moving: hanging (biped), on the knuckles (Leo), on the ceiling (Jovan). */
@@ -51,8 +55,8 @@ export interface BodyStyle {
 
 export const BODY_STYLES: Record<Species, BodyStyle> = {
   robin: { idleHunch: 0.45, walkHunch: 0.55, runHunch: 0.35, runLean: 0.55, walkStride: 1.55, runStride: 2.5, armSwing: 0.38, armOut: 0.12, footLift: 0.14, tint: 0x8a9096, tintAmount: 0, headroom: 3.45, shirtColor: 0xc8c5bd, pantsColor: 0x4a4c54, print: true, gait: 'biped', hairBox: [150, 180, 250, 230] },
-  leo: { idleHunch: 1.0, walkHunch: 1.05, runHunch: 1.15, runLean: 0.5, walkStride: 2.0, runStride: 3.6, armSwing: 0.5, armOut: 0.2, footLift: 0.12, tint: 0x6f8a5e, tintAmount: 0.75, headroom: 3.45, shirtColor: 0x66777c, pantsColor: 0x4a443c, print: false, gait: 'knuckle', hairBox: [165, 212, 225, 232] },
-  jovan: { idleHunch: 0.2, walkHunch: 0.25, runHunch: 0.3, runLean: 0.3, walkStride: 2.3, runStride: 3.4, armSwing: 0.22, armOut: 0.05, footLift: 0.12, tint: 0xa9b3ba, tintAmount: 0.45, headroom: 3.5, shirtColor: 0x5c272c, pantsColor: 0x34465e, print: false, gait: 'ceiling', hairBox: [165, 272, 225, 300] },
+  leo: { idleHunch: 1.0, walkHunch: 1.05, runHunch: 1.15, runLean: 0.5, walkStride: 2.0, runStride: 3.6, armSwing: 0.5, armOut: 0.2, footLift: 0.12, tint: 0x9a8478, tintAmount: 0, headroom: 3.45, shirtColor: 0x66777c, pantsColor: 0x4a443c, print: false, gait: 'knuckle', hairBox: [165, 212, 225, 232], jaw: { mouth: -1.12, drop: 0.85 } },
+  jovan: { idleHunch: 0.2, walkHunch: 0.25, runHunch: 0.3, runLean: 0.3, walkStride: 2.3, runStride: 3.4, armSwing: 0.22, armOut: 0.05, footLift: 0.12, tint: 0xa9b3ba, tintAmount: 0.45, headroom: 3.5, shirtColor: 0x2a2a2e, pantsColor: 0x242428, print: false, gait: 'ceiling', hairBox: [165, 272, 225, 300], hairColor: 0x3a2a20 },
 };
 
 /** Measured on the sculpt (public/assets/monster/<name>_body.json). */
@@ -63,13 +67,15 @@ export interface BodyMeta {
   shirtHalfWidth: number;
   hipsY: number;
   height: number;
+  /** Depth of the eyes (cornea) in the rest pose. */
+  eyeZ?: number;
   /** Where the shirt hem sits (grime collects there). */
   hemY?: number;
   /** Below this the trousers are shoes (Jovan's sneakers); -1 = barefoot. */
   shoeY?: number;
 }
 
-export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=5`;
+export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=7`;
 export const ROBIN_BODY_URL = bodyUrl('robin');
 
 /** Photo layout (pixels in robin.png): eye centres, and where the shirt collar sits. */
@@ -100,7 +106,7 @@ export async function loadBody(species: Species, photo: MonsterImage | null): Pr
   try {
     const [gltf, meta] = await Promise.all([
       new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(bodyUrl(species)),
-      fetch(`/assets/monster/${species}_body.json?v=5`).then((r) => r.json() as Promise<BodyMeta>),
+      fetch(`/assets/monster/${species}_body.json?v=7`).then((r) => r.json() as Promise<BodyMeta>),
     ]);
     let mesh: THREE.SkinnedMesh | null = null;
     gltf.scene.traverse((o) => {
@@ -159,13 +165,19 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
   const P = ROBIN_PHOTO;
   const ang = Math.atan2(P.eyeR[1] - P.eyeL[1], P.eyeR[0] - P.eyeL[0]);
   const skin = img ? sampleColor(img, 150, 380, 178, 405, 0xd9a58a) : new THREE.Color(0xd9a58a);
-  const hair = img ? sampleColor(img, ...style.hairBox, 0x5a3b28) : new THREE.Color(0x5a3b28);
+  const hair = style.hairColor !== undefined ? new THREE.Color(style.hairColor) : img ? sampleColor(img, ...style.hairBox, 0x5a3b28) : new THREE.Color(0x5a3b28);
   const uniforms = {
     uPhoto: { value: photo?.texture ?? null },
     uPhoto2: { value: scream?.texture ?? photo?.texture ?? null },
     uHasPhoto2: { value: scream ? 1 : 0 },
     /** How far below the eyes the photo face reaches (fraction of the image height). */
     uFaceBottom: { value: style.print ? 0.2 : 0.32 },
+    uJaw: {
+      value: style.jaw && meta
+        ? new THREE.Vector4(meta.eyeY + style.jaw.mouth * 2 * meta.eyeHalf, 2 * meta.eyeHalf, style.jaw.drop * 2 * meta.eyeHalf, 0)
+        : new THREE.Vector4(-100, 1, 0, 0),
+    },
+    uEyeZ: { value: meta?.eyeZ ?? 0.14 },
     uHasPhoto: { value: photo ? 1 : 0 },
     uPhotoSize: { value: new THREE.Vector2(W, Hh) },
     uFaceC: { value: new THREE.Vector2((P.eyeL[0] + P.eyeR[0]) / 2, (P.eyeL[1] + P.eyeR[1]) / 2) },
@@ -202,12 +214,27 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         varying vec3 vRest;
         varying vec3 vRestN;
         varying vec4 vMask;
-        varying vec2 vMask2;`,
+        varying vec2 vMask2;
+        uniform vec4 uJaw; // x: mouth line y, y: eye distance D, z: drop (m), w: open 0..1
+        uniform float uEyeZ;
+        // How much of the jaw drop a rest-pose point takes: everything below the mouth line, in
+        // the front of the head, fading out down the neck.
+        float jawW(vec3 p) {
+          float D = uJaw.y;
+          float wy = smoothstep(uJaw.x, uJaw.x - 0.22 * D, p.y) * (1.0 - smoothstep(uJaw.x - 0.9 * D, uJaw.x - 1.6 * D, p.y));
+          float wx = 1.0 - smoothstep(1.0 * D, 1.5 * D, abs(p.x));
+          float wz = smoothstep(uEyeZ - 1.7 * D, uEyeZ - 0.8 * D, p.z);
+          return wy * wx * wz;
+        }`,
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
         vRest = position;
+        // Leo's mouth opens: the jaw drops (and swings back a little), before skinning.
+        float jw = jawW(position) * uJaw.w;
+        transformed.y -= uJaw.z * jw;
+        transformed.z -= 0.3 * uJaw.z * jw;
         vRestN = normal;
         vMask = aMask;
         vMask2 = aMask2;`,
@@ -220,6 +247,17 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         uniform sampler2D uPhoto2;
         uniform float uHasPhoto2;
         uniform float uFaceBottom;
+        uniform vec4 uJaw; // x: mouth line y, y: eye distance D, z: drop (m), w: open 0..1
+        uniform float uEyeZ;
+        // How much of the jaw drop a rest-pose point takes: everything below the mouth line, in
+        // the front of the head, fading out down the neck.
+        float jawW(vec3 p) {
+          float D = uJaw.y;
+          float wy = smoothstep(uJaw.x, uJaw.x - 0.22 * D, p.y) * (1.0 - smoothstep(uJaw.x - 0.9 * D, uJaw.x - 1.6 * D, p.y));
+          float wx = 1.0 - smoothstep(1.0 * D, 1.5 * D, abs(p.x));
+          float wz = smoothstep(uEyeZ - 1.7 * D, uEyeZ - 0.8 * D, p.z);
+          return wy * wx * wz;
+        }
         uniform float uHasPhoto;
         uniform vec2 uPhotoSize;
         uniform vec2 uFaceC;
@@ -316,7 +354,9 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
           float mouthHole = 0.0;
           float blood = 0.0;
           // With a real scream photo, the scare cross-fades to it instead of warping the face.
-          float toScream = uHasPhoto2 * smoothstep(0.0, 0.3, uWarp);
+          float toScream = uHasPhoto2 * max(smoothstep(0.0, 0.3, uWarp), uJaw.w);
+          // Where this point is shown with the jaw dropped: the scream photo maps there.
+          vec2 fu2 = faceUV(vec3(p.x, p.y - uJaw.z * jawW(p) * uJaw.w, p.z));
           if (uWarp > 0.001 && uHasPhoto2 < 0.5) {
             // Work in photo pixels (y down).
             vec2 P = vec2(fu.x * uPhotoSize.x, (1.0 - fu.y) * uPhotoSize.y);
@@ -350,16 +390,16 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
               blood = max(blood, exp(-pow((P.x - E.x) / 4.0, 2.0)) * smoothstep(E.y + 6.0, E.y + 14.0, P.y) * (1.0 - smoothstep(E.y + run * 0.7, E.y + run, P.y)));
             }
           }
-          vec4 ph = mix(texture2D(uPhoto, fu), texture2D(uPhoto2, fu), toScream);
+          vec4 ph = mix(texture2D(uPhoto, fu), texture2D(uPhoto2, fu2), toScream);
           // The photo was cut out: pull the mask in from its edge (lowest alpha a few pixels
           // around) so no fringe ever shows on the cheeks.
           vec2 px = 7.0 / uPhotoSize;
           float aMin = min(min(texture2D(uPhoto, fu + vec2(px.x, 0.0)).a, texture2D(uPhoto, fu - vec2(px.x, 0.0)).a),
                            min(texture2D(uPhoto, fu + vec2(0.0, px.y)).a, texture2D(uPhoto, fu - vec2(0.0, px.y)).a));
-          float aMin2 = min(min(texture2D(uPhoto2, fu + vec2(px.x, 0.0)).a, texture2D(uPhoto2, fu - vec2(px.x, 0.0)).a),
-                            min(texture2D(uPhoto2, fu + vec2(0.0, px.y)).a, texture2D(uPhoto2, fu - vec2(0.0, px.y)).a));
+          float aMin2 = min(min(texture2D(uPhoto2, fu2 + vec2(px.x, 0.0)).a, texture2D(uPhoto2, fu2 - vec2(px.x, 0.0)).a),
+                            min(texture2D(uPhoto2, fu2 + vec2(0.0, px.y)).a, texture2D(uPhoto2, fu2 - vec2(0.0, px.y)).a));
           aMin = mix(aMin, aMin2, toScream);
-          float fw = uHasPhoto * smoothstep(0.0, 0.6, vMask2.y) * inside01(fu0) * smoothstep(0.75, 0.98, min(ph.a, aMin)) * (1.0 - smoothstep(uFaceBottom - 0.01, uFaceBottom + 0.01, 1.0 - fu0.y - (uFaceC.y / uPhotoSize.y)));
+          float fw = uHasPhoto * smoothstep(0.12, 0.7, vMask2.y) * inside01(fu0) * smoothstep(0.75, 0.98, min(ph.a, aMin)) * (1.0 - smoothstep(uFaceBottom - 0.01, uFaceBottom + 0.01, 1.0 - fu0.y - (uFaceC.y / uPhotoSize.y)));
           vec3 face = ph.rgb;
           // The face takes on the body's sickly tint (Leo green, Jovan grey).
           face = mix(face, vec3(dot(face, vec3(0.3, 0.55, 0.15))) * uTint * 1.3, uTintAmt * 0.45);
@@ -395,7 +435,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         totalEmissiveRadiance += vec3(0.55, 0.62, 0.75) * rim * 0.07;`,
       );
   };
-  mat.customProgramCacheKey = () => 'robin-v9';
+  mat.customProgramCacheKey = () => 'robin-v10';
   return mat;
 }
 
@@ -498,6 +538,8 @@ export class RobinBody {
   private actW = 0;
   /** 0..1: arms on the ground (Leo) / on the ceiling (Jovan). */
   private armIK = 0;
+  /** 0..1: Leo's mouth (jaw drop + scream face): roaring, charging, in the scare. */
+  private mouth = 0;
   /** Ceiling height above the feet (Jovan presses his palms against it). */
   ceiling = 3.6;
 
@@ -817,6 +859,12 @@ export class RobinBody {
     head.quaternion.copy(fkWorld.invert()).multiply(this.headLook).multiply(extra);
     head.updateMatrixWorld(true);
     this.lastTop = this.headTop();
+    // Mouth: gaping when he roars, open as he charges, wide in the scare.
+    if (this.style.jaw && this.uniforms) {
+      const want = sc >= 0 ? (sc > this.scareHit - 0.35 ? 1 : 0) : act === 'roar' && this.actT > 0.08 ? 1 : mode === 'attack' ? 0.9 : mode === 'run' ? 0.55 : 0;
+      this.mouth = expTo(this.mouth, want, realDt, want > this.mouth ? 14 : 5);
+      (this.uniforms.uJaw!.value as THREE.Vector4).w = this.mouth;
+    }
   }
 
   /**

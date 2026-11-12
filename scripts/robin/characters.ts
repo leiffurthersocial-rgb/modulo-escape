@@ -7,6 +7,7 @@
  * are evaluated where they were authored.
  */
 import { buildAnatomy, CLOTH, type BoneDef, type Prim, type V3 } from './anatomy.ts';
+import { buildFaceHead, JOVAN_FACE, type FaceParams } from './heads.ts';
 import { buildLeoAnatomy, type ClothFn } from './leo.ts';
 
 export type CharacterName = 'robin' | 'leo' | 'jovan';
@@ -24,6 +25,8 @@ export interface Character {
   pants: 'long' | 'short';
   /** Hoodie (long sleeves, ribbed hem, hood bunched at the back, front pocket), jeans, sneakers. */
   hoodie?: boolean;
+  /** Replace Robin's head with one sculpted to match this face (heads.ts). */
+  face?: FaceParams;
   /** A sculpt of its own (same skeleton) instead of re-proportioning Robin. */
   custom?: 'leo';
 }
@@ -48,6 +51,7 @@ export const CHARACTERS: Record<CharacterName, Character> = {
     shirt: true,
     pants: 'long',
     hoodie: true,
+    face: JOVAN_FACE,
     bones: {
       hips: { len: 1.1, thick: [1.1, 1.0, 1.05] },
       spine1: { len: 1.2, thick: [1.12, 1, 1.08] },
@@ -98,7 +102,14 @@ export function buildCharacter(c: Character): Retargeted {
     const id = (p: V3) => p;
     return { bones: L.bones, prims: L.prims, toOrig: L.prims.map(() => id), girth: L.prims.map(() => 1), cloth: L.cloth, meta: L.meta, hemY: L.meta.hemY };
   }
-  const { bones, prims } = buildAnatomy();
+  const anat = buildAnatomy();
+  const { bones } = anat;
+  let prims = anat.prims;
+  if (c.face) {
+    // Robin's eyes sit at y 2.994, cornea z ≈ 0.14, 11.35 cm apart (head scale 1.32).
+    prims = prims.filter((q) => q.bone !== 'head');
+    buildFaceHead(c.face, [0, 2.994, 0.14], 0.1135, prims);
+  }
   if (c.hoodie) {
     // Cloth and shoes (in Robin's space; mapped like everything else).
     const ell = (bone: string, ctr: V3, r: V3, k: number, to?: V3) => prims.push({ kind: 'ell', a: ctr, b: to ?? [ctr[0], ctr[1] + 1, ctr[2]], ra: 0, rb: 0, r, k, bone });

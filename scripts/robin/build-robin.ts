@@ -13,6 +13,7 @@ import { reorder } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import { buildAnatomy, CLOTH, HEAD_PIVOT, HEAD_SCALE, type Prim, type Region, type V3 } from './anatomy.ts';
 import { buildCharacter, CHARACTERS, type CharacterName } from './characters.ts';
+import { hairline } from './heads.ts';
 
 const H = Number(process.env.ROBIN_RES ?? 0.0035);
 const TARGET_TRIS = Number(process.env.ROBIN_TRIS ?? 85000);
@@ -164,6 +165,15 @@ function primDist(q: P, x: number, y: number, z: number): number {
     const line = 2.9 + 0.135 * front + 0.015 * noise(ux * 40, 0, uz * 40);
     d = Math.max(d, (line - uy) * S);
     d -= S * (0.009 * Math.abs(fbm(ux * 28, uy * 20, uz * 28, 3)) + 0.004 * noise(ux * 90, uy * 50, uz * 90));
+  }
+  const c = q.src.clip;
+  if (c) {
+    // Hair from a photo-matched head: clip at the hairline (face frame), clumps and strands.
+    const [ox, oy, oz] = q.back([x, y, z]);
+    const fx = (ox - c.origin[0]) / c.D, fy = (oy - c.origin[1]) / c.D, fz = (oz - c.origin[2]) / c.D;
+    const line = hairline(c, fz) + 0.06 * noise(fx * 3, 0.5, fz * 3);
+    d = Math.max(d, (line - fy) * c.D * 0.5);
+    d -= c.D * c.mess * (0.07 * Math.abs(fbm(fx * 2.2, fy * 1.6, fz * 2.2, 3)) + 0.025 * noise(fx * 9, fy * 4, fz * 9));
   }
   return d;
 }

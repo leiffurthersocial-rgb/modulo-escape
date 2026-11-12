@@ -18,6 +18,8 @@ export interface PlayerView {
   /** Where the camera looks, and cos of half the view cone (for "is he looking at me"). */
   forward: THREE.Vector3;
   viewCos: number;
+  /** Debug: monsters can't see or hear you. */
+  invisible: boolean;
 }
 
 export interface EntityContext {

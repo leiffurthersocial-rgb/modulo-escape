@@ -58,7 +58,7 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
   dodge round a corner and he slams into the wall and staggers, clutching his head, for a couple
   of seconds. Up close he hammers both fists down. You feel his stomps (camera shake) before you
   see him.
-- **Jovan** (wakes after ~30 s): so tall (≈ 3.8 m, in a red hoodie, jeans and sneakers) that he walks
+- **Jovan** (wakes after ~30 s): so tall (≈ 3.8 m, all in black: hoodie, jeans, sneakers) that he walks
   stooped with his palms pressed flat against the ceiling, hand over hand. He sees furthest, and he only moves while you're not looking at him: keep him on
   screen and he freezes; look away (or look back with Q) and he comes, fast and almost silent.
   You hear his head dragging along the ceiling, and lights stutter around him.
@@ -70,6 +70,9 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
   `?monsters=robin,leo` picks which ones spawn.
 - **Sound:** procedural HVAC drone that tightens as the monster gets close, your footsteps, and
   positional monster steps and screams. No audio files.
+- **Debug mode:** press pause three times quickly (button, Esc, or tap "Paused") to unlock a
+  Debug tab: invisible, can't be caught, freeze monsters, per-monster on/off / wake / bring to me /
+  scare me, teleport to the exit.
 - **Settings:** graphics presets, material comparison (Settings → Materials), monster on/off,
   key rebinding.
 

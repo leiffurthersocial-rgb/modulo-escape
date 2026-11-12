@@ -230,6 +230,24 @@ export class Monster implements Entity {
     return out.copy(this.position).setY(this.position.y + 2.1);
   }
 
+  /** Debug: put it at `at` (on `floor`), awake, coming to look at `toward`. */
+  teleport(at: THREE.Vector3, floor: number, toward: THREE.Vector3) {
+    this.position.copy(at);
+    this.object.position.copy(at);
+    this.floor = floor;
+    this.path = [];
+    this.lastKnown.copy(toward);
+    this.lastEncounter = this.time;
+    this.setState('investigate');
+  }
+
+  /** Debug: back to sleep (stands still until woken). */
+  sleep() {
+    this.setState('dormant');
+    this.setPose('idle');
+    if (this.robin) this.robin.speed = 0;
+  }
+
   wake() {
     if (this.state === 'dormant') this.setState('patrol');
   }
@@ -271,7 +289,7 @@ export class Monster implements Entity {
     const sameFloor = player.floor === this.floor;
     const inCone = toPlayer.clone().setY(0).normalize().dot(this.heading) > Math.cos(this.tuning.fov) || dist < 3;
     const range = this.tuning.sightRange * (player.flashlightOn ? 1.4 : 1) * (player.crouching ? 0.65 : 1);
-    const sees = sameFloor && dist < range && inCone && ctx.senses.lineOfSight(eye, player.eye);
+    const sees = !player.invisible && sameFloor && dist < range && inCone && ctx.senses.lineOfSight(eye, player.eye);
     const leo = this.species === 'leo';
     const jovan = this.species === 'jovan';
     const busy = this.state === 'roar' || this.state === 'charge' || this.state === 'stunned';
@@ -280,7 +298,7 @@ export class Monster implements Entity {
       const chest = this.tmp2.copy(this.position).setY(this.position.y + 2.2);
       const dir = chest.clone().sub(player.eye);
       const d = dir.length();
-      this.watched = sameFloor && d < 30 && dir.normalize().dot(player.forward) > player.viewCos && ctx.senses.lineOfSight(chest, player.eye);
+      this.watched = !player.invisible && sameFloor && d < 30 && dir.normalize().dot(player.forward) > player.viewCos && ctx.senses.lineOfSight(chest, player.eye);
       if (this.robin) this.robin.frozen = this.watched;
       this.presenceT -= dt;
       if (this.presenceT < 0) {
@@ -296,7 +314,7 @@ export class Monster implements Entity {
         if (!busy) this.setState('roar');
       } else if (this.state !== 'chase') this.setState('chase');
     } else if (this.state !== 'chase' && !busy) {
-      const heard = ctx.senses.hear(this.position, this.floor, 2, this.tuning.ears);
+      const heard = player.invisible ? null : ctx.senses.hear(this.position, this.floor, 2, this.tuning.ears);
       if (heard && (this.state !== 'investigate' || heard.pos.distanceTo(this.lastKnown) > 2)) {
         this.lastKnown.copy(heard.pos);
         if (this.state !== 'investigate') this.setState('investigate');

@@ -266,11 +266,78 @@ export class Game {
       taken.push(node);
       const kind = this.monsterModel ? 'model' : sp.tpl ? 'robin' : this.monsterImage ? 'image' : 'creature';
       const m = new Monster(b.seed, this.nav.nodePos(node), this.monsterModel, undefined, kind, this.monsterImage, sp.tpl);
+      m.floor = Math.floor(node / this.nav.N);
       this.entities.add(m);
-      this.monsters.push({ m, wakeAt: sp.wake });
+      this.monsters.push({ m, wakeAt: sp.wake, active: true });
     }
   }
-  private monsters: { m: Monster; wakeAt: number }[] = [];
+  private monsters: { m: Monster; wakeAt: number; active: boolean }[] = [];
+  /** Debug mode (unlocked by pressing pause three times): cheats and monster controls. */
+  readonly debug = { invisible: false, noCatch: false, freeze: false };
+  /** Debug: the monsters, for the panel. */
+  get debugMonsters(): { id: string; species: string; state: string; active: boolean; dist: number }[] {
+    return this.monsters.map((x) => ({ id: x.m.id, species: x.m.species, state: x.m.state, active: x.active, dist: x.m.floor === this.player.floor ? x.m.position.distanceTo(this.player.feet) : Infinity }));
+  }
+  /** Debug: switch a monster off (gone and inert) or on. */
+  debugSetActive(id: string, on: boolean) {
+    const e = this.monsters.find((x) => x.m.id === id);
+    if (!e) return;
+    e.active = on;
+    e.m.object.visible = on;
+  }
+  debugWake(id: string, awake: boolean) {
+    const e = this.monsters.find((x) => x.m.id === id);
+    if (!e) return;
+    if (awake) {
+      e.wakeAt = 0;
+      e.m.wake();
+    } else {
+      e.wakeAt = Infinity;
+      e.m.sleep();
+    }
+  }
+  /** Debug: bring a monster to you: a few metres away on your floor, ahead of you if possible. */
+  debugSpawnNear(id: string) {
+    const e = this.monsters.find((x) => x.m.id === id);
+    if (!e) return;
+    const p = this.player.feet;
+    const here = this.nav.nodeAt(p.x, p.y, p.z);
+    if (here < 0) return;
+    const fwd = this.player.camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
+    let best = -1;
+    let bestScore = -Infinity;
+    for (const n of this.nav.nodesNear(here, 3)) {
+      const q = this.nav.nodePos(n);
+      if (this.nav.floorAt(q.y) !== this.player.floor) continue;
+      const d = q.distanceTo(p);
+      if (d < 4.5) continue;
+      const score = q.clone().sub(p).setY(0).normalize().dot(fwd) * 2 - Math.abs(d - 7) * 0.3;
+      if (score > bestScore) {
+        bestScore = score;
+        best = n;
+      }
+    }
+    if (best < 0) return;
+    this.debugSetActive(id, true);
+    e.wakeAt = 0;
+    e.m.teleport(this.nav.nodePos(best), this.player.floor, p.clone());
+  }
+  /** Debug: stand in front of the exit gate. */
+  debugToExit() {
+    const ex = this.building.exit;
+    const lvl = this.building.floors[ex.floor]!;
+    const c = cellCenter(lvl, ex.x, ex.z);
+    this.player.teleport(c.x, c.z, SIDE_YAW[ex.side], 0, lvl.elevation);
+    this.player.floor = ex.floor;
+    this.updateFloors(true);
+  }
+  /** Debug: play a monster's jump scare. */
+  debugScare(id: string) {
+    const nc = this.debug.noCatch;
+    this.debug.noCatch = false;
+    this.entityContext().catchPlayer(id);
+    this.debug.noCatch = nc;
+  }
   /** Robin (the first monster), for code that only knows one. */
   get monster(): Monster | null {
     return this.monsters[0]?.m ?? null;
@@ -481,7 +548,8 @@ export class Game {
     this.director.update(dt);
     this.senses.update(dt);
     let tension = 0;
-    for (const { m, wakeAt } of this.monsters) {
+    for (const { m, wakeAt, active } of this.monsters) {
+      if (!active) continue;
       if (m.state === 'dormant' && this.time > wakeAt) m.wake();
       // Tension for the ambience: hunted = 1, otherwise rises as one gets close on your floor.
       const sameFloor = m.floor === this.player.floor;
@@ -491,7 +559,10 @@ export class Game {
       tension = Math.max(tension, hunted ? 1 : m.state === 'investigate' ? Math.max(near, 0.4) : near);
     }
     if (this.monsters.length) this.audio.setTension(tension);
-    if (this.entities.entities.size) this.entities.update(dt, this.entityContext());
+    if (this.monsters.length && !this.debug.freeze) {
+      const ctx = this.entityContext();
+      for (const e of this.monsters) if (e.active) e.m.update(dt, ctx);
+    }
   }
 
   private entityContext(): EntityContext {
@@ -508,12 +579,13 @@ export class Game {
         crouching: p.crouching,
         sprinting: p.sprinting,
         flashlightOn: p.flashlightOn,
+        invisible: this.debug.invisible,
         forward: p.camera.getWorldDirection(this.viewDir),
         // Half the narrower view angle, a little inside the screen edge.
         viewCos: Math.cos(THREE.MathUtils.degToRad(p.camera.fov * 0.5) * Math.min(1, p.camera.aspect) * 0.95),
       },
       catchPlayer: (by) => {
-        if (this.state !== 'playing') return;
+        if (this.state !== 'playing' || this.debug.noCatch) return;
         bus.emit('player:caught', { by });
         const who = this.monsters.find((x) => x.m.id === by)?.m ?? this.monster;
         this.scare.start(by, who, this.player, (dir, max) => {
