@@ -72,7 +72,7 @@ async function main() {
       game.env.update();
       const feet = cam.position.clone().setY(cam.position.y - 1.6);
       game.updateFloors(false, feet);
-      if (f % 30 === 0) game.director.lights.assignNear(feet.x, feet.y, feet.z);
+      if (f % 30 === 0) game.director.lights.assignNear(game.nav.nodeAt(feet.x, feet.y, feet.z), feet.x, feet.y, feet.z);
       game.director.update(1 / 60);
       game.dust?.update(cam.position, 0.6, game.renderer.domElement.height);
       game.renderer.info.reset();

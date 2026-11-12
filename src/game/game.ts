@@ -353,7 +353,8 @@ export class Game {
     }
     this.updateFloors(true);
     this.director.lights.setPoolSize(this.scene, q.lightPool);
-    this.director.lights.assignNear(this.player.feet.x, this.player.feet.y, this.player.feet.z);
+    const f = this.player.feet;
+    this.director.lights.assignNear(this.nav.nodeAt(f.x, f.y, f.z), f.x, f.y + 1.6, f.z);
     this.stepHz = q.physicsHz;
     this.physics.world.timestep = 1 / q.physicsHz;
     if (initial || prev.particles !== q.particles) {

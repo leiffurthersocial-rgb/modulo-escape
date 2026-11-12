@@ -175,13 +175,18 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
 export function placeLights(l: LevelData, rng: Rng): LightSlot[] {
   const out: LightSlot[] = [];
   l.cells.forEach((c, i) => {
-    if (!isWalkable(c.kind)) return;
     const cx = i % l.width;
     const cz = Math.floor(i / l.width);
     const room = c.room >= 0 ? l.rooms[c.room]! : null;
+    // Stairwells: one tube on the upper floor's ceiling above the mid landing (the stair cells
+    // themselves have no ceiling — a tube there would float in mid-air).
+    if (c.kind === 'shaft' && room && cz === room.z + 1 && cx === room.x) {
+      out.push({ id: out.length, cx, cz, kind: 'ceiling', decay: rng.next() * 0.8 });
+      return;
+    }
+    if (!isWalkable(c.kind) || c.kind === 'stair') return;
     let want = false;
     if (c.kind === 'corridor') want = (cx + cz) % 2 === 0 && rng.chance(0.85);
-    else if (c.kind === 'stair') want = cz === room!.z;
     else if (room && (room.kind === 'room' || room.kind === 'hall')) want = (cx - room.x) % 2 === 0 && (cz - room.z) % 2 === 0;
     // decay > 0.9 = dead (~10%), > 0.75 = flickering (~15%); the rest burn steadily.
     if (want) out.push({ id: out.length, cx, cz, kind: 'ceiling', decay: rng.next() });

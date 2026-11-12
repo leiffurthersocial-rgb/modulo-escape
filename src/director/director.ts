@@ -28,7 +28,7 @@ export class AmbienceDirector {
     this.offs.push(
       bus.on('player:enteredCell', (e) => {
         const S = b.cellSize;
-        this.lights.assignNear((e.x + 0.5) * S, e.floor * b.floorStep, (e.z + 0.5) * S);
+        this.lights.assignNear(e.floor * b.width * b.height + e.z * b.width + e.x, (e.x + 0.5) * S, e.floor * b.floorStep + 1.6, (e.z + 0.5) * S);
       }),
       bus.on('light:flicker', (e) => this.flickers.set(e.id, { until: this.time + e.ms / 1000, phase: this.rng.next() * 10 })),
     );
@@ -62,7 +62,7 @@ export class AmbienceDirector {
       const id = Math.floor(this.rng.next() * this.lights.states.length);
       bus.emit('light:flicker', { id, intensity: 0, ms: 300 + this.rng.next() * 900 });
     }
-    this.lights.apply();
+    this.lights.apply(dt);
   }
 
   dispose() {
