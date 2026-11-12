@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-11T07:46:37.428Z",
+  "generated": "2026-11-12T08:24:06.117Z",
   "textures": {
     "concrete_wall_008": {
       "category": "concrete_wall",
@@ -874,6 +874,307 @@
       "url": "/assets/models/quaternius_zombie.deefb34a.glb",
       "bytes": 413400,
       "triangles": 7822
+    },
+    "chess_set": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/chess_set.a32934e5.glb",
+      "bytes": 1516288,
+      "triangles": 28818
+    },
+    "binder_notebook": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/binder_notebook.7c17bdde.glb",
+      "bytes": 360772,
+      "triangles": 6326
+    },
+    "clipboard": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/clipboard.6ed73c59.glb",
+      "bytes": 171804,
+      "triangles": 6176
+    },
+    "alarm_clock_01": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/alarm_clock_01.b859ac16.glb",
+      "bytes": 219564,
+      "triangles": 5813
+    },
+    "food_apple_01": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/food_apple_01.dd116805.glb",
+      "bytes": 185808,
+      "triangles": 7012
+    },
+    "desk_lamp_arm_01": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/desk_lamp_arm_01.f030b466.glb",
+      "bytes": 556608,
+      "triangles": 9068
+    },
+    "standing_chalkboard_01": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/standing_chalkboard_01.fb178bc2.glb",
+      "bytes": 443152,
+      "triangles": 834
+    },
+    "wall_clock": {
+      "category": "prop:wall",
+      "source": "polyhaven",
+      "url": "/assets/models/wall_clock.d6bf3a6f.glb",
+      "bytes": 360852,
+      "triangles": 3658
+    },
+    "korean_fire_extinguisher_01": {
+      "category": "prop:wall",
+      "source": "polyhaven",
+      "url": "/assets/models/korean_fire_extinguisher_01.6d09562a.glb",
+      "bytes": 902680,
+      "triangles": 3692
+    },
+    "fire_alarm": {
+      "category": "prop:wall",
+      "source": "polyhaven",
+      "url": "/assets/models/fire_alarm.2f8a6983.glb",
+      "bytes": 163672,
+      "triangles": 2705
+    },
+    "metal_trash_can": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/metal_trash_can.95e1e93d.glb",
+      "bytes": 1038804,
+      "triangles": 6728
+    },
+    "WetFloorSign_01": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/WetFloorSign_01.a6205679.glb",
+      "bytes": 197152,
+      "triangles": 228
+    },
+    "potted_plant_04": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/potted_plant_04.f8919151.glb",
+      "bytes": 489532,
+      "triangles": 5898
+    },
+    "security_camera_01": {
+      "category": "prop:wall",
+      "source": "polyhaven",
+      "url": "/assets/models/security_camera_01.524ce53c.glb",
+      "bytes": 397604,
+      "triangles": 4751
+    },
+    "Sofa_01": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/Sofa_01.2acab36c.glb",
+      "bytes": 438772,
+      "triangles": 4101
+    },
+    "ArmChair_01": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/ArmChair_01.b58be15c.glb",
+      "bytes": 521244,
+      "triangles": 3657
+    },
+    "CoffeeTable_01": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/CoffeeTable_01.a964b911.glb",
+      "bytes": 444072,
+      "triangles": 3640
+    },
+    "metal_office_desk": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/metal_office_desk.e6016eae.glb",
+      "bytes": 356124,
+      "triangles": 6898
+    },
+    "drawer_cabinet": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/drawer_cabinet.8003d682.glb",
+      "bytes": 416592,
+      "triangles": 9242
+    },
+    "dartboard": {
+      "category": "prop:wall",
+      "source": "polyhaven",
+      "url": "/assets/models/dartboard.f010cc05.glb",
+      "bytes": 510916,
+      "triangles": 2379
+    },
+    "industrial_microscope": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/industrial_microscope.23ad7d82.glb",
+      "bytes": 643652,
+      "triangles": 9462
+    },
+    "vintage_microscope": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/vintage_microscope.ce84f48c.glb",
+      "bytes": 482168,
+      "triangles": 7424
+    },
+    "magnifying_glass_01": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/magnifying_glass_01.de97ba36.glb",
+      "bytes": 163124,
+      "triangles": 7240
+    },
+    "medical_box": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/medical_box.5504d405.glb",
+      "bytes": 164340,
+      "triangles": 3718
+    },
+    "circuit_board": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/circuit_board.ebcafd79.glb",
+      "bytes": 423148,
+      "triangles": 10066
+    },
+    "boombox": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/boombox.b099b0ab.glb",
+      "bytes": 485144,
+      "triangles": 3683
+    },
+    "portable_cassette_player": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/portable_cassette_player.38bc5e6c.glb",
+      "bytes": 239376,
+      "triangles": 4673
+    },
+    "wooden_bookshelf_worn": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/wooden_bookshelf_worn.5682cfb2.glb",
+      "bytes": 515436,
+      "triangles": 3536
+    },
+    "dining_table": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/dining_table.87b94573.glb",
+      "bytes": 442532,
+      "triangles": 1048
+    },
+    "dining_chair_02": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/dining_chair_02.4cea4673.glb",
+      "bytes": 495000,
+      "triangles": 7704
+    },
+    "plastic_monobloc_chair_01": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/plastic_monobloc_chair_01.51445654.glb",
+      "bytes": 426600,
+      "triangles": 1404
+    },
+    "plastic_crate_01": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/plastic_crate_01.9ba590bc.glb",
+      "bytes": 707952,
+      "triangles": 10990
+    },
+    "football": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/football.3c17d4fa.glb",
+      "bytes": 158948,
+      "triangles": 1978
+    },
+    "dirty_football": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/dirty_football.4b7e8094.glb",
+      "bytes": 457068,
+      "triangles": 16910
+    },
+    "painted_wooden_bench": {
+      "category": "prop:furniture",
+      "source": "polyhaven",
+      "url": "/assets/models/painted_wooden_bench.e413801e.glb",
+      "bytes": 421280,
+      "triangles": 630
+    },
+    "metal_toolbox": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/metal_toolbox.6ca146b6.glb",
+      "bytes": 427532,
+      "triangles": 4979
+    },
+    "wooden_ladder": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/wooden_ladder.f822f5d1.glb",
+      "bytes": 504984,
+      "triangles": 2971
+    },
+    "multi_cleaner_bottle": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/multi_cleaner_bottle.1f5c68b0.glb",
+      "bytes": 187388,
+      "triangles": 6792
+    },
+    "bleach_bottle": {
+      "category": "prop:tabletop",
+      "source": "polyhaven",
+      "url": "/assets/models/bleach_bottle.33b9561d.glb",
+      "bytes": 140556,
+      "triangles": 4052
+    },
+    "wooden_crate_01": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/wooden_crate_01.c1b73407.glb",
+      "bytes": 444176,
+      "triangles": 6576
+    },
+    "trashbag": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/trashbag.ff5d2bc3.glb",
+      "bytes": 437796,
+      "triangles": 3458
+    },
+    "wheelchair_01": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/wheelchair_01.84229d0e.glb",
+      "bytes": 669804,
+      "triangles": 14088
+    },
+    "wooden_bucket_01": {
+      "category": "prop:floor",
+      "source": "polyhaven",
+      "url": "/assets/models/wooden_bucket_01.5b655b62.glb",
+      "bytes": 425964,
+      "triangles": 2596
     }
   },
   "hdris": {

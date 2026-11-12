@@ -12,6 +12,8 @@ import type { DecalSlot } from '../gen/dressing.ts';
 import { KIT, transformBox } from '../kit/greybox.ts';
 import { boxesToSurfaceGeometry, type AABB, type SurfaceFn } from './boxMesh.ts';
 import { propMatrix } from './props.ts';
+import { BOX_SIZE } from '../gen/furnish.ts';
+import type { PropModel } from './propModels.ts';
 import { ROLE_OF, type KitRole, type WorldAssets } from './worldAssets.ts';
 import { buildRoots, buildVines } from './flora.ts';
 import { tileUv } from '../render/decalAtlas.ts';
@@ -213,11 +215,35 @@ export class ChunkManager {
       b.items.push({ m: m.clone(), propIndex, fit });
     };
     const scaleM = new THREE.Matrix4();
-    for (const { p, i } of this.propsByChunk.get(key) ?? []) {
-      if (p.type === 'vegetation' && hash01(i * 1.618) > this.opts.vegetation) continue;
+    const props = this.level.props;
+    /** Height of the surface a prop offers to things standing on it. */
+    const topOf = (q: PropSlot): number => {
+      const base = q.y ?? 0;
+      if (q.type === 'model') {
+        const m = a.props?.models.get(q.model ?? '');
+        return base + (m ? modelHeight(m) * (q.model === 'wooden_bookshelf_worn' ? 0.5 : 1) : 0.75);
+      }
+      if (q.type === 'shelf') return base + 1.03;
+      const box = BOX_SIZE[q.type];
+      if (box) return base + box.h - (q.type === 'lab_bench' ? 0.0 : 0.02);
+      if (q.type === 'classroom_desk' || q.type === 'desk') {
+        const m = a.props?.forType(q.type)[0];
+        return base + (m ? modelHeight(m) * a.props.fitFor(q.type, m) : 0.75);
+      }
+      return base + 0.75;
+    };
+    for (const { p: p0, i } of this.propsByChunk.get(key) ?? []) {
+      if (p0.type === 'vegetation' && hash01(i * 1.618) > this.opts.vegetation) continue;
+      const support = p0.on !== undefined ? props[p0.on] : undefined;
+      const p = support ? { ...p0, y: topOf(support) } : p0;
       const base = this.dynamicMatrix(i) ?? propMatrix(p, S);
       const models = a.props?.forType(p.type) ?? [];
-      if (p.type === 'rubble') {
+      if (p.type === 'model') {
+        const model = a.props?.models.get(p.model ?? '');
+        if (!model) continue;
+        const shadow = p.solid && p.r >= 0.4;
+        for (const part of model.parts) add(part.geometry, part.material, base, i, 1, shadow);
+      } else if (p.type === 'rubble') {
         add(a.rubble[p.variant % a.rubble.length]!, a.rubbleMat, base, i, 1);
       } else if (p.type === 'collapsed_slab') {
         add(a.slab.slab, a.kit.get('wall')!, base, i, 1, true);
@@ -291,6 +317,21 @@ export class ChunkManager {
 }
 
 // ───────── helpers ─────────
+
+const heightCache = new WeakMap<PropModel, number>();
+/** Height of a normalised model (base at y = 0). */
+function modelHeight(m: PropModel): number {
+  let h = heightCache.get(m);
+  if (h === undefined) {
+    h = 0;
+    for (const part of m.parts) {
+      if (!part.geometry.boundingBox) part.geometry.computeBoundingBox();
+      h = Math.max(h, part.geometry.boundingBox!.max.y);
+    }
+    heightCache.set(m, h);
+  }
+  return h;
+}
 
 function chunkKey(cx: number, cz: number): string {
   return `${Math.floor(cx / CHUNK_CELLS)},${Math.floor(cz / CHUNK_CELLS)}`;

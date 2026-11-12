@@ -10,6 +10,7 @@ import type { PropType } from '../gen/types.ts';
 import type { TexTierName } from '../render/assetManifest.ts';
 import { buildFoliageAtlas } from '../render/foliageTextures.ts';
 import { buildMainAtlas, buildPlateAtlas, buildSignAtlas } from '../render/decalAtlas.ts';
+import { FURNISH_MODELS } from '../gen/furnish.ts';
 import { createSurfaceMaterial, surfaceUniforms } from '../render/surface.ts';
 import type { PbrSet, TextureLibrary } from '../render/textures.ts';
 import { buildTreeVariants, createLeafMaterial, type TreeVariant } from './flora.ts';
@@ -114,7 +115,7 @@ export class WorldAssets {
 
     opts.onProgress?.('Loading props…');
     a.props = new PropLibrary(renderer, lib.manifest);
-    const ids = [...new Set([...Object.values(PROP_MODEL_IDS).flat(), ...OUTDOOR_SHRUB_IDS, ...OUTDOOR_ROCK_IDS])];
+    const ids = [...new Set([...Object.values(PROP_MODEL_IDS).flat(), ...OUTDOOR_SHRUB_IDS, ...OUTDOOR_ROCK_IDS, ...FURNISH_MODELS])];
     if (a.textured) await a.props.load(ids, 0, (d, t) => opts.onProgress?.(`Loading props ${d}/${t}…`));
 
     a.rubble = [0, 1, 2].map((i) => rubbleGeometry(`rubble-${i}`));
@@ -200,6 +201,20 @@ const GREY_PROP: Record<PropType, number> = {
   classroom_desk: 0x8a6a45,
   blackboard: 0x1d2b24,
   pipe: 0x5e6266,
+  model: 0x7a7a7a,
+  lab_bench: 0x2a2c2e,
+  counter: 0x9aa0a4,
+  stage: 0x4a3626,
+  seat_row: 0x5a2a2a,
+  wall_bars: 0x9c7a50,
+  hoop: 0xd0d0d0,
+  gym_mat: 0x2f4f7a,
+  wc_stall: 0x8a9a92,
+  sink: 0xd8d8d2,
+  piano: 0x141414,
+  monitor: 0x202224,
+  shelf: 0x5c6064,
+  pinboard: 0x8a6a45,
 };
 
 /** Shallow puddles: mirror-smooth, organic noise outline, animated rain-drip ripples. */

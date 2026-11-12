@@ -63,7 +63,23 @@ export type PropType =
   | 'desk'
   | 'classroom_desk'
   | 'blackboard'
-  | 'pipe';
+  | 'pipe'
+  /** A Poly Haven model by id (`PropSlot.model`), real-world scale. */
+  | 'model'
+  // Code-built KZU furniture (box footprints `w × d`, see world/props.ts).
+  | 'lab_bench'
+  | 'counter'
+  | 'stage'
+  | 'seat_row'
+  | 'wall_bars'
+  | 'hoop'
+  | 'gym_mat'
+  | 'wc_stall'
+  | 'sink'
+  | 'piano'
+  | 'monitor'
+  | 'shelf'
+  | 'pinboard';
 
 export interface PropSlot {
   type: PropType;
@@ -81,6 +97,17 @@ export interface PropSlot {
   variant: number;
   /** Whether the player collides with it. */
   solid: boolean;
+  /** Poly Haven model id for type 'model'. */
+  model?: string;
+  /** Box footprint (m) along the prop's local X (w) and Z (d), for wall-aligned furniture. */
+  w?: number;
+  d?: number;
+  /** Height of the base above the floor (m): wall-mounted things. */
+  y?: number;
+  /** Stands on top of another prop (index into props): the renderer lifts it onto that surface. */
+  on?: number;
+  /** Mounted on / standing flush against this wall of its cell. */
+  wall?: Side;
 }
 
 export interface LightSlot {

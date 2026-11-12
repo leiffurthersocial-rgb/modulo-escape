@@ -51,18 +51,26 @@ export class PropLibrary {
     this.loader = new GLTFLoader().setKTX2Loader(getKtx2Loader(renderer)).setMeshoptDecoder(MeshoptDecoder);
   }
 
+  /**
+   * Load models by id. "file#part" picks only the nodes whose name contains `part` from a file
+   * that bundles several objects (e.g. metal_trash_can#rust).
+   */
   async load(ids: string[], maxRadius = 0, onProgress?: (done: number, total: number) => void): Promise<void> {
-    const todo = ids.filter((id) => this.manifest.models[id] && !this.models.has(id));
+    const todo = ids.filter((id) => this.manifest.models[id.split('#')[0]!] && !this.models.has(id));
+    const files = [...new Set(todo.map((id) => id.split('#')[0]!))];
     let done = 0;
     await Promise.all(
-      todo.map(async (id) => {
+      files.map(async (file) => {
         try {
-          const gltf = await this.loader.loadAsync(this.manifest.models[id]!.url);
-          this.models.set(id, normalise(id, gltf.scene, maxRadius));
+          const gltf = await this.loader.loadAsync(this.manifest.models[file]!.url);
+          for (const id of todo.filter((x) => x.split('#')[0] === file)) {
+            const part = id.split('#')[1];
+            this.models.set(id, normalise(id, gltf.scene, maxRadius, part));
+          }
         } catch (e) {
-          console.warn(`model ${id} failed`, e);
+          console.warn(`model ${file} failed`, e);
         }
-        onProgress?.(++done, todo.length);
+        onProgress?.(++done, files.length);
       }),
     );
   }
@@ -91,17 +99,28 @@ function radiusOf(m: PropModel): number {
 }
 
 /** Bake node transforms into geometry, merge per material, sit on y=0, centre in XZ. */
-function normalise(id: string, root: THREE.Object3D, maxRadius: number): PropModel {
+function normalise(id: string, root: THREE.Object3D, maxRadius: number, part?: string): PropModel {
   root.updateMatrixWorld(true);
   const byMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const named = (o: THREE.Object3D | null): boolean => !!o && (o.name.includes(part!) || named(o.parent));
+  const tmp = new THREE.Matrix4();
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
-    const g = toFloatGeometry(mesh.geometry);
-    g.applyMatrix4(mesh.matrixWorld);
+    if (part && !named(mesh)) return;
     const mat = Array.isArray(mesh.material) ? mesh.material[0]! : mesh.material;
     const list = byMat.get(mat) ?? [];
-    list.push(g);
+    // GPU-instanced parts (EXT_mesh_gpu_instancing, e.g. chess pieces): bake every instance.
+    const inst = mesh as THREE.InstancedMesh;
+    const n = inst.isInstancedMesh ? inst.count : 1;
+    for (let k = 0; k < n; k++) {
+      const g = toFloatGeometry(mesh.geometry);
+      if (inst.isInstancedMesh) {
+        inst.getMatrixAt(k, tmp);
+        g.applyMatrix4(tmp.premultiply(mesh.matrixWorld));
+      } else g.applyMatrix4(mesh.matrixWorld);
+      list.push(g);
+    }
     byMat.set(mat, list);
   });
   const parts: PropPart[] = [];

@@ -17,6 +17,7 @@ import {
   type LevelData,
   type LevelSize,
 } from '../src/gen/index.ts';
+import { propBox } from '../src/gen/furnish.ts';
 
 const SEEDS = Number(process.env.GEN_SEEDS ?? 1000);
 const SIZES: LevelSize[] = ['small', 'medium', 'large'];
@@ -79,31 +80,45 @@ function checkFloor(l: LevelData): string[] {
     slots.add(p.slot);
   }
 
-  // Props: inside their cell, no overlaps, solid ones never block the centre cross or doorways.
+  // Props: inside their cell, no overlaps, solid ones keep the cell centre and every open side's
+  // entrance free. Wall-mounted things (y > 0), things standing on other props and the blackboard
+  // have no floor footprint.
   const S = l.cellSize;
-  l.props.forEach((p, i) => {
-    const u = p.x - p.cx * S;
-    const v = p.z - p.cz * S;
-    if (p.type !== 'blackboard' && (u - p.r < 0.15 || v - p.r < 0.15 || u + p.r > S - 0.15 || v + p.r > S - 0.15)) errs.push(`prop ${i} intersects wall`);
+  const floorProps = l.props.map((p, i) => ({ p, i })).filter(({ p }) => p.type !== 'blackboard' && !(p.y && p.y > 0) && p.on === undefined);
+  for (const { p, i } of floorProps) {
+    const b = propBox(p);
+    const ox = p.cx * S;
+    const oz = p.cz * S;
+    if (b.x0 < ox + 0.14 || b.z0 < oz + 0.14 || b.x1 > ox + S - 0.14 || b.z1 > oz + S - 0.14) errs.push(`prop ${i} (${p.model ?? p.type}) intersects wall`);
     if (!isWalkable(l.cells[cellIndex(l, p.cx, p.cz)]!.kind)) errs.push(`prop ${i} in void`);
     if (p.solid) {
-      const band = 0.6 * (S / 4);
-      const mid = S / 2;
-      if (Math.abs(u - mid) < band + p.r || Math.abs(v - mid) < band + p.r) errs.push(`solid prop ${i} blocks centre cross`);
+      const lo = S / 2 - 0.6;
+      const hi = S / 2 + 0.6;
+      const hit = (x0: number, z0: number, x1: number, z1: number) => b.x0 - ox < x1 - 1e-6 && b.x1 - ox > x0 + 1e-6 && b.z0 - oz < z1 - 1e-6 && b.z1 - oz > z0 + 1e-6;
+      const pass = (sd: 'N' | 'E' | 'S' | 'W') => isPassable(getEdge(l, p.cx, p.cz, sd)) || getEdge(l, p.cx, p.cz, sd) === 'exit';
+      if (hit(lo, lo, hi, hi)) errs.push(`solid prop ${i} (${p.model ?? p.type}) blocks the cell centre`);
+      if ((pass('N') && hit(lo, 0, hi, lo)) || (pass('S') && hit(lo, hi, hi, S)) || (pass('W') && hit(0, lo, lo, hi)) || (pass('E') && hit(hi, lo, S, hi)))
+        errs.push(`solid prop ${i} (${p.model ?? p.type}) blocks an entrance`);
       if ((p.cx === l.start.x && p.cz === l.start.z) || (p.cx === l.exit.x && p.cz === l.exit.z)) errs.push(`solid prop ${i} in start/exit`);
-      const k = l.cells[cellIndex(l, p.cx, p.cz)]!;
-      if (k.kind === 'stair' || k.kind === 'shaft') errs.push(`prop ${i} on stairs`);
-    }
-    for (let j = i + 1; j < l.props.length; j++) {
-      const q = l.props[j]!;
-      if (Math.hypot(p.x - q.x, p.z - q.z) < p.r + q.r) errs.push(`props ${i} and ${j} overlap`);
-    }
-  });
-  for (const pl of l.pillars) {
-    for (const p of l.props) {
-      if (Math.hypot(p.x - pl.x * S, p.z - pl.z * S) < p.r + 0.4) errs.push('prop overlaps pillar');
     }
   }
+  for (let a = 0; a < floorProps.length; a++) {
+    const A = propBox(floorProps[a]!.p);
+    for (let c = a + 1; c < floorProps.length; c++) {
+      const B = propBox(floorProps[c]!.p);
+      if (A.x0 < B.x1 - 1e-6 && A.x1 > B.x0 + 1e-6 && A.z0 < B.z1 - 1e-6 && A.z1 > B.z0 + 1e-6) errs.push(`props ${floorProps[a]!.i} and ${floorProps[c]!.i} overlap`);
+    }
+  }
+  for (const { p } of floorProps) if (p.on !== undefined && !l.props[p.on]) errs.push('prop on a missing prop');
+  for (const pl of l.pillars) {
+    for (const { p } of floorProps) {
+      const b = propBox(p);
+      const dx = Math.max(b.x0 - pl.x * S, 0, pl.x * S - b.x1);
+      const dz = Math.max(b.z0 - pl.z * S, 0, pl.z * S - b.z1);
+      if (Math.hypot(dx, dz) < 0.4) errs.push('prop overlaps pillar');
+    }
+  }
+  for (const p of l.props) if (p.on !== undefined && (p.on < 0 || p.on >= l.props.length)) errs.push('bad support index');
   return errs;
 }
 

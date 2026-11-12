@@ -35,8 +35,24 @@ export const PROP_RADIUS: Record<PropType, number> = {
   classroom_desk: 0.5,
   blackboard: 0,
   pipe: 0.2,
+  model: 0.2,
+  lab_bench: 0,
+  counter: 0,
+  stage: 0,
+  seat_row: 0,
+  wall_bars: 0,
+  hoop: 0,
+  gym_mat: 0,
+  wc_stall: 0,
+  sink: 0,
+  piano: 0,
+  monitor: 0,
+  shelf: 0,
+  pinboard: 0,
 };
 export const SOLID_PROPS: ReadonlySet<PropType> = new Set(['barrel', 'collapsed_slab', 'chair', 'desk', 'classroom_desk']);
+/** Uses that get the classroom layout (board, teacher's desk, rows of desks). */
+const DESK_ROOMS = new Set(['classroom', 'informatik', 'musik', 'bg', 'chemie', 'physik', 'biologie']);
 
 const isWallLike = (e: EdgeKind) => e === 'solid' || e === 'window';
 
@@ -65,7 +81,7 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
   const doorish = (e: EdgeKind) => e === 'door' || e === 'broken' || e === 'exit' || e === 'open';
   const FACING: Record<Side, number> = { N: 0, E: -Math.PI / 2, S: Math.PI, W: Math.PI / 2 };
   for (const r of l.rooms) {
-    if (r.kind !== 'room' || r.w * r.h < 4 || !rng.chance(0.85)) continue;
+    if (r.kind !== 'room' || r.w * r.h < 4 || !DESK_ROOMS.has(r.use ?? 'classroom') || !rng.chance(0.85)) continue;
     // Score each side: no doors first, then the longer wall (so rows run across the room).
     let best: { side: Side; score: number } | null = null;
     for (const side of ['N', 'E', 'S', 'W'] as Side[]) {
@@ -141,9 +157,8 @@ export function placeProps(l: LevelData, rng: Rng): PropSlot[] {
         const r2 = rng.next();
         if (keepClear || walls === 0) continue;
         void roll; // (was: rubble) — no loose clutter, only school furniture
-        // Small rooms are offices / store rooms: a desk or stacked chairs against the walls.
-        if (cell.kind === 'room' && room && room.w * room.h < 4 && r2 < 0.3) add(rng.chance(0.5) ? 'chair' : rng.chance(0.5) ? 'desk' : 'barrel', cx, cz, c.u, c.v);
-        else if (cell.kind === 'room' && r2 < 0.08) add('chair', cx, cz, c.u, c.v);
+        // Furniture by room use comes from furnish.ts; just the odd stray chair here.
+        if (cell.kind === 'room' && DESK_ROOMS.has(room?.use ?? 'classroom') && r2 < 0.06) add('chair', cx, cz, c.u, c.v);
       }
 
       // Mid-wall slots: old pipes along corridor walls.

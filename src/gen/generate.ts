@@ -18,6 +18,7 @@ import { buildNav, bfs } from './nav.ts';
 import { placeProps, placeLights, pickSpawnPoints } from './props.ts';
 import { dressLevel } from './dressing.ts';
 import { assignKzu } from './kzu.ts';
+import { furnish } from './furnish.ts';
 import type { Building, Cell, EdgeKind, LevelData, LevelSize, Room, Side, Stair } from './types.ts';
 
 export class GenerationError extends Error {}
@@ -230,6 +231,7 @@ function tryBuilding(seed: string, size: LevelSize, cfg: SizeConfig, attempt: nu
     const sub = (name: string) => streamRng(seed, `${name}:${f}`, attempt);
     level.wings = assignKzu(level, sub('kzu'));
     level.props = placeProps(level, sub('props'));
+    furnish(level, level.props, sub('furnish'));
     level.lights = placeLights(level, sub('lights'));
     const anchor = f === topF ? cellIndex(level, sx, sz) : firstLanding(w);
     level.spawnPoints = pickSpawnPoints(level, sub('spawns'), anchor);

@@ -8,6 +8,7 @@ import type { Building } from '../gen/types.ts';
 import { kitPieces } from '../gen/kit.ts';
 import { KIT, transformBox } from '../kit/greybox.ts';
 import { stairRamp } from '../world/stairs.ts';
+import { BOX_SIZE } from '../gen/furnish.ts';
 
 /** Key for a prop across floors. */
 export const propKey = (floor: number, index: number) => floor * 100000 + index;
@@ -49,8 +50,14 @@ export class PhysicsWorld {
           );
           this.world.createCollider(RAPIER.ColliderDesc.cylinder(0.45 * p.scale, 0.3 * p.scale).setDensity(60).setFriction(0.7), body);
           this.dynamicProps.set(propKey(level.floor, i), body);
+        } else if (p.w !== undefined && p.d !== undefined) {
+          // Box furniture against a wall (benches, counters, stalls…) or long models.
+          const along = Math.abs(Math.cos(p.rot)) > 0.5;
+          const h = BOX_SIZE[p.type]?.h ?? 0.9;
+          const y = (p.y ?? 0) + y0;
+          this.world.createCollider(RAPIER.ColliderDesc.cuboid((along ? p.w : p.d) / 2, h / 2, (along ? p.d : p.w) / 2).setTranslation(p.x, y + h / 2, p.z), fixed);
         } else {
-          const h = p.type === 'desk' || p.type === 'classroom_desk' ? 0.75 : p.type === 'chair' ? 0.85 : 0.6;
+          const h = p.type === 'desk' || p.type === 'classroom_desk' ? 0.75 : p.type === 'chair' ? 0.85 : p.type === 'model' ? 0.95 : 0.6;
           this.world.createCollider(RAPIER.ColliderDesc.cylinder(h / 2, p.r * p.scale * 0.9).setTranslation(p.x, y0 + h / 2, p.z), fixed);
         }
       });
