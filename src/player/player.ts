@@ -172,20 +172,34 @@ export class Player {
     // capsule down a slope; airborne: gravity.
     const moving = Math.abs(tx) + Math.abs(tz) > 0.01;
     this.vy = this.grounded ? (moving ? -0.3 : 0) : this.vy - GRAVITY * dt;
-    const desired = { x: this.vel.x * dt, y: this.vy * dt, z: this.vel.z * dt };
+    // On stairs the ramp turns part of the forward motion into climbing: make up for it so you
+    // walk up at your normal pace (boost from the previous step, capped).
+    const desired = { x: this.vel.x * dt * this.climbBoost, y: this.vy * dt, z: this.vel.z * dt * this.climbBoost };
     this.controller.computeColliderMovement(this.collider, desired);
     const m = this.controller.computedMovement();
     this.grounded = this.controller.computedGrounded();
+    const want = Math.hypot(this.vel.x, this.vel.z) * dt;
+    const got = Math.hypot(m.x, m.z);
+    const ratio = want > 1e-5 ? got / (want * this.climbBoost) : 1;
+    // Unblocked (not pressed against a wall) and climbing → keep the intended speed.
+    const free = ratio > 0.55;
+    const climbing = this.grounded && m.y > 0.0005 && free;
+    const boostTarget = climbing ? Math.min(1.6, 1 / Math.max(ratio, 0.62)) : 1;
+    this.climbBoost += (boostTarget - this.climbBoost) * Math.min(1, dt * 20);
     const t = this.body.translation();
     const next = { x: t.x + m.x, y: t.y + m.y, z: t.z + m.z };
     this.body.setNextKinematicTranslation(next);
-    // Actual velocity (after collisions) drives head-bob.
-    this.vel.x = m.x / dt;
-    this.vel.z = m.z / dt;
+    // Actual velocity (after collisions) feeds back — except the slope's share, so stairs don't
+    // compound into a crawl. Head-bob uses the real speed.
+    if (!free) {
+      this.vel.x = m.x / dt;
+      this.vel.z = m.z / dt;
+    }
+    this.realSpeed = got / dt;
     this.feet.set(next.x, next.y - this.height / 2, next.z);
 
     // Head-bob.
-    const hs = Math.hypot(this.vel.x, this.vel.z);
+    const hs = this.realSpeed;
     this.bobPhase += hs * dt * (this.sprinting ? 2.2 : 2.6);
     // Footsteps make noise (monsters listen): one event per stride.
     const stride = Math.floor(this.bobPhase / Math.PI);
@@ -233,6 +247,11 @@ export class Player {
   }
 
   /** Interpolate camera between physics states. alpha ∈ [0,1]. */
+  /** Horizontal speed boost while climbing a ramp (makes up for the slope). */
+  private climbBoost = 1;
+  /** Horizontal speed actually moved last step (m/s). */
+  realSpeed = 0;
+
   /** 0..1 how far the view is swung round to look behind (held key); movement keeps `yaw`. */
   lookBack = 0;
   /** Target for `lookBack` (set by the game from the held key / touch button). */

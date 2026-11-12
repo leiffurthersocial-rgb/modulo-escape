@@ -198,7 +198,11 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
           float skinM = clamp(1.0 - shirt - pants - hairM - nail, 0.0, 1.0);
           // Skin: the photo's tone, drained and bruised; veins and blotches.
           float mott = rFbm(p * 7.0);
-          vec3 sk = mix(uSkin, vec3(dot(uSkin, vec3(0.3, 0.55, 0.15))) * vec3(0.9, 0.95, 0.97), 0.55) * (0.68 + 0.4 * mott);
+          // Sickly grey-pale on the body, warming to the photo's own tone towards the head so the
+          // face doesn't sit on the neck like a mask.
+          float headward = smoothstep(2.45, 2.85, p.y);
+          vec3 grey = vec3(dot(uSkin, vec3(0.3, 0.55, 0.15))) * vec3(0.9, 0.95, 0.97);
+          vec3 sk = mix(mix(uSkin, grey, 0.5), uSkin * 0.92, headward) * mix(0.68 + 0.4 * mott, 0.9 + 0.15 * mott, headward);
           float vein = pow(1.0 - abs(rNoise(p * vec3(16.0, 5.0, 16.0)) * 2.0 - 1.0), 14.0);
           sk = mix(sk, vec3(0.22, 0.24, 0.36), vein * 0.4);
           sk = mix(sk, vec3(0.32, 0.18, 0.2), smoothstep(0.58, 0.8, rFbm(p * 3.1 + 4.0)) * 0.55);
@@ -249,7 +253,12 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
             fu = vec2(P.x / uPhotoSize.x, 1.0 - P.y / uPhotoSize.y);
           }
           vec4 ph = texture2D(uPhoto, fu);
-          float fw = uHasPhoto * vMask2.y * inside01(fu0) * smoothstep(0.6, 0.97, ph.a) * (1.0 - smoothstep(0.19, 0.21, 1.0 - fu0.y - (uFaceC.y / uPhotoSize.y)));
+          // The photo was cut out of a white background: pull the mask in from its edge (lowest
+          // alpha a few pixels around) so the whitish fringe never shows on the cheeks.
+          vec2 px = 7.0 / uPhotoSize;
+          float aMin = min(min(texture2D(uPhoto, fu + vec2(px.x, 0.0)).a, texture2D(uPhoto, fu - vec2(px.x, 0.0)).a),
+                           min(texture2D(uPhoto, fu + vec2(0.0, px.y)).a, texture2D(uPhoto, fu - vec2(0.0, px.y)).a));
+          float fw = uHasPhoto * smoothstep(0.0, 0.6, vMask2.y) * inside01(fu0) * smoothstep(0.75, 0.98, min(ph.a, aMin)) * (1.0 - smoothstep(0.19, 0.21, 1.0 - fu0.y - (uFaceC.y / uPhotoSize.y)));
           vec3 face = ph.rgb;
           face = mix(face, face * vec3(0.8, 0.7, 0.7), uWarp * 0.4);
           face = mix(face, vec3(0.22, 0.0, 0.01), blood * min(1.0, uWarp * 1.5) * 0.85);
@@ -266,9 +275,16 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
       )
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n        roughnessFactor = gRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n        normal = bumpN(-vViewPosition, normal, gH * 0.002);')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n        totalEmissiveRadiance += gEmis;');
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        totalEmissiveRadiance += gEmis;
+        // Faint cold rim on the silhouette: his shape reads against the dark.
+        float rim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
+        totalEmissiveRadiance += vec3(0.55, 0.62, 0.75) * rim * 0.07;`,
+      );
   };
-  mat.customProgramCacheKey = () => 'robin-v3';
+  mat.customProgramCacheKey = () => 'robin-v4';
   return mat;
 }
 

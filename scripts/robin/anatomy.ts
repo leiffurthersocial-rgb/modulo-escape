@@ -165,13 +165,19 @@ export function buildAnatomy(): { bones: BoneDef[]; prims: Prim[] } {
     bone(`forearm${side}`, `upperarm${side}`, elbow);
     bone(`hand${side}`, `forearm${side}`, wrist);
     ell(`upperarm${side}`, X([0.31, 2.44, -0.01]), [0.062, 0.088, 0.062], 0.04);
-    cone(`upperarm${side}`, shoulder, 0.048, elbow, 0.033, 0.03);
+    cone(`upperarm${side}`, shoulder, 0.052, elbow, 0.036, 0.03);
     cone(`upperarm${side}`, add(shoulder, mul(u, 0.02)), 0.064, add(shoulder, mul(u, 0.27)), 0.054, 0.02); // sleeve
-    ell(`upperarm${side}`, add(shoulder, mul(u, 0.3)), [0.036, 0.13, 0.04], 0.03, elbow);
-    sphere(`forearm${side}`, add(elbow, [0, 0, -0.03]), 0.03, 0.02);
-    cone(`forearm${side}`, elbow, 0.038, wrist, 0.025, 0.03);
-    ell(`forearm${side}`, add(elbow, mul(u, 0.14)), [0.042, 0.13, 0.036], 0.03, wrist);
-    sphere(`forearm${side}`, add(wrist, [0, 0, -0.018]), 0.016, 0.012);
+    ell(`upperarm${side}`, add(shoulder, mul(u, 0.3)), [0.042, 0.14, 0.046], 0.035, elbow); // biceps
+    ell(`upperarm${side}`, add(add(shoulder, mul(u, 0.26)), [0, 0, -0.022]), [0.036, 0.15, 0.03], 0.035, elbow); // triceps
+    sphere(`forearm${side}`, add(elbow, [0, 0, -0.032]), 0.034, 0.02); // bony elbow
+    sphere(`forearm${side}`, add(elbow, [s * 0.018, 0, 0.012]), 0.026, 0.02);
+    cone(`forearm${side}`, elbow, 0.041, wrist, 0.026, 0.03);
+    ell(`forearm${side}`, add(elbow, mul(u, 0.15)), [0.048, 0.14, 0.04], 0.03, wrist); // forearm muscle
+    // Tendons running down to the wrist, and the knobbly wrist bones.
+    cone(`forearm${side}`, add(add(elbow, mul(u, 0.3)), [0, 0, 0.022]), 0.008, add(wrist, [0, 0, 0.016]), 0.007, 0.012);
+    cone(`forearm${side}`, add(add(elbow, mul(u, 0.3)), [0, 0, -0.02]), 0.008, add(wrist, [0, 0, -0.015]), 0.007, 0.012);
+    sphere(`forearm${side}`, add(wrist, [0, 0, -0.019]), 0.018, 0.012);
+    sphere(`forearm${side}`, add(wrist, [0, 0, 0.017]), 0.014, 0.012);
 
     // Hand: palm faces the thigh (normal n), fingers spread along ±z.
     const n: V3 = norm(X([-0.866, -0.5, 0]));
