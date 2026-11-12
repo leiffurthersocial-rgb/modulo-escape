@@ -1,0 +1,62 @@
+{
+ "step_concrete": [
+  "/assets/audio/step_concrete_0.be1a97c9.mp3",
+  "/assets/audio/step_concrete_1.bffd4aa4.mp3",
+  "/assets/audio/step_concrete_2.2200b022.mp3",
+  "/assets/audio/step_concrete_3.22ff6d6e.mp3",
+  "/assets/audio/step_concrete_4.cddf5f79.mp3"
+ ],
+ "flesh_heavy": [
+  "/assets/audio/flesh_heavy_0.f690544c.mp3",
+  "/assets/audio/flesh_heavy_1.70dafa0d.mp3",
+  "/assets/audio/flesh_heavy_2.9dba063d.mp3",
+  "/assets/audio/flesh_heavy_3.47d0b342.mp3",
+  "/assets/audio/flesh_heavy_4.18f0f5bf.mp3"
+ ],
+ "punch_heavy": [
+  "/assets/audio/punch_heavy_0.01075d5c.mp3",
+  "/assets/audio/punch_heavy_1.f9d7603f.mp3",
+  "/assets/audio/punch_heavy_2.2b625514.mp3",
+  "/assets/audio/punch_heavy_3.1d0eda08.mp3",
+  "/assets/audio/punch_heavy_4.f90adc8d.mp3"
+ ],
+ "metal_heavy": [
+  "/assets/audio/metal_heavy_0.9a456da3.mp3",
+  "/assets/audio/metal_heavy_1.caa16ea8.mp3",
+  "/assets/audio/metal_heavy_2.83bfed82.mp3",
+  "/assets/audio/metal_heavy_3.ce51b467.mp3",
+  "/assets/audio/metal_heavy_4.6246a779.mp3"
+ ],
+ "metal_light": [
+  "/assets/audio/metal_light_0.f397a2e9.mp3",
+  "/assets/audio/metal_light_1.e8b6cfbb.mp3",
+  "/assets/audio/metal_light_2.445053fe.mp3",
+  "/assets/audio/metal_light_3.c462cb3b.mp3",
+  "/assets/audio/metal_light_4.a569304a.mp3"
+ ],
+ "plate_heavy": [
+  "/assets/audio/plate_heavy_0.78193f62.mp3",
+  "/assets/audio/plate_heavy_1.01f6ccfa.mp3",
+  "/assets/audio/plate_heavy_2.b984a526.mp3",
+  "/assets/audio/plate_heavy_3.6f5c7457.mp3",
+  "/assets/audio/plate_heavy_4.43ed6d9d.mp3"
+ ],
+ "cloth": [
+  "/assets/audio/cloth_0.77906a2a.mp3",
+  "/assets/audio/cloth_1.3df6ac82.mp3",
+  "/assets/audio/cloth_2.6b9d947b.mp3",
+  "/assets/audio/cloth_3.f35c0956.mp3"
+ ],
+ "creak": [
+  "/assets/audio/creak_0.8c30294f.mp3",
+  "/assets/audio/creak_1.dc23a0ae.mp3",
+  "/assets/audio/creak_2.0f423002.mp3"
+ ],
+ "door_open": [
+  "/assets/audio/door_open_0.180ea86f.mp3",
+  "/assets/audio/door_open_1.58bf84f8.mp3"
+ ],
+ "latch": [
+  "/assets/audio/latch_0.92afb451.mp3"
+ ]
+}

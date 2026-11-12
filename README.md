@@ -66,8 +66,8 @@ jump-scare image. If the new photo frames the face differently, adjust the eye p
 
 ## Credits and docs
 
-Textures, models and night skies are CC0 (Poly Haven, ambientCG). See `assets/LICENSES.json` and
-the in-game Credits. Robin's body, all animation and all sound are generated in code.
+Textures, models and night skies are CC0 (Poly Haven, ambientCG); sound effects are CC0 (Kenney Impact Sounds + RPG Audio, `npm run sounds:fetch`). See `assets/LICENSES.json` and
+the in-game Credits. Robin's body, all animation, the screams, the HVAC drone and the reverb are generated in code.
 
 See [PLAN.md](PLAN.md) for the plan and phases, [DECISIONS.md](DECISIONS.md) for every design
 decision and why, and [SETUP.md](SETUP.md) for setup and the asset pipeline.

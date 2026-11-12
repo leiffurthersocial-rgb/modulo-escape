@@ -574,5 +574,29 @@
     "license": "CC0 1.0",
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
     "attributionRequired": false
+  },
+  {
+    "id": "kenney_impact_audio",
+    "source": "url",
+    "kind": "sound",
+    "category": "sfx",
+    "name": "Impact Sounds (sound effects)",
+    "sourceUrl": "https://kenney.nl/assets/impact-sounds",
+    "author": "Kenney",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attributionRequired": false
+  },
+  {
+    "id": "kenney_rpg_audio",
+    "source": "url",
+    "kind": "sound",
+    "category": "sfx",
+    "name": "RPG Audio (sound effects)",
+    "sourceUrl": "https://kenney.nl/assets/rpg-audio",
+    "author": "Kenney",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attributionRequired": false
   }
 ]

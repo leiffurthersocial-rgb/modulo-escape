@@ -12,7 +12,8 @@ export interface SpatialOpts {
   gain: number;
 }
 
-function sink(ctx: AudioContext, out: AudioNode, o: SpatialOpts): AudioNode {
+/** Positional input for one sound (HRTF panner, muffled through floors). */
+export function sink(ctx: AudioContext, out: AudioNode, o: SpatialOpts): AudioNode {
   const p = ctx.createPanner();
   p.panningModel = 'HRTF';
   p.distanceModel = 'inverse';

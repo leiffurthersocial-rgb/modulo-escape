@@ -8,6 +8,8 @@
  *  - events:  every 10–35 s a knock in the ducts, a tick, or a distant metal groan, panned
  * `setTension(0..1)` is driven by the game (monster near / chasing).
  */
+import type { SampleBank } from './samples.ts';
+
 export class HvacAmbience {
   private nodes: AudioNode[] = [];
   private dreadGain: GainNode;
@@ -20,6 +22,8 @@ export class HvacAmbience {
   constructor(
     private ctx: AudioContext,
     private out: AudioNode,
+    /** Recorded metal knocks / ticks / creaks; procedural fallbacks without. */
+    private samples: SampleBank | null = null,
   ) {
     const t = ctx.currentTime;
     const noise = brownNoiseBuffer(ctx, 6);
@@ -123,6 +127,16 @@ export class HvacAmbience {
     pan.pan.value = Math.random() * 2 - 1;
     pan.connect(this.out);
     const kind = Math.random();
+    const sm = this.samples;
+    if (sm?.ready) {
+      // Recorded: knocks deep in the ducts (slowed, muffled), cooling-metal ticks, a far creak.
+      if (kind < 0.45) {
+        const n = 1 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < n; i++) sm.play('metal_heavy', pan, { gain: 0.35, rate: 0.55, vary: 0.1, at: t + i * (0.2 + Math.random() * 0.25), lowpass: 700 });
+      } else if (kind < 0.75) sm.play('metal_light', pan, { gain: 0.12, rate: 0.8, vary: 0.15, lowpass: 3500 });
+      else sm.play('creak', pan, { gain: 0.3, rate: 0.45, vary: 0.1, lowpass: 900 });
+      return;
+    }
     if (kind < 0.45) {
       // Knock(s): short low thumps.
       const n = 1 + Math.floor(Math.random() * 3);

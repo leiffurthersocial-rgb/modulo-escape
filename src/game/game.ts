@@ -537,9 +537,21 @@ export class Game {
     this.overlay.frame(this.renderer);
   }
 
+  private barrelSpeed = new Map<number, number>();
+  private barrelSound = 0;
+
   private syncDynamicProps() {
     for (const [key, body] of this.physics.dynamicProps) {
       if (body.isSleeping()) continue;
+      // A shoved / toppling barrel knocks (sudden speed change), at most every 0.35 s.
+      const v = body.linvel();
+      const sp = Math.hypot(v.x, v.y, v.z);
+      const prev = this.barrelSpeed.get(key) ?? 0;
+      if (Math.abs(sp - prev) > 1.1 && this.time - this.barrelSound > 0.35) {
+        this.barrelSound = this.time;
+        bus.emit('audio:cue', { name: 'barrel' });
+      }
+      this.barrelSpeed.set(key, sp);
       const floor = Math.floor(key / 100000);
       const i = key % 100000;
       const level = this.building.floors[floor]!;
@@ -574,6 +586,7 @@ export class Game {
     const dz = f.z - g.z;
     if (!this.gate.opening && Math.hypot(dx, dz) < 2.6) {
       this.gate.open();
+      bus.emit('audio:cue', { name: 'gate' });
       this.physics.removeGateBlocker();
       bus.emit('exit:approached', { x: this.building.exit.x, z: this.building.exit.z, side: this.building.exit.side });
       bus.emit('exit:opened', {});
