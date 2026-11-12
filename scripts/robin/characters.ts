@@ -22,10 +22,8 @@ export interface Character {
   /** Clothing: the T-shirt, and trousers ('long' to the shins, 'short' above the knee). */
   shirt: boolean;
   pants: 'long' | 'short';
-  /** Long sleeves down to the wrists. */
-  longSleeves?: boolean;
-  /** A looser shirt that hangs over the ribs instead of clinging to them. */
-  looseShirt?: boolean;
+  /** Hoodie (long sleeves, ribbed hem, hood bunched at the back, front pocket), jeans, sneakers. */
+  hoodie?: boolean;
   /** A sculpt of its own (same skeleton) instead of re-proportioning Robin. */
   custom?: 'leo';
 }
@@ -49,21 +47,20 @@ export const CHARACTERS: Record<CharacterName, Character> = {
     name: 'jovan',
     shirt: true,
     pants: 'long',
-    longSleeves: true,
-    looseShirt: true,
+    hoodie: true,
     bones: {
       hips: { len: 1.1, thick: [1.1, 1.0, 1.05] },
       spine1: { len: 1.2, thick: [1.12, 1, 1.08] },
       spine2: { len: 1.2, thick: [1.14, 1, 1.1] },
       chest: { len: 1.12, thick: [1.16, 1, 1.12] },
-      neck1: { len: 1.0, thick: 0.95 },
-      neck2: { len: 1.0, thick: 0.95 },
+      neck1: { len: 0.72, thick: 1.18 },
+      neck2: { len: 0.72, thick: 1.15 },
       head: { len: 1, thick: 0.97 },
       ...side(['clavicle'], { len: 1.18, thick: 1.0 }),
       ...side(['upperarm'], { len: 1.32, thick: 1.1 }),
       ...side(['forearm'], { len: 1.34, thick: 1.08 }),
-      ...side(['hand'], { len: 1.3, thick: 1.05 }),
-      ...fingers({ len: 1.4, thick: 0.95 }),
+      ...side(['hand'], { len: 1.3, thick: 1.3 }),
+      ...fingers({ len: 1.3, thick: 1.3 }),
       ...side(['thigh'], { len: 1.32, thick: 1.22 }),
       ...side(['shin'], { len: 1.34, thick: 1.2 }),
       ...side(['foot'], { len: 1.15, thick: 1.0 }),
@@ -102,11 +99,24 @@ export function buildCharacter(c: Character): Retargeted {
     return { bones: L.bones, prims: L.prims, toOrig: L.prims.map(() => id), girth: L.prims.map(() => 1), cloth: L.cloth, meta: L.meta, hemY: L.meta.hemY };
   }
   const { bones, prims } = buildAnatomy();
-  if (c.looseShirt) {
-    // Cloth shells over the ribcage and belly (in Robin's space; mapped like everything else).
-    const shell = (bone: string, ctr: V3, r: V3, k: number) => prims.push({ kind: 'ell', a: ctr, b: [ctr[0], ctr[1] + 1, ctr[2]], ra: 0, rb: 0, r, k, bone });
-    shell('chest', [0, 2.19, -0.01], [0.19, 0.24, 0.146], 0.04);
-    shell('spine2', [0, 2.02, -0.005], [0.172, 0.13, 0.135], 0.05);
+  if (c.hoodie) {
+    // Cloth and shoes (in Robin's space; mapped like everything else).
+    const ell = (bone: string, ctr: V3, r: V3, k: number, to?: V3) => prims.push({ kind: 'ell', a: ctr, b: to ?? [ctr[0], ctr[1] + 1, ctr[2]], ra: 0, rb: 0, r, k, bone });
+    ell('chest', [0, 2.19, -0.01], [0.19, 0.24, 0.146], 0.04); // hoodie body over the ribs
+    ell('spine2', [0, 2.02, -0.005], [0.172, 0.13, 0.135], 0.05);
+    ell('spine1', [0, 1.82, -0.005], [0.162, 0.15, 0.135], 0.05); // over the sunken belly
+    ell('spine1', [0, 1.675, -0.005], [0.172, 0.03, 0.142], 0.02); // ribbed hem
+    ell('spine1', [0, 1.79, 0.128], [0.11, 0.055, 0.014], 0.012); // front pocket
+    ell('chest', [0, 2.49, -0.11], [0.16, 0.06, 0.07], 0.03); // hood, bunched up at the back
+    for (const [s, sd] of [
+      [1, 'L'],
+      [-1, 'R'],
+    ] as const) {
+      // Sneakers: a rounded shell over the foot (toes inside), a padded collar at the ankle.
+      ell(`foot${sd}`, [s * 0.172, 0.05, 0.07], [0.05, 0.185, 0.066], 0.012, [s * 0.172, 0.05, 1]);
+      ell(`foot${sd}`, [s * 0.172, 0.016, 0.07], [0.016, 0.195, 0.07], 0.008, [s * 0.172, 0.016, 1]); // sole
+      prims.push({ kind: 'cone', a: [s * 0.165, 0.1, -0.03], b: [s * 0.165, 0.14, -0.02], ra: 0.05, rb: 0.047, k: 0.02, bone: `foot${sd}` });
+    }
   }
   const byName = new Map(bones.map((b) => [b.name, b]));
   const scale = (n: string) => c.bones[n] ?? {};

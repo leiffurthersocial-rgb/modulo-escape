@@ -180,12 +180,22 @@ function regionAt(px: number, py: number, pz: number, q: P): Region {
   if (RT.cloth) return RT.cloth([px, py, pz], q.src.bone, clothHelpers);
   const [x, y, z] = q.back([px, py, pz]);
   const r = clothRule(x, y, z, q.src.bone);
-  if (CH.longSleeves && q.src.bone.startsWith('upperarm')) return 'shirt';
-  if (CH.longSleeves && q.src.bone.startsWith('forearm')) {
-    const a = bonePos.get(q.src.bone)!;
-    const c = childOf.get(q.src.bone)!;
-    const t = ((x - a[0]) * (c[0] - a[0]) + (y - a[1]) * (c[1] - a[1]) + (z - a[2]) * (c[2] - a[2])) / ((c[0] - a[0]) ** 2 + (c[1] - a[1]) ** 2 + (c[2] - a[2]) ** 2);
-    return t < 0.88 + 0.05 * noise(x * 40, y * 40, z * 40) ? 'shirt' : 'skin';
+  if (CH.hoodie) {
+    const b = q.src.bone;
+    if (b.startsWith('upperarm')) return 'shirt';
+    if (b.startsWith('forearm')) {
+      const a = bonePos.get(b)!;
+      const c = childOf.get(b)!;
+      const t = ((x - a[0]) * (c[0] - a[0]) + (y - a[1]) * (c[1] - a[1]) + (z - a[2]) * (c[2] - a[2])) / ((c[0] - a[0]) ** 2 + (c[1] - a[1]) ** 2 + (c[2] - a[2]) ** 2);
+      return t < 0.9 ? 'shirt' : 'skin';
+    }
+    const torso = b === 'chest' || b === 'spine2' || b === 'spine1' || b === 'hips' || b.startsWith('clavicle');
+    if (torso || b === 'neck1') {
+      if (y < 1.645) return 'pants';
+      const neck = Math.hypot(x, z * 1.15) < 0.075 && y > 2.5;
+      return neck || (b === 'neck1' && y > 2.56) ? 'skin' : 'shirt';
+    }
+    if (b.startsWith('thigh') || b.startsWith('shin') || b.startsWith('foot') || b.startsWith('toes')) return 'pants';
   }
   if (r === 'shirt' && !CH.shirt) return 'skin';
   if (r === 'pants' && CH.pants === 'short' && q.src.bone.startsWith('thigh')) {
@@ -596,7 +606,8 @@ await io.write(OUT, doc);
   const top = Math.max(...P.map((q) => q.max[1])) - 0.02;
   const meta = RT.meta ? { character: CHAR, ...RT.meta, hipsY: bones.find((b) => b.name === 'hips')!.pos[1], height: top, shirt: CH.shirt } : {
     character: CHAR,
-    hemY: RT.hemY,
+    hemY: CH.hoodie ? -10 : RT.hemY,
+    shoeY: CH.hoodie ? bones.find((b) => b.name === 'footL')!.pos[1] + 0.06 : -1,
     eyeY: head[1] + (eyeY0 - headO[1]) * headThick,
     eyeHalf: 0.043 * HEAD_SCALE * headThick,
     eyeZ: head[2],

@@ -50,7 +50,7 @@ export interface BodyStyle {
 export const BODY_STYLES: Record<Species, BodyStyle> = {
   robin: { idleHunch: 0.45, walkHunch: 0.55, runHunch: 0.35, runLean: 0.55, walkStride: 1.55, runStride: 2.5, armSwing: 0.38, armOut: 0.12, footLift: 0.14, tint: 0x8a9096, tintAmount: 0, headroom: 3.45, shirtColor: 0xc8c5bd, pantsColor: 0x4a4c54, print: true, gait: 'biped' },
   leo: { idleHunch: 1.0, walkHunch: 1.05, runHunch: 1.15, runLean: 0.5, walkStride: 2.0, runStride: 3.6, armSwing: 0.5, armOut: 0.2, footLift: 0.12, tint: 0x6f8a5e, tintAmount: 0.75, headroom: 3.45, shirtColor: 0x66777c, pantsColor: 0x4a443c, print: false, gait: 'knuckle' },
-  jovan: { idleHunch: 0.2, walkHunch: 0.25, runHunch: 0.3, runLean: 0.3, walkStride: 2.3, runStride: 3.4, armSwing: 0.22, armOut: 0.05, footLift: 0.12, tint: 0xb8bfc4, tintAmount: 0.3, headroom: 3.5, shirtColor: 0x4a4c52, pantsColor: 0x2c2d33, print: false, gait: 'ceiling' },
+  jovan: { idleHunch: 0.2, walkHunch: 0.25, runHunch: 0.3, runLean: 0.3, walkStride: 2.3, runStride: 3.4, armSwing: 0.22, armOut: 0.05, footLift: 0.12, tint: 0xa9b3ba, tintAmount: 0.45, headroom: 3.5, shirtColor: 0x5c272c, pantsColor: 0x34465e, print: false, gait: 'ceiling' },
 };
 
 /** Measured on the sculpt (public/assets/monster/<name>_body.json). */
@@ -63,9 +63,11 @@ export interface BodyMeta {
   height: number;
   /** Where the shirt hem sits (grime collects there). */
   hemY?: number;
+  /** Below this the trousers are shoes (Jovan's sneakers); -1 = barefoot. */
+  shoeY?: number;
 }
 
-export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=4`;
+export const bodyUrl = (s: Species) => `/assets/monster/${s}_body.glb?v=5`;
 export const ROBIN_BODY_URL = bodyUrl('robin');
 
 /** Photo layout (pixels in robin.png): eye centres, and where the shirt collar sits. */
@@ -96,7 +98,7 @@ export async function loadBody(species: Species, photo: MonsterImage | null): Pr
   try {
     const [gltf, meta] = await Promise.all([
       new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(bodyUrl(species)),
-      fetch(`/assets/monster/${species}_body.json?v=4`).then((r) => r.json() as Promise<BodyMeta>),
+      fetch(`/assets/monster/${species}_body.json?v=5`).then((r) => r.json() as Promise<BodyMeta>),
     ]);
     let mesh: THREE.SkinnedMesh | null = null;
     gltf.scene.traverse((o) => {
@@ -170,6 +172,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
     uPantsCol: { value: new THREE.Color(style.pantsColor) },
     uPrint: { value: style.print ? 1 : 0 },
     uHemY: { value: meta?.hemY ?? 1.97 },
+    uShoeY: { value: meta?.shoeY ?? -1 },
     uTintAmt: { value: style.tintAmount },
     uEyeHalf: { value: meta?.eyeHalf ?? P.eyeHalf },
     uSkin: { value: skin },
@@ -224,6 +227,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         uniform vec3 uPantsCol;
         uniform float uPrint;
         uniform float uHemY;
+        uniform float uShoeY;
         uniform float uEyeHalf;
         uniform float uWarp;
         uniform float uScareTime;
@@ -289,6 +293,9 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
           sh = mix(sh, pr.rgb * (0.65 + 0.35 * dirt), prW);
           // Trousers: dark, worn, torn.
           vec3 pa = uPantsCol * (0.62 + 0.75 * rFbm(p * vec3(9.0, 3.0, 9.0)));
+          // Sneakers: dark canvas on a scuffed off-white sole.
+          vec3 shoeC = mix(vec3(0.03, 0.03, 0.035) * (0.7 + 0.6 * rNoise(p * 80.0)), vec3(0.5, 0.48, 0.44) * (0.75 + 0.3 * rNoise(p * 50.0)), smoothstep(0.034, 0.024, p.y));
+          pa = mix(pa, shoeC, step(p.y, uShoeY));
           vec3 ha = uHair * (0.55 + 0.7 * rNoise(p * vec3(60.0, 18.0, 60.0)));
           vec3 na = vec3(0.32, 0.27, 0.17) * (0.6 + 0.5 * rNoise(p * 120.0));
           vec3 col = sk * skinM + sh * shirt + pa * pants + ha * hairM + na * nail;
@@ -361,7 +368,7 @@ export function createRobinMaterial(photo: MonsterImage | null, meta?: BodyMeta,
         totalEmissiveRadiance += vec3(0.55, 0.62, 0.75) * rim * 0.07;`,
       );
   };
-  mat.customProgramCacheKey = () => 'robin-v7';
+  mat.customProgramCacheKey = () => 'robin-v8';
   return mat;
 }
 
