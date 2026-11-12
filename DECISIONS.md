@@ -125,3 +125,4 @@ Running log of technical decisions. Newest at the bottom.
 | 119 | 2026-11-12 | A bit darker: ceiling lights 7.5 → 6.2, tubes glow less, indoor eye adaptation 1.35 → 1.18; flashlight 38 → 44 | "A tad darker so the flashlight is more useful." |
 | 120 | 2026-11-12 | Red flicker: with a monster within ~11 m on your floor, now and then a tube near you or near it buzzes red and blinks (the closer, the more often) | "Sometimes a light flickers red when a monster is really near." |
 
+| 121 | 2026-11-12 | Stamina buffed slightly: sprint ~5.5 → ~6.7 s, refill ~6 → ~5.3 s, recovery starts after 0.7 s (was 0.9) | "Slightly buff the player's stamina." |

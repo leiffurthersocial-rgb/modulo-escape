@@ -143,14 +143,14 @@ export class Player {
     const mv = input.moveVector();
     const wantSprint = input.isDown('sprint') && !this.crouching && mv.y > 0.2;
     this.sprinting = wantSprint && !this.exhausted && this.stamina > 0;
-    // Stamina: ~5.5 s of sprint, refills in ~6 s after 0.9 s of rest.
+    // Stamina: ~6.7 s of sprint, refills in ~5.3 s after 0.7 s of rest.
     if (this.sprinting) {
-      this.stamina = Math.max(0, this.stamina - dt * 0.18);
+      this.stamina = Math.max(0, this.stamina - dt * 0.15);
       this.sinceSprint = 0;
       if (this.stamina === 0) this.exhausted = true;
     } else {
       this.sinceSprint += dt;
-      if (this.sinceSprint > 0.9) this.stamina = Math.min(1, this.stamina + dt * (this.exhausted ? 0.12 : 0.16));
+      if (this.sinceSprint > 0.7) this.stamina = Math.min(1, this.stamina + dt * (this.exhausted ? 0.14 : 0.19));
       if (this.exhausted && this.stamina >= 0.3) this.exhausted = false;
     }
     const speed = this.crouching ? CROUCH_SPEED : this.sprinting ? SPRINT : WALK;
