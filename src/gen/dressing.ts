@@ -220,7 +220,6 @@ function placeDecals(l: LevelData, rng: Rng, damp: number[]): DecalSlot[] {
 
 /**
  * German signs on the corridor walls:
- *  - glowing green NOTAUSGANG signs at junctions and turns, arrow along the shortest way out
  *  - AUSGANG above the exit gate
  *  - TRAKT signs where a corridor crosses into another wing
  *  - "← Mensa" / "Aula →" at junctions near the big halls
@@ -228,14 +227,10 @@ function placeDecals(l: LevelData, rng: Rng, damp: number[]): DecalSlot[] {
  */
 function placeSigns(l: LevelData, rng: Rng): DecalSlot[] {
   const out: DecalSlot[] = [];
-  const dist = l.nav.distToExit;
   const adj = l.nav.adj;
   const used = new Set<string>();
   const cxz = (i: number) => [i % l.width, Math.floor(i / l.width)] as const;
-  const corridorish = (i: number) => {
-    const k = l.cells[i]!.kind;
-    return k === 'corridor' || k === 'hall';
-  };
+
   /** Put a sign on a free solid side wall of the cell (perpendicular to D); arrow tile by side. */
   const place = (i: number, D: { dx: number; dz: number }, tiles: [number, number] | number, w: number, h: number, y: number) => {
     const [cx, cz] = cxz(i);
@@ -256,19 +251,6 @@ function placeSigns(l: LevelData, rng: Rng): DecalSlot[] {
     return { dx: bx - ax, dz: bz - az };
   };
 
-  // Notausgang.
-  if (dist.length) {
-    l.cells.forEach((_, i) => {
-      if (!corridorish(i) || !(dist[i]! > 0)) return;
-      const next = adj[i]!.find((n) => dist[n] === dist[i]! - 1);
-      if (next === undefined) return;
-      const D = step(i, next);
-      const junction = adj[i]!.length >= 3;
-      const turn = adj[i]!.some((m) => dist[m] === dist[i]! + 1 && (step(m, i).dx !== D.dx || step(m, i).dz !== D.dz));
-      const chance = junction ? 0.8 : turn ? 0.6 : dist[i]! % 4 === 0 ? 0.3 : 0;
-      if (rng.chance(chance)) place(i, D, [SIGN_TILE.notausgang.left, SIGN_TILE.notausgang.right], 1.0, 0.5, 2.45);
-    });
-  }
   // Ausgang above the gate.
   if (l.exit.x >= 0) {
     const p = wallPoint(l, l.exit.x, l.exit.z, l.exit.side, 0, 3.25);

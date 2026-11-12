@@ -53,7 +53,7 @@ export interface JumpScareConfig {
 export const JUMPSCARE: JumpScareConfig = {
   duration: 4.4,
   blackAt: 3.2,
-  faceDistance: 0.46,
+  faceDistance: 0.58,
   shake: 0.12,
   turnTime: 0.16,
   standOff: 2.3,

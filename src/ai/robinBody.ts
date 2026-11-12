@@ -229,31 +229,30 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
             vec2 P = vec2(fu.x * uPhotoSize.x, (1.0 - fu.y) * uPhotoSize.y);
             vec2 M = vec2(205.0, 430.0);
             vec2 E1 = vec2(145.0, 352.0), E2 = vec2(232.0, 345.0);
-            // Glitch wobble.
-            P.x += uWarp * sin(P.y * 0.35 + uScareTime * 47.0) * 4.0;
-            // Mouth tears open: stretch vertically around the smile, wider at the centre.
+            // Mouth tears open: a smooth vertical stretch around the smile.
             vec2 d = P - M;
-            float mw = exp(-pow(d.x / 70.0, 2.0));
-            P.y = M.y + d.y / (1.0 + 2.2 * uWarp * mw);
-            // Eyes bulge.
+            float mw = exp(-pow(d.x / 75.0, 2.0)) * exp(-pow(d.y / 90.0, 2.0));
+            P.y = M.y + d.y / (1.0 + 0.9 * uWarp * mw);
+            // Eyes widen a little.
             for (int k = 0; k < 2; k++) {
               vec2 E = k == 0 ? E1 : E2;
               vec2 de = P - E;
-              P = E + de * (1.0 - 0.5 * uWarp * exp(-dot(de, de) / 420.0));
-              // Blood running down from each eye.
-              float run = 60.0 + 170.0 * uWarp;
-              blood = max(blood, exp(-pow((P.x - E.x + sin(P.y * 0.08) * 3.0) / 6.0, 2.0)) * step(E.y, P.y) * (1.0 - smoothstep(E.y + run * 0.6, E.y + run, P.y)));
+              P = E + de * (1.0 - 0.25 * uWarp * exp(-dot(de, de) / 500.0));
+              // A thin dark-red tear running down from each eye.
+              float run = 40.0 + 110.0 * uWarp;
+              float tear = exp(-pow((P.x - E.x) / 4.0, 2.0)) * smoothstep(E.y + 4.0, E.y + 12.0, P.y) * (1.0 - smoothstep(E.y + run * 0.7, E.y + run, P.y));
+              blood = max(blood, tear);
             }
-            // The torn mouth is a black hole.
-            vec2 dm = (P - M) / vec2(62.0, 10.0 + 34.0 * uWarp);
-            mouthHole = uWarp * (1.0 - smoothstep(0.55, 1.0, length(dm)));
+            // The stretched mouth is dark inside.
+            vec2 dm = (P - M) / vec2(55.0, 8.0 + 18.0 * uWarp);
+            mouthHole = uWarp * 0.85 * (1.0 - smoothstep(0.6, 1.0, length(dm)));
             fu = vec2(P.x / uPhotoSize.x, 1.0 - P.y / uPhotoSize.y);
           }
           vec4 ph = texture2D(uPhoto, fu);
           float fw = uHasPhoto * vMask2.y * inside01(fu0) * smoothstep(0.6, 0.97, ph.a) * (1.0 - smoothstep(0.19, 0.21, 1.0 - fu0.y - (uFaceC.y / uPhotoSize.y)));
           vec3 face = ph.rgb;
-          face = mix(face, face * vec3(0.75, 0.62, 0.62), uWarp * 0.6);
-          face = mix(face, vec3(0.28, 0.0, 0.01), blood * uWarp * 0.9);
+          face = mix(face, face * vec3(0.8, 0.7, 0.7), uWarp * 0.4);
+          face = mix(face, vec3(0.22, 0.0, 0.01), blood * min(1.0, uWarp * 1.5) * 0.85);
           face = mix(face, vec3(0.015, 0.0, 0.0), mouthHole);
           col = mix(col, face, fw);
           col *= mix(1.0, vMask.x, 0.85);
@@ -269,7 +268,7 @@ export function createRobinMaterial(photo: MonsterImage | null): THREE.MeshStand
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n        normal = bumpN(-vViewPosition, normal, gH * 0.002);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n        totalEmissiveRadiance += gEmis;');
   };
-  mat.customProgramCacheKey = () => 'robin-v2';
+  mat.customProgramCacheKey = () => 'robin-v3';
   return mat;
 }
 
