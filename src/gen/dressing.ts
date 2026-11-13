@@ -186,7 +186,7 @@ function placeDecals(l: LevelData, rng: Rng, damp: number[]): DecalSlot[] {
         tryAdd(0.25 + dm * 0.5, (u) => push('main', rng.pick(DECAL_TILES.streak), wallPoint(l, cx, cz, side, u, rng.range(2.2, 2.7)), rng.range(0.9, 1.3), rng.range(1.6, 2.4), 0, cx, cz));
         tryAdd(0.22, (u) => push('main', rng.pick(DECAL_TILES.crack), wallPoint(l, cx, cz, side, u, rng.range(0.8, 2.6)), 1.1, 1.1, rng.range(-0.6, 0.6), cx, cz));
         if (c.kind === 'corridor') tryAdd(0.1, (u) => push('main', rng.pick(DECAL_TILES.stencil), wallPoint(l, cx, cz, side, u, 1.75), 1.0, 0.5, 0, cx, cz));
-        tryAdd(0.05, (u) => push('main', rng.pick(DECAL_TILES.graffiti), wallPoint(l, cx, cz, side, u, rng.range(1.2, 1.7)), 1.3, 0.8, rng.range(-0.08, 0.08), cx, cz));
+        tryAdd(0.08, (u) => push('main', rng.pick(DECAL_TILES.graffiti), wallPoint(l, cx, cz, side, u, rng.range(1.25, 1.6)), 1.9, 1.15, rng.range(-0.08, 0.08), cx, cz));
         rng.next(); // (was: moss patch) keep the stream stable
         tryAdd(0.12, (u) => push('main', rng.pick(DECAL_TILES.stain), wallPoint(l, cx, cz, side, u, rng.range(0.6, 1.4)), 0.9, 0.9, rng.range(0, Math.PI * 2), cx, cz));
       }

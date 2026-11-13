@@ -66,7 +66,8 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
 - **Gun:** a pistol (Poly Haven, CC0) sometimes lies on the floor. Walk over it to pick it up
   (you carry one at most). It has one bullet: shoot a monster and it's stunned for 7–9 s, then
   slinks off and leaves you alone for a while before it comes back. The bang is loud: the others
-  hear it. The spent gun vanishes; another turns up somewhere else later.
+  hear it. A hit monster bleeds and is knocked down (Jovan crumples), lies there twitching, then
+  gets back up. The spent gun vanishes; another turns up somewhere else later.
 - **Hiding:** crouch next to a classroom table or the teacher's desk ("HIDDEN" under the
   crosshair) and monsters that aren't already after you won't spot you unless they're right next
   to you.

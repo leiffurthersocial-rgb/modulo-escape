@@ -560,7 +560,11 @@ export class RobinBody {
   /** Freeze in place (Jovan while you look at him): no gait, no breathing — only twitches. */
   frozen = false;
   /** One-off performances the AI asks for (Leo: roar = rear up and pound the chest; stunned). */
-  act: 'none' | 'roar' | 'stunned' = 'none';
+  act: 'none' | 'roar' | 'stunned' | 'downed' = 'none';
+  /** How long a 'downed' (shot) lasts, so it can get up in time. */
+  downFor = 8;
+  /** 0..1: how far it has gone down (shot). */
+  private fall = 0;
   private actT = 0;
   private actW = 0;
   /** 0..1: arms on the ground (Leo) / on the ceiling (Jovan). */
@@ -691,6 +695,25 @@ export class RobinBody {
     this.actT = act === 'none' ? 0 : this.actT + dt;
     this.actW = expTo(this.actW, act === 'none' ? 0 : 1, dt, 8);
     const leo = this.species === 'leo';
+    // Shot: knocked off its feet — a fast fall (0.45 s), lying there twitching, then it rises
+    // stiffly in one piece, like a plank tipping back up. Jovan is too tall to fall flat in a
+    // corridor: he crumples instead (knees buckle, folds over, head hanging).
+    const tall = this.species === 'jovan';
+    if (act === 'downed') {
+      const t = this.actT;
+      this.fall = THREE.MathUtils.smoothstep(t, 0, 0.45) * (1 - THREE.MathUtils.smoothstep(t, this.downFor - 1.6, this.downFor - 0.15));
+      // Twitching on the floor.
+      if (this.fall > 0.8 && Math.random() < dt * 2.2) {
+        this.twitch.roll.v += (Math.random() - 0.5) * 30;
+        this.twitch.yaw.v += (Math.random() - 0.5) * 20;
+        for (const a of this.arms) a.swing.v += (Math.random() - 0.5) * 6;
+      }
+    } else this.fall = expTo(this.fall, 0, realDt, 6);
+    if (!tall) {
+      this.object.rotation.x = -this.fall * 1.42;
+      this.object.position.y = this.fall * 0.22 * (this.hipsY / 1.55);
+    }
+    if (this.fall > 0.5) look = null;
 
     // ── posture targets ──
     const p = this.post;
@@ -705,6 +728,7 @@ export class RobinBody {
     let rateK = 1;
     if (act === 'roar') Object.assign(tgt, { hunch: -0.15, lean: 0, crouch: 0.12, reach: 0, spread: 0 });
     if (act === 'stunned') Object.assign(tgt, { hunch: 0.5, lean: 0, crouch: 0.3, reach: 0, spread: 0 });
+    if (act === 'downed') Object.assign(tgt, tall ? { hunch: 1.6, lean: 0, crouch: 0.6, reach: 0, spread: 0.3 } : { hunch: -0.25, lean: 0, crouch: 0.04, reach: 0, spread: 1 });
     // Leo's slam: rear up with both fists overhead, then bring them down (period 0.9 s).
     const slamPh = leo && mode === 'attack' && sc < 0 ? (this.attackT % 0.9) / 0.9 : -1;
     if (slamPh >= 0) {
@@ -797,7 +821,7 @@ export class RobinBody {
     }
 
     this.object.updateMatrixWorld(true);
-    if (leo && (this.actW > 0.001 || slamPh >= 0)) {
+    if (leo && ((this.actW > 0.001 && act !== 'downed') || slamPh >= 0)) {
       this.leoActArms(act, slamPh);
       this.object.updateMatrixWorld(true);
     }
@@ -842,7 +866,7 @@ export class RobinBody {
     // ── arms on the ground (Leo) / pressed against the ceiling (Jovan) ──
     let ikW = 0;
     if (st.gait === 'knuckle') ikW = mode === 'attack' || act !== 'none' || sc >= 0 ? 0 : 1;
-    if (st.gait === 'ceiling') ikW = mode === 'attack' || sc >= 0 || p.duck > 0.3 ? 0 : 1;
+    if (st.gait === 'ceiling') ikW = mode === 'attack' || sc >= 0 || p.duck > 0.3 || act !== 'none' ? 0 : 1;
     this.armIK = expTo(this.armIK, ikW, dt, 6);
     if (this.armIK > 0.002) this.armsIK(stride, beta, objQ, p.run);
 
@@ -907,7 +931,7 @@ export class RobinBody {
    *   stunned  — one hand clutching his head, the other arm hanging limp
    *   slam     — (attack) both fists high overhead, then hammered down
    */
-  private leoActArms(act: 'none' | 'roar' | 'stunned', slamPh: number) {
+  private leoActArms(act: 'none' | 'roar' | 'stunned' | 'downed', slamPh: number) {
     const t = this.actT;
     for (const arm of this.arms) {
       const s = arm.side;

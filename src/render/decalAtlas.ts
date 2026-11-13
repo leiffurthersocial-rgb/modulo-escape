@@ -100,29 +100,118 @@ function stencil(ctx: Ctx, s: number, r: Rng, text: string, sub: string) {
   ctx.restore();
 }
 
+/**
+ * Hand-scrawled letters (finger strokes): polylines in a 0..1 box (x right, y down). Font-free, so
+ * the writing looks the same on every device, and shaky like it was smeared on with a hand.
+ */
+const SCRAWL: Record<string, number[][]> = {
+  A: [[0, 1, 0.5, 0, 1, 1], [0.22, 0.6, 0.8, 0.6]],
+  B: [[0.05, 0, 0.05, 1], [0.05, 0, 0.75, 0.08, 0.75, 0.42, 0.05, 0.5], [0.05, 0.5, 0.9, 0.6, 0.85, 0.95, 0.05, 1]],
+  D: [[0.05, 0, 0.05, 1], [0.05, 0, 0.8, 0.2, 0.9, 0.6, 0.6, 0.95, 0.05, 1]],
+  E: [[0.85, 0, 0.05, 0, 0.05, 1, 0.9, 1], [0.05, 0.5, 0.7, 0.5]],
+  F: [[0.85, 0, 0.05, 0, 0.05, 1], [0.05, 0.48, 0.7, 0.48]],
+  H: [[0.05, 0, 0.05, 1], [0.9, 0, 0.9, 1], [0.05, 0.5, 0.9, 0.5]],
+  I: [[0.5, 0, 0.5, 1]],
+  L: [[0.1, 0, 0.1, 1, 0.9, 1]],
+  M: [[0, 1, 0.05, 0, 0.5, 0.6, 0.95, 0, 1, 1]],
+  N: [[0.05, 1, 0.05, 0, 0.9, 1, 0.9, 0]],
+  O: [[0.5, 0, 0.9, 0.2, 0.95, 0.7, 0.6, 1, 0.2, 0.9, 0.05, 0.4, 0.3, 0.05, 0.55, 0]],
+  R: [[0.05, 1, 0.05, 0, 0.8, 0.1, 0.8, 0.42, 0.05, 0.5], [0.4, 0.5, 0.95, 1]],
+  S: [[0.9, 0.1, 0.5, 0, 0.1, 0.2, 0.3, 0.45, 0.8, 0.55, 0.9, 0.85, 0.5, 1, 0.05, 0.9]],
+  T: [[0, 0, 1, 0], [0.5, 0, 0.5, 1]],
+  U: [[0.05, 0, 0.1, 0.8, 0.5, 1, 0.9, 0.8, 0.95, 0]],
+  W: [[0, 0, 0.2, 1, 0.5, 0.45, 0.8, 1, 1, 0]],
+  '?': [[0.1, 0.2, 0.5, 0, 0.9, 0.2, 0.5, 0.5, 0.5, 0.7], [0.5, 0.92, 0.5, 1]],
+  '!': [[0.5, 0, 0.5, 0.7], [0.5, 0.92, 0.5, 1]],
+};
+
+/** Words written in blood on the walls. */
+const BLOOD_WORDS = ['HILFE', 'LAUF', 'HILF MIR', 'RAUS', 'ER SIEHT DICH', 'ROBIN', 'NICHT UMDREHEN', 'HILFE!'];
+
 function graffiti(ctx: Ctx, s: number, r: Rng) {
-  const hues = [r.int(0, 360), r.int(0, 360)];
+  const word = r.pick(BLOOD_WORDS);
   ctx.save();
   ctx.translate(s / 2, s / 2);
-  ctx.rotate(r.range(-0.15, 0.15));
+  ctx.rotate(r.range(-0.12, 0.12));
+  ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.font = `italic 900 ${s * 0.32}px "Arial Black", Impact, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const word = r.pick(['KZU', 'LAUF', 'AUSGANG?', 'HILFE', 'ROBIN']);
-  ctx.lineWidth = s * 0.05;
-  ctx.strokeStyle = `hsla(${hues[1]},60%,15%,0.9)`;
-  ctx.strokeText(word, 0, 0);
-  ctx.fillStyle = `hsla(${hues[0]},70%,55%,0.85)`;
-  ctx.fillText(word, 0, 0);
-  // Drips.
-  ctx.fillStyle = `hsla(${hues[0]},70%,45%,0.7)`;
-  for (let i = 0; i < 8; i++) ctx.fillRect(r.range(-0.35, 0.35) * s, s * 0.1, s * 0.012, r.range(0.05, 0.25) * s);
-  // Fade with the wall.
+  // Two lines for long phrases.
+  const words = word.length > 9 && word.includes(' ') ? [word.slice(0, word.lastIndexOf(' ')), word.slice(word.lastIndexOf(' ') + 1)] : [word];
+  const longest = Math.max(...words.map((w) => w.length));
+  const lh = Math.min(s * 0.3, (s * 0.86) / (longest * 0.78));
+  const lw = lh * 0.62;
+  const blood = (a: number) => `rgba(${r.int(55, 85)},${r.int(0, 6)},${r.int(0, 5)},${a})`;
+  const drips: [number, number][] = [];
+  words.forEach((w, li) => {
+    const y0 = (li - (words.length - 1) / 2) * lh * 1.25 - lh / 2;
+    let x = (-w.length * lw * 1.28) / 2;
+    for (const ch of w) {
+      const strokes = SCRAWL[ch];
+      if (strokes) {
+        const sc = r.range(0.9, 1.12);
+        const yo = r.range(-0.06, 0.06) * lh;
+        for (const st of strokes) {
+          // Each stroke smeared a few times with a shaky finger: a wide faint pass, the body,
+          // and a dark wet core.
+          for (const [width, alpha] of [
+            [0.28, 0.3],
+            [0.19, 0.92],
+            [0.09, 1],
+          ] as const) {
+            ctx.strokeStyle = blood(alpha);
+            ctx.lineWidth = lh * width * r.range(0.85, 1.15);
+            // Wobbly: each segment split into short shaky pieces.
+            ctx.beginPath();
+            for (let i = 0; i < st.length; i += 2) {
+              const px = x + st[i]! * lw * sc;
+              const py = y0 + yo + st[i + 1]! * lh * sc;
+              if (i === 0) {
+                ctx.moveTo(px + r.range(-0.04, 0.04) * lh, py + r.range(-0.04, 0.04) * lh);
+                continue;
+              }
+              const qx = x + st[i - 2]! * lw * sc;
+              const qy = y0 + yo + st[i - 1]! * lh * sc;
+              for (let k = 1; k <= 4; k++) ctx.lineTo(qx + ((px - qx) * k) / 4 + r.range(-0.045, 0.045) * lh, qy + ((py - qy) * k) / 4 + r.range(-0.045, 0.045) * lh);
+            }
+            ctx.stroke();
+          }
+          // Where a stroke ends low, blood runs down from it.
+          const ex = x + st[st.length - 2]! * lw * sc;
+          const ey = y0 + yo + st[st.length - 1]! * lh * sc;
+          if (st[st.length - 1]! > 0.6 && r.next() < 0.75) drips.push([ex, ey]);
+          if (r.next() < 0.25) drips.push([x + st[0]! * lw * sc, y0 + yo + st[1]! * lh * sc]);
+        }
+      }
+      x += lw * 1.28;
+    }
+  });
+  // Runs: thin, uneven, ending in a fat drop.
+  for (const [dx, dy] of drips) {
+    const len = r.range(0.06, 0.32) * s;
+    const w0 = lh * r.range(0.025, 0.05);
+    ctx.fillStyle = blood(0.85);
+    ctx.beginPath();
+    ctx.moveTo(dx - w0, dy);
+    ctx.quadraticCurveTo(dx - w0 * 0.4, dy + len * 0.6, dx - w0 * 0.3, dy + len);
+    ctx.lineTo(dx + w0 * 0.3, dy + len);
+    ctx.quadraticCurveTo(dx + w0 * 0.4, dy + len * 0.6, dx + w0, dy);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(dx, dy + len, w0 * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Spatter and hand smears around the writing.
+  for (let i = 0; i < 40; i++) {
+    ctx.fillStyle = blood(r.range(0.4, 0.9));
+    ctx.beginPath();
+    ctx.arc(r.range(-0.48, 0.48) * s, r.range(-0.4, 0.4) * s, r.range(0.6, 3.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Dried at the edges: eat into it a little.
   ctx.globalCompositeOperation = 'destination-out';
-  for (let i = 0; i < 500; i++) {
-    ctx.fillStyle = `rgba(0,0,0,${r.range(0.1, 0.6)})`;
-    ctx.fillRect(r.range(-0.5, 0.5) * s, r.range(-0.5, 0.5) * s, r.range(2, 8), r.range(2, 8));
+  for (let i = 0; i < 160; i++) {
+    ctx.fillStyle = `rgba(0,0,0,${r.range(0.1, 0.4)})`;
+    ctx.fillRect(r.range(-0.5, 0.5) * s, r.range(-0.5, 0.5) * s, r.range(1, 5), r.range(1, 5));
   }
   ctx.restore();
 }

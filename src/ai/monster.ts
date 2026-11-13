@@ -276,7 +276,12 @@ export class Monster implements Entity {
     this.setState('stunned');
     this.stunFor = 7 + this.rng.next() * 2;
     this.shotDown = true;
-    if (this.robin) this.robin.frozen = false;
+    if (this.robin) {
+      this.robin.frozen = false;
+      // Knocked down (not the wall-crash stagger).
+      this.robin.act = 'downed';
+      this.robin.downFor = this.stunFor;
+    }
     bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind: this.species === 'leo' ? 'roar' : 'screech' });
   }
 

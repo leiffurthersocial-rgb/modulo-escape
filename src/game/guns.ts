@@ -189,6 +189,9 @@ export class Guns {
     if (!this.held && this.flashT <= 0 && this.recoil <= 0) this.view.visible = false;
   }
 
+  /** Where the last shot hit (the wound) and which way the bullet went. */
+  lastHit: { point: THREE.Vector3; dir: THREE.Vector3 } | null = null;
+
   /** Pull the trigger. Returns the monster hit, if any. */
   fire(player: Player, monsters: Monster[]): Monster | null {
     if (!this.held) return null;
@@ -221,6 +224,7 @@ export class Guns {
         if (score > bestScore) {
           bestScore = score;
           best = m;
+          this.lastHit = { point: m.position.clone().setY(m.position.y + h), dir: fwd.clone() };
         }
       }
     }

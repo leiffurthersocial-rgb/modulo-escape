@@ -31,6 +31,7 @@ import { buildStairsGeometry } from '../world/stairs.ts';
 import { loadMaterialPicks, resolvedQuality, saveSettings, settings } from './settings.ts';
 import { Autopilot } from './autopilot.ts';
 import { Guns } from './guns.ts';
+import { Blood } from './blood.ts';
 import { JumpScare } from './jumpscare.ts';
 import { lowerPreset, PRESETS, type Quality } from '../render/quality.ts';
 import { AmbienceDirector } from '../director/director.ts';
@@ -72,6 +73,8 @@ export class Game {
   readonly senses: Senses;
   /** Pistols on the floor, and the one you carry. */
   readonly guns: Guns;
+  /** Blood sprays and pools (shot monsters). */
+  readonly blood: Blood;
   readonly entities: EntityManager;
   dust: Dust | null = null;
   private gateMat: THREE.MeshStandardMaterial;
@@ -211,6 +214,7 @@ export class Game {
     this.maybeSpawnMonster();
     this.guns = new Guns(this.scene, building, this.nav, this.senses, assets.props.models.get('service_pistol') ?? null, streamRng(building.seed, 'guns'));
     this.guns.init(this.player);
+    this.blood = new Blood(this.scene);
     this.offs.push(
       bus.on('settings:changed', ({ key }) => {
         if (key === 'touchControls' || key === '*') this.applyTouchSetting();
@@ -606,10 +610,13 @@ export class Game {
     this.gate.update(dt);
     this.director.update(dt);
     this.guns.update(dt, this.player);
+    this.blood.update(dt);
     if (input.pressed('shoot') && this.guns.held) {
       const hit = this.guns.fire(this.player, this.monsters.filter((x) => x.active).map((x) => x.m));
       if (hit) {
         hit.shot();
+        const lh = this.guns.lastHit;
+        if (lh) this.blood.hit(lh.point, lh.dir, hit.position.y, hit.position);
         // It loses the hunter role; someone else gets a turn later.
         if (hit.id === this.hunterId) this.hunterUntil = this.time + 8;
       }
