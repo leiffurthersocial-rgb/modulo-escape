@@ -24,8 +24,10 @@ interface Pickup {
 }
 
 /** Most guns lying around at once, and how long until a used one is replaced. */
-const MAX_PICKUPS = 2;
-const RESPAWN = [35, 70] as const;
+const MAX_PICKUPS = 3;
+const RESPAWN = [25, 50] as const;
+/** Gone this long without finding one, and none nearby on your floor: one turns up near you. */
+const PITY_AFTER = 75;
 
 export class Guns {
   readonly group = new THREE.Group();
@@ -39,6 +41,8 @@ export class Guns {
   private recoil = 0;
   private bob = 0;
   private respawnAt: number[] = [];
+  /** Seconds since you last found (or held) a gun. */
+  private sinceFound = 0;
   private time = 0;
   private template: THREE.Group;
 
@@ -85,17 +89,18 @@ export class Guns {
     this.view.position.set(0.17, -0.17, -0.36);
     this.view.rotation.set(0, Math.PI / 2, 0);
     // One near-ish your start (not on top of you), one anywhere.
-    this.spawn(player, 10, 35);
+    this.spawn(player, 8, 25, player.floor);
+    this.spawn(player, 15, 45);
     this.spawn(player, 25, 999);
   }
 
   /** Place a gun on the floor somewhere between `min` and `max` metres (walking) from you, out of sight. */
-  private spawn(player: Player, min: number, max: number): boolean {
+  private spawn(player: Player, min: number, max: number, onFloor?: number): boolean {
     const p = player.feet;
     const here = this.nav.nodeAt(p.x, p.y, p.z);
     const pos = new THREE.Vector3();
-    for (let tries = 0; tries < 60; tries++) {
-      const floor = Math.floor(this.rng.next() * this.building.floors.length);
+    for (let tries = 0; tries < 150; tries++) {
+      const floor = onFloor ?? Math.floor(this.rng.next() * this.building.floors.length);
       const n = this.nav.randomNode(this.rng, floor);
       if (n < 0) continue;
       const l = this.building.floors[floor]!;
@@ -105,7 +110,8 @@ export class Guns {
       const d = pos.distanceTo(p);
       if (here >= 0 && (d < min || d > max)) continue;
       if (this.pickups.some((g) => g.pos.distanceTo(pos) < 20)) continue;
-      if (floor === player.floor && this.senses.lineOfSight(pos.clone().setY(pos.y + 0.3), player.camera.position)) continue;
+      // Not where you'd see it appear (walls only have collision near you, so only check close by).
+      if (floor === player.floor && d < 14 && this.senses.lineOfSight(pos.clone().setY(pos.y + 0.3), player.camera.position, player.collider)) continue;
       // Off-centre in the cell, on the floor, lying on its side at a random angle.
       pos.x += (this.rng.next() - 0.5) * 1.6;
       pos.z += (this.rng.next() - 0.5) * 1.6;
@@ -164,9 +170,22 @@ export class Guns {
         this.held = true;
         this.view.visible = true;
         bus.emit('gun:pickup', {});
+        this.sinceFound = 0;
         bus.emit('gun:held', { held: true });
         break;
       }
+    }
+    // Not found one for a while and none lying near you on your floor: one turns up nearby.
+    this.sinceFound = this.held ? 0 : this.sinceFound + dt;
+    if (this.sinceFound > PITY_AFTER && !this.pickups.some((g) => g.floor === player.floor && g.pos.distanceTo(player.feet) < 30)) {
+      this.sinceFound = 40; // try again in ~35 s if this one isn't found either
+      if (this.pickups.length >= MAX_PICKUPS) {
+        // Make room: the one furthest from you goes.
+        const far = [...this.pickups].sort((a, b) => b.pos.distanceTo(player.feet) - a.pos.distanceTo(player.feet))[0]!;
+        this.group.remove(far.object);
+        this.pickups.splice(this.pickups.indexOf(far), 1);
+      }
+      this.spawn(player, 10, 25, player.floor);
     }
     // Replacements for spent guns.
     this.respawnAt = this.respawnAt.filter((t) => {

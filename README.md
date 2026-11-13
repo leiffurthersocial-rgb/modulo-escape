@@ -61,9 +61,11 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
   see him.
 - **Jovan** (wakes after ~30 s): so tall (≈ 4.8 m, gaunt, black hollow eyes, in a ripped black shirt) that he walks
   stooped with his palms pressed flat against the ceiling, hand over hand. He sees furthest, and he only moves while you're not looking at him: keep him on
-  screen and he freezes; look away (or look back with Q) and he comes, fast and almost silent.
+  screen and he freezes (stare too long and his head slowly turns round to look back at you); look
+  away (or look back with Q) and he comes, fast and almost silent.
   You hear his head dragging along the ceiling, and lights stutter around him.
-- **Gun:** a pistol (Poly Haven, CC0) sometimes lies on the floor. Walk over it to pick it up
+- **Gun:** pistols (Poly Haven, CC0) lie on the floor, three at a time, one on your starting
+  floor (if you haven't found one for a while, one turns up near you). Walk over it to pick it up
   (you carry one at most). It has one bullet: shoot a monster and it's stunned for 7–9 s, then
   slinks off and leaves you alone for a while before it comes back. The bang is loud: the others
   hear it. A hit monster bleeds and is knocked down (Jovan crumples), lies there twitching, then

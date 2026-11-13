@@ -316,6 +316,8 @@ export class Monster implements Entity {
   }
   private pounded = false;
   private unseenT = 0;
+  /** How long you've been looking at Jovan (he stares back after a moment). */
+  private watchedT = 0;
   /** Robin's giggle timer (seconds, counted down per vocal tick). */
   private nextGiggle = 25;
 
@@ -380,6 +382,11 @@ export class Monster implements Entity {
       const d = dir.length();
       this.watched = !player.invisible && sameFloor && d < 30 && dir.normalize().dot(player.forward) > player.viewCos && ctx.senses.lineOfSight(chest, player.eye);
       if (this.robin) this.robin.frozen = this.watched;
+      // Keep staring at him and, after a moment, his head starts turning to look back at you.
+      const before = this.watchedT;
+      this.watchedT = this.watched ? this.watchedT + dt : Math.max(0, this.watchedT - dt * 2);
+      if (before < 0.9 && this.watchedT >= 0.9) bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 3.2, z: this.position.z, floor: this.floor, kind: 'click' });
+      if (this.robin) this.robin.stare = THREE.MathUtils.smoothstep(this.watchedT, 0.9, 3.2);
       this.presenceT -= dt;
       if (this.presenceT < 0) {
         this.presenceT = 0.5;

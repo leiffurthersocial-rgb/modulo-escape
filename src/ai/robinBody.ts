@@ -559,6 +559,13 @@ export class RobinBody {
   private lastTop = 0;
   /** Freeze in place (Jovan while you look at him): no gait, no breathing — only twitches. */
   frozen = false;
+  /**
+   * 0..1: staring back at you (Jovan, while you look at him): the head slowly turns to face you,
+   * twisting much further round than a neck should, and tilts. Set by the AI.
+   */
+  stare = 0;
+  private stareRoll = 0;
+  private stareTwist = 0;
   /** One-off performances the AI asks for (Leo: roar = rear up and pound the chest; stunned). */
   act: 'none' | 'roar' | 'stunned' | 'downed' = 'none';
   /** How long a 'downed' (shot) lasts, so it can get up in time. */
@@ -783,7 +790,15 @@ export class RobinBody {
     const rock = st.gait === 'knuckle' ? this.gaitAmp * p.run * 0.16 * Math.sin(this.phase * Math.PI * 2 + 0.8) : 0;
     const arch = act === 'roar' ? this.actW * 0.3 : 0;
     B('chest').quaternion.setFromEuler(new THREE.Euler(hunch * 0.45 - breath - scream * 0.25 + rock - arch, counter * 0.4, Math.sin(this.t * 0.37) * 0.04 - dizzy * 0.1 * Math.sin(this.actT * 2.3)));
-    B('neck1').quaternion.setFromEuler(new THREE.Euler(p.hunch * 0.25, 0, 0));
+    // Staring back: the neck itself corkscrews round towards you (the head does the rest).
+    let neckYaw = 0;
+    if (look && this.stare > 0.001) {
+      this.object.updateMatrixWorld(true);
+      const lp = this.object.worldToLocal(_v3.copy(look));
+      neckYaw = Math.atan2(lp.x, lp.z) * this.stareTwist;
+    }
+    this.stareTwist = expTo(this.stareTwist, this.stare, realDt, 0.9);
+    B('neck1').quaternion.setFromEuler(new THREE.Euler(p.hunch * 0.25, neckYaw * 0.3, 0, 'YXZ'));
 
     // ── arms ──
     const spineFwd = hunch + p.lean * 0.35 - scream * 0.25;
@@ -894,7 +909,7 @@ export class RobinBody {
     const shake = (scream > 0 ? scream : 0) * (sc >= 0 ? 1.8 : 1);
     const head = B('head');
     const neck2 = B('neck2');
-    neck2.quaternion.setFromEuler(new THREE.Euler(-p.hunch * 0.3 - scream * (sc >= 0 ? -0.15 : 0.6), 0, 0));
+    neck2.quaternion.setFromEuler(new THREE.Euler(-p.hunch * 0.3 - scream * (sc >= 0 ? -0.15 : 0.6), neckYaw * 0.35, 0, 'YXZ'));
     neck2.updateMatrixWorld(true);
     const fkWorld = neck2.getWorldQuaternion(new THREE.Quaternion());
     let want: THREE.Quaternion;
@@ -902,17 +917,21 @@ export class RobinBody {
       const hp = head.getWorldPosition(_v2);
       _m.lookAt(look, hp, Y);
       want = new THREE.Quaternion().setFromRotationMatrix(_m);
-      // Clamp: no more than ~75° from the neck's forward.
+      // Clamp: no more than ~75° from the neck's forward — unless he's staring back at you
+      // (Jovan, watched): then the head twists round much further than a neck should.
+      const lim = 1.3 + this.stare * 1.55;
       const ang = fkWorld.angleTo(want);
-      if (ang > 1.3) want = fkWorld.clone().slerp(want, 1.3 / ang);
+      if (ang > lim) want = fkWorld.clone().slerp(want, lim / ang);
     } else want = fkWorld.clone();
     if (!this.hasLook) {
       this.headLook.copy(want);
       this.hasLook = true;
     }
-    this.headLook.slerp(want, 1 - Math.exp(-realDt * (sc >= 0 ? 14 : this.frozen ? 0.8 : mode === 'idle' ? 2.5 : 5)));
+    // Watched and staring back: a slow, steady turn towards you (~3 s), not a glance.
+    this.headLook.slerp(want, 1 - Math.exp(-realDt * (sc >= 0 ? 14 : this.stare > 0.01 ? 1.1 : this.frozen ? 0.8 : mode === 'idle' ? 2.5 : 5)));
+    this.stareRoll = expTo(this.stareRoll, this.stare * 0.55, realDt, 1.2);
     const extra = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(tw.pitch.x * 0.1 - scream * (sc >= 0 ? -0.12 : 0.55) + Math.sin(this.t * 41) * 0.06 * shake, tw.yaw.x * 0.1 + Math.sin(this.t * 37) * 0.08 * shake, tilt + tw.roll.x * 0.1 + Math.sin(this.t * 29) * 0.1 * shake),
+      new THREE.Euler(tw.pitch.x * 0.1 - scream * (sc >= 0 ? -0.12 : 0.55) + Math.sin(this.t * 41) * 0.06 * shake, tw.yaw.x * 0.1 + Math.sin(this.t * 37) * 0.08 * shake, tilt + this.stareRoll + tw.roll.x * 0.1 + Math.sin(this.t * 29) * 0.1 * shake),
     );
     head.quaternion.copy(fkWorld.invert()).multiply(this.headLook).multiply(extra);
     head.updateMatrixWorld(true);
