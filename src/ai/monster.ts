@@ -287,7 +287,27 @@ export class Monster implements Entity {
     this.cowedUntil = this.time + 15; // slinks off, ignoring you
     this.setState('patrol');
     this.nextDrift = this.time + 30;
-    this.path = ctx.nav.path(me, this.farNode(ctx, 8)).slice(1);
+    this.path = this.pathAway(ctx, me);
+  }
+
+  /** A route to somewhere far that doesn't pass close by you (falls back to the least-bad one). */
+  private pathAway(ctx: EntityContext, me: number): number[] {
+    const you = ctx.player.position;
+    const q = new THREE.Vector3();
+    let best: number[] = [];
+    let bestClear = -1;
+    for (let i = 0; i < 14; i++) {
+      const path = ctx.nav.path(me, this.farNode(ctx, 6)).slice(1);
+      if (!path.length) continue;
+      let clear = Infinity;
+      for (const n of path.slice(0, 12)) clear = Math.min(clear, ctx.nav.nodePos(n, q).distanceTo(you));
+      if (clear > 5) return path;
+      if (clear > bestClear) {
+        bestClear = clear;
+        best = path;
+      }
+    }
+    return best;
   }
   private pounded = false;
   private unseenT = 0;
@@ -471,7 +491,7 @@ export class Monster implements Entity {
           if (near.length) this.path = ctx.nav.path(me, this.rng.pick(near)).slice(1);
         } else this.path = ctx.nav.path(me, this.farNode(ctx, 6)).slice(1);
       }
-      if (!this.path.length) this.path = ctx.nav.path(me, ctx.nav.randomNode(this.rng, this.floor)).slice(1);
+      if (!this.path.length) this.path = this.time < this.cowedUntil ? this.pathAway(ctx, me) : ctx.nav.path(me, ctx.nav.randomNode(this.rng, this.floor)).slice(1);
     }
 
     // ── body + sound ──

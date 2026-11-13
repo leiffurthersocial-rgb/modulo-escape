@@ -78,8 +78,9 @@ export class Player {
     this.prevFeet.copy(this.feet);
 
     this.flashlight = new THREE.SpotLight(0xfff4e0, 0, 28, 0.48, 0.55, 1.6);
-    this.flashlight.position.set(0.18, -0.12, 0);
-    this.flashlight.target.position.set(0.05, -0.1, -1);
+    // Held in the left hand (the right one is for a gun, if you find one).
+    this.flashlight.position.set(-0.2, -0.13, 0.02);
+    this.flashlight.target.position.set(-0.04, -0.1, -1);
     this.camera.add(this.flashlight, this.flashlight.target);
   }
 

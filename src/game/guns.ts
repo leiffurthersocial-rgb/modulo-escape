@@ -52,12 +52,32 @@ export class Guns {
   ) {
     this.template = model ? fromModel(model) : fallbackPistol();
     scene.add(this.group);
+    // In your hand it sits right in your own flashlight's beam: a darker copy of its materials
+    // keeps it from blowing out to white.
     this.view = this.template.clone();
+    this.view.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const mat = (m.material as THREE.MeshStandardMaterial).clone();
+      mat.color?.multiplyScalar(0.3);
+      m.material = mat;
+      m.castShadow = false;
+    });
     this.view.visible = false;
+    // Muzzle: a flash of light and a bright additive burst at the barrel.
     this.flash = new THREE.PointLight(0xffc070, 0, 9, 2);
-    this.flash.position.set(0, 0.04, -0.32);
+    this.flash.position.set(0.16, 0.09, 0);
     this.view.add(this.flash);
+    this.muzzle = new THREE.Sprite(new THREE.SpriteMaterial({ map: burstTexture(), color: 0xffd8a0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    this.muzzle.position.set(0.17, 0.09, 0);
+    this.muzzle.scale.setScalar(0.16);
+    this.muzzle.visible = false;
+    this.view.add(this.muzzle);
+    // A faint glint on guns lying around, so you can spot one in the dark.
+    this.glintMat = new THREE.SpriteMaterial({ map: burstTexture(), color: 0xfff0d8, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 });
   }
+  private muzzle: THREE.Sprite;
+  private glintMat: THREE.SpriteMaterial;
 
   /** Put the first-person gun on the camera, and the first pickups in the building. */
   init(player: Player) {
@@ -89,9 +109,15 @@ export class Guns {
       // Off-centre in the cell, on the floor, lying on its side at a random angle.
       pos.x += (this.rng.next() - 0.5) * 1.6;
       pos.z += (this.rng.next() - 0.5) * 1.6;
-      const o = this.template.clone();
-      o.position.set(pos.x, pos.y + 0.025, pos.z);
-      o.rotation.set(Math.PI / 2, 0, this.rng.next() * Math.PI * 2);
+      const o = new THREE.Group();
+      const gun = this.template.clone();
+      gun.scale.multiplyScalar(1.2);
+      gun.rotation.set(Math.PI / 2, 0, this.rng.next() * Math.PI * 2);
+      const glint = new THREE.Sprite(this.glintMat);
+      glint.scale.setScalar(0.1);
+      glint.position.set(0.04, 0.09, 0.02);
+      o.add(gun, glint);
+      o.position.set(pos.x, pos.y + 0.03, pos.z);
       this.group.add(o);
       this.pickups.push({ object: o, pos: pos.clone(), floor });
       return true;
@@ -124,6 +150,12 @@ export class Guns {
     this.recoil = Math.max(0, this.recoil - dt * 4);
     this.flashT = Math.max(0, this.flashT - dt);
     this.flash.intensity = this.flashT > 0 ? 60 * (this.flashT / 0.07) : 0;
+    this.muzzle.visible = this.flashT > 0;
+    this.muzzle.material.rotation = this.time * 37;
+    this.muzzle.scale.setScalar(0.12 + 0.1 * (this.flashT / 0.07));
+    // The glint: a short twinkle every few seconds.
+    const tw = (this.time % 3.2) / 3.2;
+    this.glintMat.opacity = tw > 0.9 ? Math.sin(((tw - 0.9) / 0.1) * Math.PI) * 0.7 : 0;
     this.view.position.set(0.17 + Math.sin(this.bob) * 0.006, -0.17 + Math.abs(Math.cos(this.bob)) * 0.006 + this.recoil * 0.03, -0.36 + this.recoil * 0.07);
     this.view.rotation.set(this.recoil * 0.5, Math.PI / 2, 0);
     if (!this.held && this.flashT <= 0 && this.recoil <= 0) this.view.visible = false;
@@ -135,6 +167,11 @@ export class Guns {
     this.held = false;
     this.recoil = 1;
     this.flashT = 0.07;
+    // Show the flash on this very frame (update() already ran).
+    this.muzzle.visible = true;
+    this.muzzle.scale.setScalar(0.22);
+    this.flash.intensity = 60;
+    this.view.rotation.set(0.5, Math.PI / 2, 0);
     bus.emit('gun:held', { held: false });
     const eye = player.camera.position;
     const fwd = player.camera.getWorldDirection(new THREE.Vector3());
@@ -193,6 +230,29 @@ function fromModel(m: PropModel): THREE.Group {
   const c = box.getCenter(new THREE.Vector3());
   g.children.forEach((ch) => ch.position.set(-c.x, -box.min.y, -c.z));
   return g;
+}
+
+/** A soft star-shaped burst (muzzle flash, glint). */
+let burst: THREE.Texture | null = null;
+function burstTexture(): THREE.Texture {
+  if (burst) return burst;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, 'rgba(255,255,255,1)');
+  r.addColorStop(0.25, 'rgba(255,230,180,0.6)');
+  r.addColorStop(1, 'rgba(255,200,120,0)');
+  g.fillStyle = r;
+  g.fillRect(0, 0, 64, 64);
+  // Four thin rays.
+  g.globalCompositeOperation = 'lighter';
+  g.fillStyle = 'rgba(255,240,210,0.22)';
+  g.fillRect(31, 6, 2, 52);
+  g.fillRect(6, 31, 52, 2);
+  burst = new THREE.CanvasTexture(c);
+  burst.colorSpace = THREE.SRGBColorSpace;
+  return burst;
 }
 
 /** If the model didn't load: a simple dark pistol from boxes. */
