@@ -22,6 +22,8 @@ export interface PlayerView {
   invisible: boolean;
   /** Walking or running (not standing still). */
   moving: boolean;
+  /** Crouched behind a classroom table: unseen unless a monster is right there or already on you. */
+  hidden: boolean;
 }
 
 export interface EntityContext {

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-12T08:24:06.117Z",
+  "generated": "2026-11-13T07:10:39.906Z",
   "textures": {
     "concrete_wall_008": {
       "category": "concrete_wall",
@@ -874,6 +874,13 @@
       "url": "/assets/models/quaternius_zombie.deefb34a.glb",
       "bytes": 413400,
       "triangles": 7822
+    },
+    "service_pistol": {
+      "category": "prop:gun",
+      "source": "polyhaven",
+      "url": "/assets/models/service_pistol.dc28a64e.glb",
+      "bytes": 575208,
+      "triangles": 7556
     }
   },
   "hdris": {

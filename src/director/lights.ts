@@ -72,7 +72,17 @@ export class LightRegistry {
       this.byNode.set(st.node, list);
     });
     const geo = new THREE.BoxGeometry(1.3, 0.07, 0.22);
-    this.fixtureMat = new THREE.MeshStandardMaterial({ color: 0x6c6c66, emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.6 });
+    // Dark housing (its own light right under it would otherwise blow it out to white), the glow
+    // carries the colour.
+    this.fixtureMat = new THREE.MeshStandardMaterial({ color: 0x141414, emissive: 0xffffff, emissiveIntensity: 1.5, roughness: 0.6 });
+    // The glow follows the per-tube colour too (dimming, flicker, red), not just the diffuse.
+    this.fixtureMat.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n#if defined( USE_COLOR ) || defined( USE_INSTANCING_COLOR )\n totalEmissiveRadiance *= vColor.rgb;\n#endif',
+      );
+    };
+    this.fixtureMat.customProgramCacheKey = () => 'tube-glow-2';
     this.fixtures = new THREE.InstancedMesh(geo, this.fixtureMat, Math.max(1, this.states.length));
     const m = new THREE.Matrix4();
     this.states.forEach((s, i) => {
@@ -156,14 +166,15 @@ export class LightRegistry {
       const i = this.assigned[k]!;
       this.fade[k] = Math.min(1, this.fade[k]! + dt * 3.5);
       const s = i >= 0 ? this.states[i]! : null;
-      light.intensity = s ? BASE_INTENSITY * s.level * this.fade[k]! * (1 + 0.4 * s.red) : 0;
+      light.intensity = s ? BASE_INTENSITY * s.level * this.fade[k]! : 0;
       light.color.setHex(COLOR);
       if (s && s.red > 0) light.color.lerp(RED, s.red);
     });
     this.states.forEach((s, i) => {
       if (s.dead) return;
       const v = 0.08 + 0.92 * s.level;
-      this.fixtures.setColorAt(i, this.color.setRGB(v, v * (1 - 0.9 * s.red), v * (1 - 0.9 * s.red)));
+      // Red: a deep red, dimmer than white (bright red tone-maps back to white).
+      this.fixtures.setColorAt(i, this.color.setRGB(v * (1 - 0.5 * s.red), v * (1 - 0.98 * s.red), v * (1 - 0.98 * s.red)));
     });
     if (this.fixtures.instanceColor) this.fixtures.instanceColor.needsUpdate = true;
   }

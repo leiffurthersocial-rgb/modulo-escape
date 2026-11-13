@@ -808,6 +808,16 @@ export class UI {
     this.staminaFill = h('div', { class: 'stamina-fill' });
     this.staminaEl = h('div', { class: 'stamina', title: 'Stamina' }, this.staminaFill);
     this.hintEl = h('div', { class: 'hint' }, '');
+    const hiddenEl = h('div', { class: 'hidden-tag', hidden: true }, 'HIDDEN');
+    const gunEl = h('div', { class: 'gun-tag', hidden: true }, 'PISTOL · 1 SHOT');
+    let toldGun = false;
+    bus.on('gun:held', ({ held }) => (gunEl.hidden = !held));
+    bus.on('gun:pickup', () => {
+      if (toldGun) return;
+      toldGun = true;
+      this.toast(game.touch.enabled ? 'A pistol — one bullet. SHOOT stuns a monster for a while.' : 'A pistol — one bullet. Click (or G) stuns a monster for a while.', 3500);
+    });
+    bus.on('player:hidden', ({ hidden }) => (hiddenEl.hidden = !hidden));
     const pauseBtn = h('button', { class: 'hudbtn', onclick: () => game.setState('paused'), title: 'Pause' }, '❚❚');
     this.hud = h(
       'div',
@@ -816,6 +826,8 @@ export class UI {
       h('div', { class: 'topbar' }, pauseBtn),
       this.staminaEl,
       this.hintEl,
+      hiddenEl,
+      gunEl,
     );
     this.root.insertBefore(this.hud, this.el);
     let shown = 1;

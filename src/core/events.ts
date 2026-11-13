@@ -14,10 +14,16 @@ export interface GameEvents {
   'player:caught': { by: string };
   /** Monster foot plant (audible, positional). loud 0..1. */
   'monster:step': { x: number; y: number; z: number; floor: number; loud: number; species?: string };
-  'monster:vocal': { x: number; y: number; z: number; floor: number; kind: 'breath' | 'click' | 'screech' | 'scream' | 'roar' | 'growl' | 'scrape' | 'thud' };
+  'monster:vocal': { x: number; y: number; z: number; floor: number; kind: 'breath' | 'click' | 'screech' | 'scream' | 'roar' | 'growl' | 'scrape' | 'thud' | 'giggle' | 'knock' };
   /** A monster is around (twice a second): the director flickers lights near Jovan. */
   'monster:presence': { x: number; y: number; z: number; floor: number; species: string };
   /** Leo slams the floor: lights around stutter, the floor shakes. */
+  /** Guns: picked one up / holding one or not / fired (who was hit, if anyone). */
+  'gun:pickup': Record<string, never>;
+  'gun:held': { held: boolean };
+  'gun:fired': { x: number; y: number; z: number; hit: string | null };
+  /** You're hidden behind a table (or not any more). */
+  'player:hidden': { hidden: boolean };
   'monster:pound': { x: number; y: number; z: number; floor: number };
   /** Jump scare begins (input frozen, camera on the monster) / ends (→ caught screen). */
   'scare:start': { by: string; /** Seconds until the hit (scream / flash). */ hitAt: number; /** 3D Robin choreography (no 2D face). */ robin: boolean; /** Robin: darkness starts (breath at your ear). */ darkAt: number; /** Robin: the last face in the black (0 = none). */ booAt: number };

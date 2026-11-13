@@ -3,6 +3,7 @@
  * and buttons for sprint (hold), crouch (toggle) and flashlight.
  * Safe-area aware. Uses Pointer Events so it also works with Apple Pencil.
  */
+import { bus } from '../core/events.ts';
 import type { Input } from './input.ts';
 import type { Action } from '../game/settings.ts';
 
@@ -40,8 +41,12 @@ export class TouchControls {
         <button data-act="crouch" class="tbtn">DUCK</button>
         <button data-act="flashlight" class="tbtn">LIGHT</button>
         <button data-act="lookBack" class="tbtn">BACK</button>
+        <button data-act="shoot" class="tbtn tbtn-shoot" hidden>SHOOT</button>
       </div>`;
     parent.appendChild(this.el);
+    // The SHOOT button only while you carry a gun.
+    const shootBtn = this.el.querySelector<HTMLButtonElement>('.tbtn-shoot')!;
+    bus.on('gun:held', ({ held }) => (shootBtn.hidden = !held));
     this.stickBase = this.el.querySelector('.stick-base')!;
     this.stickKnob = this.el.querySelector('.stick-knob')!;
     const move = this.el.querySelector<HTMLElement>('.touch-move')!;

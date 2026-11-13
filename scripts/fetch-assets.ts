@@ -31,6 +31,8 @@ export interface SourceEntry {
   /** Models: max texture size, and meshoptimizer simplify ratio (0..1). */
   textureSize?: number;
   simplify?: number;
+  /** Models: keep only the nodes whose name contains one of these (files that bundle several objects). */
+  keep?: string[];
   /** source 'url': direct download plus the licence facts we verified by hand. */
   url?: string;
   name?: string;

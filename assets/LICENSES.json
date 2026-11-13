@@ -480,6 +480,18 @@
     "attributionRequired": false
   },
   {
+    "id": "service_pistol",
+    "source": "polyhaven",
+    "kind": "model",
+    "category": "prop:gun",
+    "name": "Service Pistol",
+    "sourceUrl": "https://polyhaven.com/a/service_pistol",
+    "author": "Mateusz Sadek",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attributionRequired": false
+  },
+  {
     "id": "shrub_sorrel_01",
     "source": "polyhaven",
     "kind": "model",

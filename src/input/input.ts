@@ -151,6 +151,8 @@ export class Input {
   };
 
   private onMouseDown = (e: MouseEvent) => {
+    // Left click shoots while the mouse is captured.
+    if (this.enabled && this.lookMode === 'locked' && e.button === 0) this.press('shoot');
     if (this.lookMode === 'drag') {
       this.dragging = true;
       this.lastX = e.clientX;

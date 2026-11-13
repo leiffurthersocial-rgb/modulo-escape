@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { bus } from '../core/events.ts';
-import { randomSeed } from '../core/rng.ts';
+import { randomSeed, streamRng } from '../core/rng.ts';
 import { isLevelSize } from '../gen/config.ts';
 import { cellCenter, cellIndex, SIDE_YAW } from '../gen/grid.ts';
 import { kitPieces } from '../gen/kit.ts';
@@ -30,6 +30,7 @@ import { ExitGate } from '../world/exitGate.ts';
 import { buildStairsGeometry } from '../world/stairs.ts';
 import { loadMaterialPicks, resolvedQuality, saveSettings, settings } from './settings.ts';
 import { Autopilot } from './autopilot.ts';
+import { Guns } from './guns.ts';
 import { JumpScare } from './jumpscare.ts';
 import { lowerPreset, PRESETS, type Quality } from '../render/quality.ts';
 import { AmbienceDirector } from '../director/director.ts';
@@ -69,6 +70,8 @@ export class Game {
   readonly perf = new PerfMonitor();
   readonly nav: NavQuery;
   readonly senses: Senses;
+  /** Pistols on the floor, and the one you carry. */
+  readonly guns: Guns;
   readonly entities: EntityManager;
   dust: Dust | null = null;
   private gateMat: THREE.MeshStandardMaterial;
@@ -206,6 +209,8 @@ export class Game {
     this.touch = new TouchControls(root, this.input, () => this.setState('paused'));
     this.applyTouchSetting();
     this.maybeSpawnMonster();
+    this.guns = new Guns(this.scene, building, this.nav, this.senses, assets.props.models.get('service_pistol') ?? null, streamRng(building.seed, 'guns'));
+    this.guns.init(this.player);
     this.offs.push(
       bus.on('settings:changed', ({ key }) => {
         if (key === 'touchControls' || key === '*') this.applyTouchSetting();
@@ -281,11 +286,24 @@ export class Game {
    * in a row when there's a choice), so encounters vary instead of everyone converging at once.
    */
   private hunterId = '';
+  /** Crouched next to a classroom table / teacher's desk. */
+  private hidden = false;
+  private desks: { floor: number; x: number; z: number; r: number }[] | null = null;
+  private updateHidden() {
+    this.desks ??= this.building.floors.flatMap((l) => l.props.filter((pr) => pr.type === 'classroom_desk' || pr.type === 'desk').map((pr) => ({ floor: l.floor, x: pr.x, z: pr.z, r: pr.r })));
+    const p = this.player;
+    const now = p.crouching && this.desks.some((d) => d.floor === p.floor && Math.hypot(d.x - p.feet.x, d.z - p.feet.z) < d.r + 0.75);
+    if (now !== this.hidden) {
+      this.hidden = now;
+      bus.emit('player:hidden', { hidden: now });
+    }
+  }
   private hunterUntil = 0;
   private hunterRng = Math.random;
   /** When you last actually saw each monster (on screen, in line of sight, within 30 m). */
   private lastShown = new Map<string, number>();
   private shownCheck = 0;
+  private silenceCooldown = 20;
   private pickHunter() {
     const awake = this.monsters.filter((x) => x.active && x.m.state !== 'dormant');
     if (!awake.length) return;
@@ -576,6 +594,15 @@ export class Game {
     this.checkExit();
     this.gate.update(dt);
     this.director.update(dt);
+    this.guns.update(dt, this.player);
+    if (input.pressed('shoot') && this.guns.held) {
+      const hit = this.guns.fire(this.player, this.monsters.filter((x) => x.active).map((x) => x.m));
+      if (hit) {
+        hit.shot();
+        // It loses the hunter role; someone else gets a turn later.
+        if (hit.id === this.hunterId) this.hunterUntil = this.time + 8;
+      }
+    }
     this.senses.update(dt);
     this.shownCheck -= dt;
     if (this.shownCheck < 0) {
@@ -587,7 +614,13 @@ export class Game {
         const at = x.m.position.clone().setY(x.m.position.y + 1.6);
         const to = at.clone().sub(eye);
         const d = to.length();
-        if (d < 30 && to.divideScalar(d).dot(fwd) > 0.6 && this.senses.lineOfSight(eye, at)) this.lastShown.set(x.m.id, this.time);
+        const inView = d < 30 && to.divideScalar(d).dot(fwd) > 0.6 && this.senses.lineOfSight(eye, at);
+        if (inView) this.lastShown.set(x.m.id, this.time);
+        // About to come round the corner at you: the building goes quiet first.
+        else if (d < 11 && this.time > this.silenceCooldown && x.m.state !== 'dormant' && x.m.state !== 'watch' && !this.senses.lineOfSight(eye, at)) {
+          this.silenceCooldown = this.time + 45;
+          bus.emit('audio:cue', { name: 'silence' });
+        }
       }
     }
     if (this.time > this.hunterUntil || !this.monsters.some((x) => x.m.id === this.hunterId && x.active && x.m.state !== 'dormant')) this.pickHunter();
@@ -612,6 +645,7 @@ export class Game {
     }
     if (this.monsters.length) this.audio.setTension(tension);
     this.director.threat = { dist: threat, x: tx, z: tz, floor: this.player.floor };
+    this.updateHidden();
     this.director.playerPos.x = this.player.feet.x;
     this.director.playerPos.z = this.player.feet.z;
     if (this.monsters.length && !this.debug.freeze) {
@@ -636,6 +670,7 @@ export class Game {
         flashlightOn: p.flashlightOn,
         invisible: this.debug.invisible,
         moving: p.realSpeed > 0.5,
+        hidden: this.hidden,
         forward: p.camera.getWorldDirection(this.viewDir),
         // Half the narrower view angle, a little inside the screen edge.
         viewCos: Math.cos(THREE.MathUtils.degToRad(p.camera.fov * 0.5) * Math.min(1, p.camera.aspect) * 0.95),
@@ -865,6 +900,8 @@ export async function createGame(
         )
       ).filter((t): t is RobinTemplate => !!t)
     : [];
+  // The pistol you can find on the floor (Poly Haven, CC0).
+  await assets.props.load(['service_pistol']);
   const game = new Game(root, building, hooks, renderer, lib, assets, env, quality, scene, monsterModel, monsterImage, bodies);
   onProgress('Compiling shaders…', 0.88);
   await renderer.compileAsync(game.scene, game.player.camera).catch(() => {});

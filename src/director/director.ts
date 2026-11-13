@@ -88,9 +88,18 @@ export class AmbienceDirector {
       }
       s.level = lv;
     }
-    // A monster really near: now and then a light close to you flickers red.
+    // A monster near (within ~14 m): now and then a light close to you flickers red.
     const th = this.threat;
-    if (th.dist < 11 && this.rng.next() < dt * 0.9 * (1 - th.dist / 11)) {
+    // Now and then a false alarm: a tube near you goes red with nothing there (~every 2–3 min).
+    const falseAlarm = th.dist > 14 && this.rng.next() < dt / 150;
+    if (falseAlarm) {
+      for (const [i, s] of this.lights.states.entries()) {
+        if (s.dead || s.floor !== th.floor || Math.hypot(s.pos.x - this.playerPos.x, s.pos.z - this.playerPos.z) > 9) continue;
+        this.reds.set(i, t + 0.6 + this.rng.next() * 0.9);
+        break;
+      }
+    }
+    if (th.dist < 14 && this.rng.next() < dt * 0.9 * (1 - th.dist / 14)) {
       let best = -1;
       let bd = Infinity;
       for (const [i, s] of this.lights.states.entries()) {

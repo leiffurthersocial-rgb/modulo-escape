@@ -174,13 +174,26 @@ async function findModelFile(e: SourceEntry): Promise<string | null> {
 }
 
 async function processModel(e: SourceEntry, draco: boolean, manifest: Manifest) {
-  const src = await findModelFile(e);
+  let src = await findModelFile(e);
   if (!src) {
     console.warn(`  ✗ ${e.id}: no cached model`);
     return;
   }
   const tmp = join(WORK, `${e.id}.glb`);
   await mkdir(WORK, { recursive: true });
+  if (e.keep?.length) {
+    // The file bundles several objects: keep only the named parts.
+    const { NodeIO } = await import('@gltf-transform/core');
+    const { ALL_EXTENSIONS } = await import('@gltf-transform/extensions');
+    const { prune } = await import('@gltf-transform/functions');
+    const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
+    const doc = await io.read(src);
+    for (const n of doc.getRoot().listNodes()) if (!e.keep.some((k) => n.getName().includes(k))) n.dispose();
+    await doc.transform(prune());
+    const kept = join(WORK, `${e.id}.keep.glb`);
+    await io.write(kept, doc);
+    src = kept;
+  }
   const gt = join(ROOT, 'node_modules', '.bin', 'gltf-transform');
   // 1) geometry: dedup/prune/weld (+simplify), meshopt or Draco; textures resized, left uncompressed.
   const mid = join(WORK, `${e.id}.mid.glb`);

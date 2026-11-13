@@ -261,8 +261,38 @@ export class Monster implements Entity {
 
   /** Leo heard your footsteps after a slam: he goes there fast. */
   private rush = false;
+  /** How long the current stun lasts (wall: 2.4 s; shot: 7–9 s), and whether it was a bullet. */
+  private stunFor = 2.4;
+  private shotDown = false;
+  /** After being shot: until then it slinks away and ignores you. */
+  private cowedUntil = 0;
+
+  /**
+   * Shot: it reels, screams and is stunned for several seconds; then it slinks off somewhere
+   * else and leaves you alone for a while before it comes back.
+   */
+  shot() {
+    if (this.state === 'dormant' || this.state === 'attack') return;
+    this.setState('stunned');
+    this.stunFor = 7 + this.rng.next() * 2;
+    this.shotDown = true;
+    if (this.robin) this.robin.frozen = false;
+    bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind: this.species === 'leo' ? 'roar' : 'screech' });
+  }
+
+  /** After being shot: away from you, out of mind for a while. */
+  private recover(ctx: EntityContext, me: number) {
+    this.shotDown = false;
+    this.lastEncounter = this.time + 25; // no stalking for a good while
+    this.cowedUntil = this.time + 15; // slinks off, ignoring you
+    this.setState('patrol');
+    this.nextDrift = this.time + 30;
+    this.path = ctx.nav.path(me, this.farNode(ctx, 8)).slice(1);
+  }
   private pounded = false;
   private unseenT = 0;
+  /** Robin's giggle timer (seconds, counted down per vocal tick). */
+  private nextGiggle = 25;
 
   private setState(s: MonsterState) {
     const at = { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor };
@@ -278,6 +308,7 @@ export class Monster implements Entity {
     this.path = [];
     this.rush = false;
     this.pounded = false;
+    if (s !== 'stunned') this.stunFor = 2.4;
     if (this.robin) this.robin.act = s === 'roar' ? 'roar' : s === 'stunned' ? 'stunned' : 'none';
   }
 
@@ -297,6 +328,13 @@ export class Monster implements Entity {
     const eye = this.tmp.copy(this.position).setY(this.position.y + 2.1);
     const player = ctx.player;
 
+    // ── shot: reeling (Leo has his own stagger in leoBusy) ──
+    if (this.state === 'stunned' && this.species !== 'leo') {
+      this.setPose('idle');
+      if (this.robin) this.robin.speed = 0;
+      if (this.stateTime > this.stunFor) this.recover(ctx, me);
+      return;
+    }
     // ── perception ──
     const toPlayer = player.eye.clone().sub(eye);
     const dist = toPlayer.length();
@@ -304,7 +342,9 @@ export class Monster implements Entity {
     const sameFloor = player.floor === this.floor;
     const inCone = toPlayer.clone().setY(0).normalize().dot(this.heading) > Math.cos(this.tuning.fov) || dist < 3;
     const range = this.tuning.sightRange * (player.flashlightOn ? 1.4 : 1) * (player.crouching ? 0.65 : 1);
-    const sees = !player.invisible && sameFloor && dist < range && inCone && ctx.senses.lineOfSight(eye, player.eye);
+    // Crouched behind a table you're out of sight — unless it's right there, or already after you.
+    const hiddenFromMe = player.hidden && dist > 2.5 && this.state !== 'chase' && this.state !== 'charge';
+    const sees = !player.invisible && !hiddenFromMe && sameFloor && dist < range && inCone && ctx.senses.lineOfSight(eye, player.eye);
     const leo = this.species === 'leo';
     const jovan = this.species === 'jovan';
     const busy = this.state === 'roar' || this.state === 'charge' || this.state === 'stunned' || this.state === 'stare' || this.state === 'pound';
@@ -322,7 +362,9 @@ export class Monster implements Entity {
       }
     }
     this.unseenT = sees ? 0 : this.unseenT + dt;
-    if (sees) {
+    if (sees && this.time < this.cowedUntil) {
+      // Still smarting from the bullet: keeps its distance.
+    } else if (sees) {
       this.lastSeen = this.time;
       this.lastEncounter = this.time;
       this.lastKnown.copy(player.position);
@@ -338,7 +380,7 @@ export class Monster implements Entity {
           bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind: 'roar' });
         } else if (!busy) this.setState(flat > 8 && !player.sprinting ? 'stare' : 'roar');
       } else if (this.state !== 'chase') this.setState('chase');
-    } else if (this.state !== 'chase' && !busy && this.state !== 'watch' && this.state !== 'ambush') {
+    } else if (this.time >= this.cowedUntil && this.state !== 'chase' && !busy && this.state !== 'watch' && this.state !== 'ambush') {
       const heard = player.invisible ? null : ctx.senses.hear(this.position, this.floor, 2, this.tuning.ears);
       if (heard && (this.state !== 'investigate' || heard.pos.distanceTo(this.lastKnown) > 2)) {
         this.lastKnown.copy(heard.pos);
@@ -497,7 +539,10 @@ export class Monster implements Entity {
     if (this.state === 'stunned') {
       this.setPose('idle');
       if (this.robin) this.robin.speed = 0;
-      if (this.stateTime > 2.4) this.setState('pound');
+      if (this.stateTime > this.stunFor) {
+        if (this.shotDown) this.recover(ctx, me);
+        else this.setState('pound');
+      }
       return;
     }
     // Charge: steer only a little towards you (≤ 0.55 rad/s); walls stop him cold.
@@ -680,7 +725,9 @@ export class Monster implements Entity {
       // Almost silent: his head dragging along the ceiling while he moves, now and then a click.
       this.nextVocal -= dt;
       if (this.nextVocal > 0) return;
-      this.nextVocal = 1.8 + this.rng.next() * 2.2;
+      // The scrape comes more and more often as he closes in on you.
+      const closeness = sameFloor ? THREE.MathUtils.clamp(1 - flat / 28, 0, 1) : 0;
+      this.nextVocal = THREE.MathUtils.lerp(3.2, 0.9, closeness) + this.rng.next() * THREE.MathUtils.lerp(2.4, 0.6, closeness);
       if (moving) bus.emit('monster:vocal', { ...at, y: this.position.y + 3.4, kind: 'scrape' });
       else if (this.rng.next() < 0.4) bus.emit('monster:vocal', { ...at, kind: 'click' });
       return;
@@ -691,7 +738,9 @@ export class Monster implements Entity {
       if (this.nextVocal > 0) return;
       const close = sameFloor && flat < 14;
       this.nextVocal = close ? 2.2 + this.rng.next() * 2.5 : 3.5 + this.rng.next() * 3;
-      if (close || this.rng.next() < 0.5) bus.emit('monster:vocal', { ...at, kind: close ? 'growl' : 'breath' });
+      // Searching, he knocks on the walls (feeling for you, or calling you out).
+      if (this.state === 'search' && this.rng.next() < 0.5) bus.emit('monster:vocal', { ...at, kind: 'knock' });
+      else if (close || this.rng.next() < 0.5) bus.emit('monster:vocal', { ...at, kind: close ? 'growl' : 'breath' });
       return;
     }
     const near = sameFloor && flat < 12;
@@ -708,6 +757,13 @@ export class Monster implements Entity {
     }
     const hunting = this.state === 'chase' || this.state === 'investigate';
     this.nextVocal = (hunting ? 1.6 : 3.2) + this.rng.next() * 3;
+    // Far away (another floor, or the other end of the building): now and then a giggle.
+    this.nextGiggle -= 4;
+    if ((!sameFloor || flat > 22) && this.nextGiggle < 0) {
+      this.nextGiggle = 45 + this.rng.next() * 50;
+      bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2.6, z: this.position.z, floor: this.floor, kind: 'giggle' });
+      return;
+    }
     if (!sameFloor && flat > 12) return;
     const kind = this.rng.next() < 0.35 ? 'click' : 'breath';
     bus.emit('monster:vocal', { x: this.position.x, y: this.position.y + 2, z: this.position.z, floor: this.floor, kind });

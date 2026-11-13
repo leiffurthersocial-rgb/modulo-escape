@@ -24,9 +24,9 @@ Then open the URL it prints.
 - `?monster=off|on|billboard|model`: no monster / force it on / the old floating-image Robin / the zombie test model
 
 **Controls:** WASD to move · Shift to sprint (stamina bar) · C/Z to crouch · F for the flashlight ·
-hold Q to look back (keep running forward) ·
+hold Q to look back (keep running forward) · left click or G to shoot (when you have a gun) ·
 Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, materials). Touch controls
-(joystick, Run, Duck, Light, Back) are on by default; turn them off in Settings.
+(joystick, Run, Duck, Light, Back, and Shoot while you carry a gun) are on by default; turn them off in Settings.
 
 ## The game
 
@@ -63,15 +63,27 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
   stooped with his palms pressed flat against the ceiling, hand over hand. He sees furthest, and he only moves while you're not looking at him: keep him on
   screen and he freezes; look away (or look back with Q) and he comes, fast and almost silent.
   You hear his head dragging along the ceiling, and lights stutter around him.
+- **Gun:** a pistol (Poly Haven, CC0) sometimes lies on the floor. Walk over it to pick it up
+  (you carry one at most). It has one bullet: shoot a monster and it's stunned for 7–9 s, then
+  slinks off and leaves you alone for a while before it comes back. The bang is loud: the others
+  hear it. The spent gun vanishes; another turns up somewhere else later.
+- **Hiding:** crouch next to a classroom table or the teacher's desk ("HIDDEN" under the
+  crosshair) and monsters that aren't already after you won't spot you unless they're right next
+  to you.
 - **Taking turns:** only one monster hunts you at a time; the others roam elsewhere, and one
   that spots you while you're already being chased just watches you, then backs off. When a
-  monster is close, lights near you flicker red.
+  monster is within ~14 m, tubes near you flicker red (and now and then one does with nothing
+  there).
 - **Faces:** each monster wears its photo (`robin.png`, `leo.png`, `jovan.png`); Leo's and Jovan's
   are made from the photos in `assets/leo/` and `assets/jovan/` by `python3 scripts/robin/make_faces.py`
   (aligned to robin.png's eye positions and cut out). A `<name>_scream.png` (Leo has one) replaces
   the face during that monster's jump scare. Without a photo a monster is faceless (hollow eyes
   and mouth).
   `?monsters=robin,leo` picks which ones spawn.
+- **Sounds that warn you:** Robin giggling somewhere far off (muffled through the floors), Leo
+  knocking on the walls while he searches, Jovan's ceiling scrape coming faster as he closes in,
+  the building going quiet a moment before something rounds the corner, and very rarely your own
+  footstep answered from behind.
 - **Sound:** procedural HVAC drone that tightens as the monster gets close, your footsteps, and
   positional monster steps and screams. No audio files.
 - **Debug mode:** press pause three times quickly (button, Esc, or tap "Paused") to unlock a

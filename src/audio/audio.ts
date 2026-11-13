@@ -7,7 +7,7 @@
 import { bus } from '../core/events.ts';
 import { settings } from '../game/settings.ts';
 import { HvacAmbience } from './hvac.ts';
-import { ceilingScrape, creatureBreath, creatureClicks, creatureGrowl, creatureRoar, creatureScream, creatureScreech, creatureStep, earBreath, heartbeat, playerStep, screamSting, setListener, shriekSting, sink, wallThud } from './creatureSounds.ts';
+import { ceilingScrape, creatureGiggle, gunshot, wallKnocks, creatureBreath, creatureClicks, creatureGrowl, creatureRoar, creatureScream, creatureScreech, creatureStep, earBreath, heartbeat, playerStep, screamSting, setListener, shriekSting, sink, wallThud } from './creatureSounds.ts';
 import { createReverb, SampleBank } from './samples.ts';
 
 export type AudioBus = 'ambience' | 'sfx' | 'music' | 'stingers';
@@ -46,9 +46,23 @@ export class AudioManager {
         const strength = n.radius >= 15 ? 1 : n.radius >= 4 ? 0.45 : 0.08;
         if (this.samples?.ready) this.sampledStep(strength);
         else playerStep(this.ctx, this.buses.get('sfx')!, strength, this.stepSide);
+        // Very rarely, a step answers yours from behind, a beat too late.
+        if (strength > 0.2 && strength < 1 && this.samples?.ready && this.ctx.currentTime > this.nextEcho) {
+          this.nextEcho = this.ctx.currentTime + 90 + Math.random() * 90;
+          const L = this.listener;
+          const d = sink(this.ctx, this.buses.get('sfx')!, { x: L.x - L.fx * 5, y: L.y - 1.4, z: L.z - L.fz * 5, floorsApart: 0, gain: 0.9 });
+          this.samples.play('step_concrete', d, { gain: 0.6, rate: 0.88, at: this.ctx.currentTime + 0.38 });
+        }
       }),
+      // Your pistol.
+      bus.on('gun:fired', () => {
+        if (!this.ctx || this.ctx.state !== 'running') return;
+        gunshot(this.ctx, this.buses.get('sfx')!);
+        this.silence(0.5, 1.5);
+      }),
+      bus.on('gun:pickup', () => this.samples?.ready && this.samples.play('latch', this.buses.get('sfx')!, { gain: 0.6, rate: 1.7 })),
       bus.on('monster:step', (e) =>
-        this.atMonster(e, (ctx, out, o) => {
+        this.atMonster(e, 1, (ctx, out, o) => {
           const sm = this.samples;
           if (!sm?.ready) return creatureStep(ctx, out, o, e.loud);
           // Heavy bare foot: a slowed fleshy slap on concrete, plus the low body thump (Leo: a
@@ -60,9 +74,9 @@ export class AudioManager {
           creatureStep(ctx, out, { ...o, gain: o.gain * 0.45 }, e.loud);
         }),
       ),
-      bus.on('audio:cue', (c) => this.cue(c.name)),
+      bus.on('audio:cue', (c) => (c.name === 'silence' ? this.silence() : this.cue(c.name))),
       bus.on('monster:vocal', (e) =>
-        this.atMonster(e, (ctx, out, o) =>
+        this.atMonster(e, e.kind === 'giggle' ? 2 : 1, (ctx, out, o) =>
           e.kind === 'breath'
             ? creatureBreath(ctx, out, o)
             : e.kind === 'click'
@@ -77,6 +91,10 @@ export class AudioManager {
                       ? ceilingScrape(ctx, out, o)
                       : e.kind === 'thud'
                         ? wallThud(ctx, out, o)
+                        : e.kind === 'giggle'
+                          ? creatureGiggle(ctx, out, o)
+                          : e.kind === 'knock'
+                            ? wallKnocks(ctx, out, o)
                         : creatureScreech(ctx, out, { ...o, gain: o.gain * 1.4 }),
         ),
       ),
@@ -123,21 +141,26 @@ export class AudioManager {
   }
 
   private listenerFloor = 0;
+  private listener = { x: 0, y: 0, z: 0, fx: 0, fz: 1 };
+  private nextEcho = 60;
   private stepSide = 1;
 
   /** Call every frame with the camera so positional sounds come from the right place. */
   updateListener(pos: { x: number; y: number; z: number }, fwd: { x: number; y: number; z: number }, floor: number) {
     this.listenerFloor = floor;
+    const fl = Math.hypot(fwd.x, fwd.z) || 1;
+    this.listener = { x: pos.x, y: pos.y, z: pos.z, fx: fwd.x / fl, fz: fwd.z / fl };
     if (this.ctx && this.ctx.state === 'running') setListener(this.ctx, pos, fwd);
   }
 
   private atMonster(
     e: { x: number; y: number; z: number; floor: number },
+    maxApart: number,
     play: (ctx: AudioContext, out: AudioNode, o: { x: number; y: number; z: number; floorsApart: number; gain: number }) => void,
   ) {
     if (!this.ctx || this.ctx.state !== 'running') return;
     const apart = Math.abs(e.floor - this.listenerFloor);
-    if (apart > 1) return;
+    if (apart > maxApart) return;
     play(this.ctx, this.buses.get('sfx')!, { x: e.x, y: e.y, z: e.z, floorsApart: apart, gain: 1 });
   }
 
@@ -190,7 +213,20 @@ export class AudioManager {
       sm.play('latch', out, { gain: 0.8, rate: 0.7 });
       sm.play('creak', out, { gain: 0.9, rate: 0.42, at: this.ctx.currentTime + 0.25 });
       sm.play('door_open', out, { gain: 0.6, rate: 0.55, at: this.ctx.currentTime + 0.2 });
-    } else if (name === 'barrel') sm.play('plate_heavy', out, { gain: 0.5, rate: 0.7 });
+    } else if (name === 'silence') this.silence();
+    else if (name === 'barrel') sm.play('plate_heavy', out, { gain: 0.5, rate: 0.7 });
+  }
+
+  /** The ambience drops out (the building holds its breath), then creeps back. */
+  silence(hold = 1.8, back = 2.5) {
+    const g = this.buses.get('ambience');
+    if (!g || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.linearRampToValueAtTime(0.03, t + 0.25);
+    g.gain.setValueAtTime(0.03, t + hold);
+    g.gain.linearRampToValueAtTime(1, t + hold + back);
   }
 
   private fadeAmbience(seconds: number) {

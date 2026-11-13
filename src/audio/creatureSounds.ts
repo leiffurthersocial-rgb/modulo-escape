@@ -492,6 +492,93 @@ export function wallThud(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
   noiseBurst(ctx, d, t, 0.4, 'lowpass', 600, 0.7, 0.8, 0.003);
 }
 
+/**
+ * Robin's giggle, echoing from somewhere else: a quick run of breathy "hee-hee-hah"s, too high
+ * and slightly off, the last one dragging.
+ */
+export function creatureGiggle(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
+  const d = sink(ctx, out, { ...o, gain: o.gain * 1.3 });
+  let t = ctx.currentTime;
+  const n = 5 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) {
+    const last = i === n - 1;
+    const dur = last ? 0.32 : 0.075 + Math.random() * 0.03;
+    const f0 = 430 - i * 14 + (Math.random() - 0.5) * 30;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(f0 * 1.06, t);
+    osc.frequency.exponentialRampToValueAtTime(f0 * (last ? 0.72 : 0.92), t + dur);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.16, t + 0.012);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    // Vowel formants: "ee" for the giggles, "ah" for the last one.
+    for (const [f, q, g] of last ? ([[800, 6, 1], [1250, 8, 0.7]] as const) : ([[330, 6, 0.6], [2300, 9, 1]] as const)) {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = f;
+      bp.Q.value = q;
+      const gg = ctx.createGain();
+      gg.gain.value = g;
+      osc.connect(bp).connect(gg).connect(env);
+    }
+    env.connect(d);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+    noiseBurst(ctx, d, t, dur * 0.8, 'bandpass', 3000, 1.2, 0.05, 0.006); // breath in it
+    t += dur + 0.05 + Math.random() * 0.05;
+  }
+}
+
+/** Leo knocking on a wall, searching: three heavy, slow knocks on concrete. */
+export function wallKnocks(ctx: AudioContext, out: AudioNode, o: SpatialOpts) {
+  const d = sink(ctx, out, { ...o, gain: o.gain * 1.4 });
+  const t0 = ctx.currentTime;
+  const n = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) {
+    const t = t0 + i * (0.42 + Math.random() * 0.12);
+    const th = ctx.createOscillator();
+    th.frequency.setValueAtTime(110, t);
+    th.frequency.exponentialRampToValueAtTime(48, t + 0.18);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.9, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    th.connect(g).connect(d);
+    th.start(t);
+    th.stop(t + 0.3);
+    noiseBurst(ctx, d, t, 0.12, 'bandpass', 420, 1.4, 0.7, 0.002);
+  }
+}
+
+/** Your pistol: a hard crack, a low punch, and a ringing in your ears that fades. */
+export function gunshot(ctx: AudioContext, out: AudioNode) {
+  const t = ctx.currentTime;
+  const g = ctx.createGain();
+  g.gain.value = 1.4;
+  g.connect(out);
+  noiseBurst(ctx, g, t, 0.09, 'highpass', 1400, 0.7, 1.6, 0.001);
+  noiseBurst(ctx, g, t, 0.5, 'lowpass', 900, 0.8, 1.0, 0.002);
+  const th = ctx.createOscillator();
+  th.frequency.setValueAtTime(140, t);
+  th.frequency.exponentialRampToValueAtTime(38, t + 0.25);
+  const tg = ctx.createGain();
+  tg.gain.setValueAtTime(1.3, t);
+  tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+  th.connect(tg).connect(g);
+  th.start(t);
+  th.stop(t + 0.4);
+  // Tinnitus.
+  const ring = ctx.createOscillator();
+  ring.frequency.value = 3900 + Math.random() * 300;
+  const rg = ctx.createGain();
+  rg.gain.setValueAtTime(0.0001, t);
+  rg.gain.linearRampToValueAtTime(0.03, t + 0.25);
+  rg.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+  ring.connect(rg).connect(out);
+  ring.start(t);
+  ring.stop(t + 3.3);
+}
+
 /** Your heartbeat, speeding up: `beats` lub-dubs between `at` and `until`. */
 export function heartbeat(ctx: AudioContext, out: AudioNode, at: number, until: number) {
   let t = at;

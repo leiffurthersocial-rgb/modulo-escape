@@ -10,6 +10,7 @@ export type Action =
   | 'crouch'
   | 'flashlight'
   | 'lookBack'
+  | 'shoot'
   | 'interact'
   | 'pause'
   | 'debug'
@@ -24,6 +25,7 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'crouch', label: 'Crouch' },
   { id: 'flashlight', label: 'Flashlight' },
   { id: 'lookBack', label: 'Look back (hold)' },
+  { id: 'shoot', label: 'Shoot (when you have a gun; also left click)' },
   { id: 'interact', label: 'Interact' },
   { id: 'pause', label: 'Pause' },
   { id: 'debug', label: 'Debug overlay' },
@@ -39,6 +41,7 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   crouch: ['KeyC', 'KeyZ'],
   flashlight: ['KeyF'],
   lookBack: ['KeyQ'],
+  shoot: ['KeyG'],
   interact: ['KeyE'],
   pause: ['Escape', 'KeyP'],
   debug: ['F3', 'Backquote'],
