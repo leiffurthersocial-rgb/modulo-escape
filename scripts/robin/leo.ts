@@ -36,8 +36,8 @@ const rot = (v: V3, k: V3, t: number): V3 => {
 };
 
 /** Eye line and half eye distance (unscaled), for the face photo. */
-const EYE_Y = 2.49;
-const EYE_HALF = 0.05;
+const EYE_Y = 2.52;
+const EYE_HALF = 0.056;
 const HEM_Y = 1.2;
 
 export function buildLeoAnatomy() {
@@ -95,7 +95,7 @@ export function buildLeoAnatomy() {
   carve('chest', [0, 1.7, -0.33], [0.03, 0.3, 0.04], 0.05);
   carve('spine1', [0, 1.35, 0.235], [0.012, 0.25, 0.03], 0.02); // linea alba
   cone('neck1', [0, 1.98, -0.05], 0.17, [0, 2.24, 0.02], 0.135, 0.06);
-  cone('neck2', [0, 2.22, 0.03], 0.13, [0, 2.38, 0.09], 0.1, 0.05);
+  cone('neck2', [0, 2.22, 0.03], 0.13, [0, 2.41, 0.09], 0.105, 0.05);
   // Head: sculpted to match Leo's photo (heads.ts), eyes at EYE_Y.
   buildFaceHead(LEO_FACE, [0, EYE_Y, 0.27], 2 * EYE_HALF, prims);
 
@@ -127,18 +127,6 @@ export function buildLeoAnatomy() {
     ell(`forearm${side}`, add(add(elbow, mul(u, 0.22)), [0, 0, 0.05]), [0.17, 0.3, 0.15], 0.04, wrist);
     ell(`forearm${side}`, add(add(elbow, mul(u, 0.3)), [0, 0, -0.06]), [0.15, 0.32, 0.13], 0.04, wrist);
     ell(`forearm${side}`, add(add(elbow, mul(u, 0.12)), mul(outw, 0.07)), [0.1, 0.18, 0.1], 0.03, wrist);
-    // Raised veins over the forearm.
-    for (const [dz, ph] of [
-      [0.12, 0],
-      [-0.1, 1.7],
-    ] as const) {
-      let p = add(add(elbow, mul(u, 0.12)), [0, 0, dz]);
-      for (let i = 0; i < 6; i++) {
-        const q = add(add(p, mul(u, 0.1)), [0, 0, -0.012 * Math.sin(i * 1.3 + ph)]);
-        cone(`forearm${side}`, add(p, mul(norm(X([-0.866, -0.5, 0])), -0.05)), 0.011, add(q, mul(norm(X([-0.866, -0.5, 0])), -0.05)), 0.011, 0.012);
-        p = q;
-      }
-    }
     // Hand: palm faces the thigh (n), fingers spread along ±z. Thick, short fingers; blunt claws.
     const n: V3 = norm(X([-0.866, -0.5, 0]));
     const zA: V3 = [0, 0, 1];
@@ -156,7 +144,7 @@ export function buildLeoAnatomy() {
       const knuckle = add(add(wrist, mul(u, 0.2)), mul(zA, f.dz));
       let dir = norm(add(u, mul(zA, f.dz * 1.2)));
       const curlAxis = norm(cross(dir, n));
-      sphere(`hand${side}`, add(knuckle, mul(n, -0.01)), 0.042, 0.02);
+      sphere(`hand${side}`, add(knuckle, mul(n, -0.016)), 0.046, 0.009);
       let p = knuckle;
       let r = 0.036;
       for (let j = 0; j < 3; j++) {
@@ -165,7 +153,7 @@ export function buildLeoAnatomy() {
         bone(bn, j === 0 ? `hand${side}` : `${f.name}${j}${side}`, p);
         const q = add(p, mul(dir, f.len[j]!));
         const r2 = r * 0.9;
-        cone(bn, p, r, q, r2, 0.012);
+        cone(bn, p, r, q, r2, 0.006);
         if (j < 2) sphere(bn, q, r2 * 1.1, 0.01);
         else cone(bn, add(add(p, mul(dir, f.len[j]! * 0.4)), mul(n, -r2 * 0.75)), r2 * 0.7, add(add(q, mul(dir, 0.022)), mul(n, 0.004)), 0.004, 0.006, 'nail');
         p = q;

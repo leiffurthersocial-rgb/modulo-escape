@@ -71,7 +71,7 @@ export const LEO_FACE: FaceParams = {
   chinW: 1.15,
   ear: 1.0,
   skull: [1.06, 1.0, 1.0],
-  hair: { vol: [1.42, 1.56, 1.66], centre: [0, 0.62, -1.24], front: 1.18, side: 0.35, back: -1.25, mess: 0.75 },
+  hair: { vol: [1.4, 1.55, 1.6], centre: [0, 0.62, -1.3], front: 1.18, side: 0.35, back: -1.25, mess: 0.75 },
 };
 
 export const ROBIN_FACE: FaceParams = {
@@ -156,5 +156,5 @@ export function buildFaceHead(f: FaceParams, origin: V3, D: number, prims: Prim[
   const h = f.hair;
   if (!h) return;
   const clip: HairClip = { origin, D, front: h.front, side: h.side, back: h.back, mess: h.mess };
-  push({ kind: 'ell', a: P(h.centre), b: P([h.centre[0], h.centre[1] + 1, h.centre[2]]), ra: 0, rb: 0, r: [h.vol[0] * D, h.vol[1] * D, h.vol[2] * D], k: 0.06 * D, region: 'hair', clip });
+  push({ kind: 'ell', a: P(h.centre), b: P([h.centre[0], h.centre[1] + 1, h.centre[2]]), ra: 0, rb: 0, r: [h.vol[0] * D, h.vol[1] * D, h.vol[2] * D], k: 0.12 * D, region: 'hair', clip });
 }
