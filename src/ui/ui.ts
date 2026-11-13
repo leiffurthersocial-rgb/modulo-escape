@@ -382,6 +382,14 @@ export class UI {
       return [h('label', {}, label), h('div', { class: 'row', style: 'flex-wrap:nowrap' }, input)];
     };
     const list = h('div', { style: 'display:flex;flex-direction:column;gap:8px' });
+    const gunInfo = h('p', {}, '');
+    const inf = h('input', { type: 'checkbox', checked: game.guns.infinite, style: 'width:22px;height:22px;accent-color:var(--accent)' });
+    inf.addEventListener('change', () => (game.guns.infinite = inf.checked));
+    const gunTick = [h('label', {}, 'Infinite ammo (the gun is never spent)'), h('div', { class: 'row', style: 'flex-wrap:nowrap' }, inf)];
+    const renderGun = () => {
+      const n = game.guns.positions.length;
+      gunInfo.textContent = `${game.guns.held ? 'You have a gun. ' : 'No gun in hand. '}${n} lying around${n ? ` (floors ${[...new Set(game.guns.positions.map((p) => (p.floor === 0 ? 'E' : p.floor)))].join(', ')})` : ''}.`;
+    };
     const render = () => {
       list.replaceChildren();
       for (const m of game.debugMonsters) {
@@ -413,7 +421,8 @@ export class UI {
       }
     };
     render();
-    const timer = setInterval(() => (wrap.isConnected ? !wrap.hidden && render() : clearInterval(timer)), 1000);
+    renderGun();
+    const timer = setInterval(() => (wrap.isConnected ? !wrap.hidden && (render(), renderGun()) : clearInterval(timer)), 1000);
     wrap.append(
       h(
         'div',
@@ -422,6 +431,16 @@ export class UI {
         ...tick('Can’t be caught', 'noCatch'),
         ...tick('Freeze all monsters', 'freeze'),
       ),
+      h('h3', {}, 'Gun'),
+      gunInfo,
+      h(
+        'div',
+        { class: 'row' },
+        h('button', { onclick: () => (game.guns.give(), resume()) }, 'Give me a gun'),
+        h('button', { onclick: () => (game.guns.dropNear(game.player), resume()) }, 'Drop a gun here'),
+        h('button', { onclick: () => (game.debugToGun() ? resume() : this.toast('No gun lying around right now')) }, 'Go to the nearest gun'),
+      ),
+      h('div', { class: 'field' }, ...gunTick),
       h('h3', {}, 'Monsters'),
       list,
       h(

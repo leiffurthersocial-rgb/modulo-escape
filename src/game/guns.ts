@@ -109,20 +109,48 @@ export class Guns {
       // Off-centre in the cell, on the floor, lying on its side at a random angle.
       pos.x += (this.rng.next() - 0.5) * 1.6;
       pos.z += (this.rng.next() - 0.5) * 1.6;
-      const o = new THREE.Group();
-      const gun = this.template.clone();
-      gun.scale.multiplyScalar(1.2);
-      gun.rotation.set(Math.PI / 2, 0, this.rng.next() * Math.PI * 2);
-      const glint = new THREE.Sprite(this.glintMat);
-      glint.scale.setScalar(0.1);
-      glint.position.set(0.04, 0.09, 0.02);
-      o.add(gun, glint);
-      o.position.set(pos.x, pos.y + 0.03, pos.z);
-      this.group.add(o);
-      this.pickups.push({ object: o, pos: pos.clone(), floor });
+      this.place(pos, floor);
       return true;
     }
     return false;
+  }
+
+  /** Lay a gun on the floor at `pos`. */
+  private place(pos: THREE.Vector3, floor: number) {
+    const o = new THREE.Group();
+    const gun = this.template.clone();
+    gun.scale.multiplyScalar(1.2);
+    gun.rotation.set(Math.PI / 2, 0, this.rng.next() * Math.PI * 2);
+    const glint = new THREE.Sprite(this.glintMat);
+    glint.scale.setScalar(0.1);
+    glint.position.set(0.04, 0.09, 0.02);
+    o.add(gun, glint);
+    o.position.set(pos.x, pos.y + 0.03, pos.z);
+    this.group.add(o);
+    this.pickups.push({ object: o, pos: pos.clone(), floor });
+  }
+
+  // ── debug ──
+  /** Never spent: fire as often as you like. */
+  infinite = false;
+  /** Put a loaded gun in your hand. */
+  give() {
+    if (this.held) return;
+    this.held = true;
+    this.view.visible = true;
+    bus.emit('gun:held', { held: true });
+  }
+  /** Drop a gun on the floor a step in front of you (walk onto it to pick it up). */
+  dropNear(player: Player) {
+    const fwd = player.camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
+    const pos = player.feet.clone().addScaledVector(fwd, 1.6);
+    this.place(pos, player.floor);
+  }
+  /** Where the nearest gun lies (your floor first), or null. */
+  nearest(player: Player): { x: number; z: number; floor: number } | null {
+    const by = (g: Pickup) => Math.hypot(g.pos.x - player.feet.x, g.pos.z - player.feet.z) + Math.abs(g.floor - player.floor) * 1000;
+    const g = [...this.pickups].sort((a, b) => by(a) - by(b))[0];
+    return g ? { x: g.pos.x, z: g.pos.z, floor: g.floor } : null;
   }
 
   update(dt: number, player: Player) {
@@ -164,7 +192,7 @@ export class Guns {
   /** Pull the trigger. Returns the monster hit, if any. */
   fire(player: Player, monsters: Monster[]): Monster | null {
     if (!this.held) return null;
-    this.held = false;
+    this.held = this.infinite;
     this.recoil = 1;
     this.flashT = 0.07;
     // Show the flash on this very frame (update() already ran).
@@ -172,7 +200,7 @@ export class Guns {
     this.muzzle.scale.setScalar(0.22);
     this.flash.intensity = 60;
     this.view.rotation.set(0.5, Math.PI / 2, 0);
-    bus.emit('gun:held', { held: false });
+    if (!this.infinite) bus.emit('gun:held', { held: false });
     const eye = player.camera.position;
     const fwd = player.camera.getWorldDirection(new THREE.Vector3());
     let best: Monster | null = null;
@@ -199,7 +227,7 @@ export class Guns {
     const p = player.feet;
     bus.emit('gun:fired', { x: eye.x, y: eye.y, z: eye.z, hit: best?.id ?? null });
     bus.emit('noise', { x: p.x, y: p.y, z: p.z, floor: player.floor, radius: 40, source: 'player' });
-    this.respawnAt.push(this.time + RESPAWN[0] + this.rng.next() * (RESPAWN[1] - RESPAWN[0]));
+    if (!this.infinite) this.respawnAt.push(this.time + RESPAWN[0] + this.rng.next() * (RESPAWN[1] - RESPAWN[0]));
     return best;
   }
 

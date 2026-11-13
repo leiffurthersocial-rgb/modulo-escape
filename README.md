@@ -87,8 +87,8 @@ Esc/P to pause · F3 for the debug overlay · F4 for the debug menu (mood, mater
 - **Sound:** procedural HVAC drone that tightens as the monster gets close, your footsteps, and
   positional monster steps and screams. No audio files.
 - **Debug mode:** press pause three times quickly (button, Esc, or tap "Paused") to unlock a
-  Debug tab: invisible, can't be caught, freeze monsters, per-monster on/off / wake / bring to me /
-  scare me, teleport to the exit.
+  Debug tab: invisible, can't be caught, freeze monsters, gun (give / drop here / go to nearest /
+  infinite ammo), per-monster on/off / wake / bring to me / scare me, teleport to the exit.
 - **Settings:** graphics presets, material comparison (Settings → Materials), monster on/off,
   key rebinding.
 

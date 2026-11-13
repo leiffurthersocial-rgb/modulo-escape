@@ -371,7 +371,18 @@ export class Game {
     e.m.teleport(this.nav.nodePos(best), this.player.floor, p.clone());
   }
   /** Debug: stand in front of the exit gate. */
-  debugToExit() {
+  /** Debug: stand next to the nearest gun on the floor. */
+  debugToGun(): boolean {
+    const g = this.guns.nearest(this.player);
+    if (!g) return false;
+    const lvl = this.building.floors[g.floor]!;
+    this.player.teleport(g.x + 1.4, g.z, this.player.yaw, -0.5, lvl.elevation);
+    this.player.floor = g.floor;
+    this.player.yaw = Math.atan2(1.4, 0);
+    this.updateFloors(true);
+    return true;
+  }
+    debugToExit() {
     const ex = this.building.exit;
     const lvl = this.building.floors[ex.floor]!;
     const c = cellCenter(lvl, ex.x, ex.z);
